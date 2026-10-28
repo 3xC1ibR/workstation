@@ -113,6 +113,7 @@ test("scatter renders observations with and without optional color or injected s
   const env = environment(t), doc = fixture();
   const instance = env.create(doc);
   assert.equal(marks(chart(instance), "dot").length, 2);
+  assert.ok([...marks(chart(instance), "dot")].every(mark => +mark.getAttribute("r") === 4.3), "Unscaled observation marks retain their declared pixel radius");
   assert.ok(shadow(instance).querySelector("style").textContent.length > 100);
   instance.dispose();
   delete doc.views[0].color;
@@ -209,6 +210,30 @@ test("size-sorted scatter marks retain the entity identity at the clicked positi
   const coordinates = {bubbles: true, clientX: +highestMeasurement.getAttribute("cx"), clientY: +highestMeasurement.getAttribute("cy")};
   highestMeasurement.dispatchEvent(new env.window.MouseEvent("click", coordinates));
   assert.deepEqual(plain(instance.getState().selected), ["b"]);
+});
+
+test("bubble area is proportional to value and remains fixed across time, filters, and selection", t => {
+  const env = environment(t), doc = fixture();
+  doc.dataset.fields.push({key: "sample_size", label: "Sample size", type: "number"});
+  doc.dataset.rows.forEach(row => { row.sample_size = (row.entity === "a" ? 1 : 4) * (row.year === 2028 ? 4 : 1); });
+  doc.views[0].size = "sample_size";
+  const instance = env.create(doc);
+  const radii = () => [...marks(chart(instance), "dot")].map(mark => +mark.getAttribute("r")).sort((a, b) => a - b);
+  const latest = radii();
+  assert.equal(latest[1] ** 2 / latest[0] ** 2, 4, "Four times the value must occupy four times the area");
+  instance.seek(2020);
+  assert.equal(radii()[1], latest[0], "The same value has the same area at a different observed time");
+  instance.setState({filters: {group: ["Production"]}});
+  assert.deepEqual(radii(), [latest[0]], "Filtering out other values must not rescale retained bubbles");
+  instance.select("b");
+  assert.deepEqual(radii(), [latest[0]], "Selection must not distort a quantitative area encoding");
+  instance.dispose();
+  doc.dataset.rows.filter(row => row.year === 2020).forEach(row => { row.sample_size = row.entity === "a" ? null : -1; });
+  const missing = env.create(doc);
+  missing.seek(2020);
+  assert.equal(shadow(missing).querySelectorAll('.plot circle').length, 0);
+  assert.match(shadow(missing).textContent, /No observations in this view/);
+  assert.match(shadow(missing).textContent, /2 excluded/);
 });
 
 test("clicking a category bar applies the matching shared filter", t => {
