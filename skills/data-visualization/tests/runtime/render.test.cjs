@@ -138,8 +138,8 @@ test("line renders full history and preserves a measured null as a gap", t => {
   const env = environment(t), instance = env.create();
   instance.setState({view: "line"});
   const paths = [...marks(chart(instance), "line")];
-  assert.equal(paths.length, 2);
-  assert.ok(paths.some(element => (element.getAttribute("d").match(/M/g) || []).length === 2), "A missing interior observation must break its series");
+  assert.equal(paths.length, 1, "Only Alpha has adjacent measured observations; Beta’s isolated points must not be joined");
+  assert.equal(marks(chart(instance), "dot").length, 5, "All measured points remain visible on both sides of the missing value");
   assert.deepEqual(env.errors, []);
 });
 
@@ -589,4 +589,41 @@ test("undo restores focus context and repeated-entity record navigation retains 
   assert.equal(instance.audit().panel, 'inspect');
   assert.equal(shadow(instance).querySelectorAll('[data-time-cursor]').length, 1);
   assert.equal(instance.focusCohort('group', 'Unknown group'), false);
+});
+
+test("sampled steps and sparse markers preserve exact selection and explicit gap guides", t => {
+  const env=environment(t),doc=fixture();
+  doc.dataset.rows=[[2020,2],[2021,2],[2022,2],[2023,3],[2030,4],[2031,4]].map(([year,value])=>({entity:"a",name:"Alpha",year,value,group:"Research"}));
+  Object.assign(doc.views[1],{curve:"step-after",points:"changes",maxGap:5,gapStyle:"dashed",clip:true,yReverse:true,yDomain:[1,5]});
+  const instance=env.create(doc,{state:{view:"line"}}),svg=chart(instance);
+  assert.ok(svg.querySelector('[aria-description="Unsampled interval"]'),"Long unsampled intervals must be distinct");
+  assert.ok(svg.querySelector('clipPath'),"An explicit rank window clips off-window geometry");
+  assert.equal(marks(svg,"dot").length,5);
+  const positions=[...marks(svg,"dot")].map(position);
+  assert.ok(positions[0].y<positions.at(-1).y,"Rank 1 is above larger rank numbers");
+  const last=[...marks(svg,"dot")].at(-1); last.dispatchEvent(new env.window.MouseEvent("click",{bubbles:true}));
+  assert.equal(instance.getState().time,2031,"Sparse marker selection maps to the actual source record");
+  assert.equal(instance.getRows().length,6,"Marker reduction never removes observations from export");
+  assert.deepEqual(env.errors,[]);
+});
+
+test("focused ranges stay fixed across time and live load preserves navigation and presentation", t => {
+  const env=environment(t),doc=fixture();
+  doc.views[0].detailView="line"; doc.views[1].domainScope="cohort";
+  const instance=env.create(doc); instance.select("a");
+  const parent=plain(instance.getState());
+  assert.equal(instance.focusEntity("a"),true);
+  const domain=()=>plain(chart(instance).scale("y").domain);
+  assert.deepEqual(domain(),[2,8]);
+  instance.seek(2020); assert.deepEqual(domain(),[2,8]);
+  instance.setPresentation("sources");
+  const refreshed=fixture();refreshed.views=doc.views;
+  refreshed.dataset.rows.push({entity:"a",name:"Alpha",year:2032,value:16,group:"Research"});
+  instance.load(refreshed,{preserveState:true});
+  assert.equal(instance.audit().depth,1);assert.equal(instance.audit().presentation,"sources");
+  assert.equal(instance.getState().time,2020);
+  instance.back(); assert.deepEqual(domain(),[2,16]);
+  instance.back(); assert.deepEqual(plain(instance.getState()),parent);
+  instance.load(refreshed);assert.equal(instance.audit().depth,0);assert.equal(instance.getState().time,2032);
+  assert.deepEqual(env.errors,[]);
 });

@@ -9,7 +9,7 @@
   --view-choice-width:250px; --time-label-width:140px; --play-width:64px; --panel-heading-height:110px; --source-width:1100px; --caption-width:700px;
   --page-width:1680px; --panel-width:320px; --chart-height:max(360px,calc(100svh - 250px)); --table-height:65svh;
   --range-height:24px; --range-track:1px; --range-thumb-width:8px; --range-thumb-height:12px;
-  --mark-radius:3.5; --mark-selected-radius:5;
+  --mark-radius:3.5; --mark-selected-radius:5; --context-opacity:.55; --selection-context-opacity:.18;
   --motion-duration:420ms; --motion-panel:260ms; --motion-distance:8px; --motion-easing:cubic-bezier(.22,1,.36,1);
   --body-font:"IBM Plex Mono",ui-monospace,Menlo,"Courier New",monospace;
   --display-font:"Helvetica Neue",Helvetica,Arial,sans-serif; --mono-font:var(--body-font);

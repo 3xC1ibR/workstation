@@ -72,3 +72,5 @@ Suggested acceptance checks for a new dataset:
 ## Operational limits
 
 The browser runtime materializes the dataset and renders with SVG through pinned Observable Plot and D3. Use measured limits for a particular dataset; do not advertise million-row interactive performance from these small examples. The importer defaults to 100,000 rows as a protective limit, not a promised render capacity. Large-data SQL, WebGL, remote connectors, continuous streaming, geographic maps, and video encoding need explicit host adapters and separate validation.
+
+For periodically sampled ranks or measurements, use the sampled-trajectory options in [specification.md](specification.md). Preserve original observation rows and coverage before reducing visible markers. Use an explicit overview domain plus `detailView` when an entrant's earlier outlier would compress the main comparison; let the detail use `domainScope:"cohort"` so its range follows the selected entities without changing during playback. For a live archive, embed the shared runtime and use the state-preserving load contract in [runtime-api.md](runtime-api.md); export the same declarative document through the compiler.

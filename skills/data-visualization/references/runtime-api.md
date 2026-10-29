@@ -75,3 +75,9 @@ PLAYWRIGHT_MODULE=/path/to/node_modules/playwright \
 ```
 
 Set `CHROME_PATH` for a different Chrome executable and `DATA_VISUALIZATION_TEST_OUTPUT` for screenshot/report output outside the source tree. Always inspect the screenshots; numerical and DOM tests cannot grade visual clarity.
+
+## Live host refresh
+
+Use `load(nextDocument, {preserveState:true})` to refresh an archive while retaining selection, query, representation, open sheet, focus ancestry, and undo context. Context states are normalized against the replacement document. Playback stops on load; hosts should defer automatic refresh while `audit().playing` is true. To follow newly arriving records only when appropriate, compare the old cursor with the old final frame before loading, and seek the new final frame only if the user was already following the latest observation. A reset load clears navigation and returns to the chart.
+
+The leaderboard host in `/opt/projects/open-kernel-challenge/leaderboard_observatory/` is a real embedding specimen: it serves these assets directly, maps retained SQLite observations to the document grammar, and compiles the same document to offline HTML. Its collector and board selection remain host responsibilities. Its full-history workload was checked at roughly 7,500 records and 860 visible markers; this is a measured specimen size, not a general performance guarantee.

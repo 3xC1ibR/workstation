@@ -168,6 +168,13 @@
         }
       }
       if (view.timeMode !== undefined && view.timeMode !== "all") fail(path + ".timeMode must be all when specified");
+      if (view.domainScope !== undefined && !["dataset", "cohort"].includes(view.domainScope)) fail(path + ".domainScope must be dataset or cohort");
+      for (const key of ["xReverse", "yReverse", "clip"]) if (view[key] !== undefined && typeof view[key] !== "boolean") fail(path + "." + key + " must be boolean");
+      if (view.curve !== undefined && (view.type !== "line" || !["linear", "step-after", "step-before"].includes(view.curve))) fail(path + ".curve must be linear, step-after, or step-before on a line view");
+      if (view.points !== undefined && (view.type !== "line" || !["all", "changes"].includes(view.points))) fail(path + ".points must be all or changes on a line view");
+      if (view.maxGap !== undefined && (view.type !== "line" || !finite(view.maxGap) || view.maxGap <= 0 || !["number", "date"].includes(fields.get(view.x)?.type))) fail(path + ".maxGap requires a positive numeric distance on a numeric or date line axis");
+      if (view.gapStyle !== undefined && (!view.maxGap || !["break", "dashed"].includes(view.gapStyle))) fail(path + ".gapStyle requires maxGap and must be break or dashed");
+      if (view.detailView !== undefined && typeof view.detailView !== "string") fail(path + ".detailView must name a full-history line view");
       if (view.columns !== undefined) {
         if (!Array.isArray(view.columns)) fail(path + ".columns must be an array");
         view.columns.forEach(key => reference(key, path + ".columns"));
@@ -183,6 +190,10 @@
         });
       }
     });
+    for (const view of doc.views) if (view.detailView !== undefined) {
+      const detail = doc.views.find(candidate => candidate.id === view.detailView);
+      if (!detail || detail.type !== "line" || detail.timeMode !== "all" || detail.x !== doc.time?.field) fail("detailView must reference a full-history line with x equal to the observed-time field");
+    }
     if (doc.filters !== undefined) {
       if (!Array.isArray(doc.filters)) fail("filters must be an array");
       doc.filters.forEach((filter, index) => {
@@ -366,6 +377,45 @@
     return String(value);
   }
 
+  // Geometry is derived from source records, never synthetic observations.
+  // Null measurements always break a line; long intervals may get a dashed guide.
+  function lineGeometry(doc, view, rows, cursor = null) {
+    const fields = fieldMap(doc), series = view.series || view.color || doc.dataset.entityKey;
+    const groups = new Map(), segments = [], points = new Set();
+    const ordinal = new Map([...new Set(doc.dataset.rows.map(row => row[view.x]).filter(value => value != null))].map((value, index) => [value, index]));
+    const numericX = ["number", "date"].includes(fields.get(view.x)?.type);
+    const numericY = ["number", "date"].includes(fields.get(view.y)?.type);
+    const x = row => numericX ? coordinate(fields.get(view.x), row[view.x]) : ordinal.get(row[view.x]);
+    const y = row => numericY ? coordinate(fields.get(view.y), row[view.y]) : row[view.y];
+    const valid = row => row[view.y] != null && (!numericY || Number.isFinite(y(row))) && (view.yScale !== "log" || y(row) > 0);
+    for (const row of rows) if (Number.isFinite(x(row)) && (view.xScale !== "log" || x(row) > 0)) {
+      const key = row[series]; if (!groups.has(key)) groups.set(key, []); groups.get(key).push(row);
+    }
+    for (const entries of groups.values()) {
+      entries.sort((a, b) => x(a) - x(b));
+      let run = [], previous = null;
+      const finish = () => {
+        if (!run.length) return;
+        if (run.length > 1) segments.push({rows: run, gap: false});
+        points.add(run[0]); points.add(run.at(-1)); run = [];
+      };
+      for (const row of entries) {
+        if (!valid(row)) { finish(); previous = null; continue; }
+        if (previous && view.maxGap && x(row) - x(previous) > view.maxGap) {
+          finish();
+          if (view.gapStyle === "dashed") segments.push({rows: [previous, row], gap: true});
+        }
+        if (view.points !== "changes" || !previous || y(row) !== y(previous)) {
+          points.add(row); if (previous) points.add(previous);
+        }
+        if (doc.time && coordinate(fields.get(doc.time.field), row[doc.time.field]) === coordinate(fields.get(doc.time.field), cursor)) points.add(row);
+        run.push(row); previous = row;
+      }
+      finish();
+    }
+    return {segments, points: [...points]};
+  }
+
   function serializeState(doc, state) { return JSON.stringify(normalizeState(doc, state)); }
   function deserializeState(doc, value) {
     if (typeof value !== "string") throw new TypeError("Saved exploration state must be a JSON string");
@@ -382,5 +432,5 @@
 
   return Object.freeze({validate, fieldMap, fields: fieldMap, frames, createState, normalizeState,
     cohortRows, selectedRows, summarize, stableDomain, formatValue, serializeState, deserializeState,
-    registerViewType, isViewTypeRegistered});
+    registerViewType, isViewTypeRegistered, lineGeometry});
 });

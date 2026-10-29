@@ -315,3 +315,33 @@ test("local source provenance uses a title and SHA-256 checksum without inventin
   doc.dataset.sources[0].url = "javascript:alert(1)";
   assert.throws(() => Core.validate(doc), /HTTP or HTTPS/);
 });
+
+test("sampled line geometry preserves records, null breaks, long gaps and changed endpoints", () => {
+  const doc = fixture(), view = {type:"line",x:"year",y:"value",series:"entity",maxGap:5,gapStyle:"dashed",points:"changes"};
+  doc.dataset.rows = [[0,2],[1,2],[2,2],[3,4],[4,null],[5,6],[20,8],[21,8],[22,8]].map(([year,value])=>({entity:"a",year,value}));
+  const original = JSON.stringify(doc);
+  const geometry = Core.lineGeometry(doc,view,doc.dataset.rows,21);
+  assert.deepEqual(geometry.segments.map(segment=>[segment.gap,segment.rows.map(row=>row.year)]),[[false,[0,1,2,3]],[true,[5,20]],[false,[20,21,22]]]);
+  assert.deepEqual(geometry.points.map(row=>row.year).sort((a,b)=>a-b),[0,2,3,5,20,21,22]);
+  assert.ok(geometry.points.every(row=>doc.dataset.rows.includes(row)),"Markers refer to source records");
+  assert.equal(JSON.stringify(doc),original);
+  assert.equal(Core.lineGeometry(doc,{...view,gapStyle:"break"},doc.dataset.rows).segments.some(segment=>segment.gap),false);
+});
+
+test("sampled geometry supports date gaps in milliseconds and categorical axes", () => {
+  const doc = datedFixture(), view = {type:"line",x:"year",y:"value",maxGap:86400000,gapStyle:"dashed"};
+  const geometry = Core.lineGeometry(doc,view,doc.dataset.rows);
+  assert.equal(geometry.segments.filter(segment=>segment.gap).length,1);
+  const ordinal = {type:"line",x:"group",y:"name",series:"entity"};
+  assert.ok(Core.lineGeometry(doc,ordinal,doc.dataset.rows).segments.length>0);
+});
+
+test("sampled view options validate types, domains and meaningful history references", () => {
+  const doc = fixture();
+  doc.views[0] = {...doc.views[0],type:"line",timeMode:"all",curve:"step-after",points:"changes",maxGap:5,gapStyle:"dashed",domainScope:"cohort",yReverse:true,clip:true,detailView:"measurements"};
+  assert.doesNotThrow(()=>Core.validate(doc));
+  for (const patch of [{curve:"spline"},{maxGap:0},{maxGap:"5"},{gapStyle:"smooth"},{points:"sample"},{domainScope:"frame"},{yReverse:1},{clip:"true"},{detailView:"table"}]) {
+    const invalid = structuredClone(doc); Object.assign(invalid.views[0],patch);
+    assert.throws(()=>Core.validate(invalid),JSON.stringify(patch));
+  }
+});

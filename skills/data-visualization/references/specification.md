@@ -51,3 +51,17 @@ The default visual grammar matches system-drawings: pure white, black ink, monos
 For scatter and line points, `size` encodes a nonnegative quantitative field as circle area. Its square-root radius scale uses the full-source maximum, stays fixed across time and filters, and is unaffected by selection. Zero has zero area; missing or negative sizes do not produce a point. The size value appears in the mark tooltip. Without `size`, points use categorical symbols with a constant nominal radius and a larger selection highlight; charts without categories use circles.
 
 All metadata is plain text. External source links must be HTTP or HTTPS. Dataset links may also be relative paths. The compiler must encode JSON `<` as `\u003c` before embedding in a script element. HTML export includes local pinned rendering libraries, stylesheet, runtime, core, and data. A complete export makes no network requests.
+
+## Sampled trajectories and focused scales
+
+Line views accept `curve: "linear"` (default), `"step-after"`, or `"step-before"`. Steps represent sampled values, not known transition times. `maxGap` is a positive interval in x units (milliseconds for dates). Adjacent observations farther apart end the solid segment; `gapStyle: "break"` leaves the interval empty, while `"dashed"` adds a straight guide between the original endpoints. Null measurements always break a line and never receive a guide across the null. Explain the threshold and coverage in the caption or methodology. Uncertainty bands retain their existing behavior; these line options describe the central trajectory.
+
+`points: "changes"` reduces visible markers to segment endpoints, both sides of a measurement change, and actual records at the cursor. `"all"` is the default. All source rows remain in tables, counts, evidence, and CSV; this is a rendering choice, not statistical downsampling. Do not claim that a guide or an interpolated screen position is an observation.
+
+`xReverse` / `yReverse` reverse an axis without changing its data or declared ascending domain. `clip: true` clips lines, markers, and endpoint labels to the drawing rectangle, useful for a rank window. `domainScope: "cohort"` derives numeric/date domains from the full history of the current filters and search, ignoring time and region brushes; axes remain fixed during playback. The default `"dataset"` continues to use the full dataset. Explicit axis domains take priority. Cohort scope affects quantitative chart axes and uncertainty bounds; bar aggregates retain their full-dataset scale.
+
+`detailView` names a full-history line view whose x is the document's time field. The inspector's Open observed history action uses it rather than the first history view. This supports a clipped overview with a full-range detail, or keeps speedup inspection on speedup instead of switching to rank.
+
+```json
+{"id":"rank-overview","type":"line","x":"observed_at","y":"rank","series":"team","timeMode":"all","curve":"step-after","maxGap":900000,"gapStyle":"dashed","points":"changes","yDomain":[1,55],"yReverse":true,"clip":true,"detailView":"rank-history"}
+```

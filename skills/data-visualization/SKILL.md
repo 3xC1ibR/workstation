@@ -5,7 +5,7 @@ description: Create portable interactive data explorations, statistical plots, l
 
 # Data Visualization
 
-Turn a question and its evidence into an explorable instrument. Author an `exploration.json`; the bundled engine provides the interface, charting, time controls, source inspection, and export. A resulting HTML file includes its renderer and data and works offline.
+Turn a question and its evidence into an explorable instrument. Author an `exploration.json`; the bundled engine provides the interface, charting, time controls, source inspection, and export. A resulting HTML file includes its renderer and data and works offline. Sampled trajectories can declare step curves, unsampled gaps, change markers, reversed axes, and full-range focused histories; live hosts can refresh data without losing the current exploration. See [the document grammar](references/specification.md) and [embedding API](references/runtime-api.md).
 
 The sibling relationship to system-drawings includes its authoring architecture, exploration model, and minimalist 1970s NASA/IBM visual language: white paper, fine black rules, compact uppercase titles, monospace lettering, and plain square controls. Start with the drawing. A selected mark reveals its data sheet; useful cohorts and repeated entities can open focused views with an exact return path. Reveal filters, guided questions, and export controls through Explore. Keep charts monochrome; distinguish categories with stable symbols, open/filled marks, line patterns, and labels. Use the shared theme in `assets/style.css`. Choose statistical encodings for data; do not force quantitative comparisons into three-dimensional solids.
 
