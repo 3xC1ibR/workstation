@@ -107,7 +107,7 @@ def build(document):
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <meta name="description" content="{html.escape(document.get('subtitle',''),quote=True)}"><title>{title}</title>
 <style id="data-exploration-style">{css}</style>
-<style>body{{margin:0;background:#f7f6f2}}noscript{{display:block;padding:2rem;font:16px sans-serif}}</style></head>
+<style>body{{margin:0}}noscript{{display:block;padding:2rem;font:16px sans-serif}}</style></head>
 <body><noscript>This interactive exploration requires JavaScript. The accompanying observations.csv contains the source observations.</noscript>
 <main id="exploration"></main><script id="exploration-document" type="application/json">{data}</script>
 <script>{javascript}

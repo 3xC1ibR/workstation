@@ -108,17 +108,23 @@ function chart(instance) {
   return svg;
 }
 function marks(svg, label) { return svg.querySelectorAll('g[aria-label="' + label + '"] circle, g[aria-label="' + label + '"] rect, g[aria-label="' + label + '"] path'); }
+function position(mark) {
+  if (mark.hasAttribute("cx")) return {x: +mark.getAttribute("cx"), y: +mark.getAttribute("cy")};
+  const match = mark.getAttribute("transform").match(/translate\(([-.\d]+)[, ]+([-.\d]+)\)/);
+  assert.ok(match, "Symbol must have an observed position");
+  return {x: +match[1], y: +match[2]};
+}
 
 test("scatter renders observations with and without optional color or injected styles", t => {
   const env = environment(t), doc = fixture();
   const instance = env.create(doc);
   assert.equal(marks(chart(instance), "dot").length, 2);
-  assert.ok([...marks(chart(instance), "dot")].every(mark => +mark.getAttribute("r") === 4.3), "Unscaled observation marks retain their declared pixel radius");
   assert.ok(shadow(instance).querySelector("style").textContent.length > 100);
   instance.dispose();
   delete doc.views[0].color;
   const fallback = env.create(doc, {styles: ""});
   assert.equal(marks(chart(fallback), "dot").length, 2);
+  assert.ok([...marks(chart(fallback), "dot")].every(mark => +mark.getAttribute("r") === 3.5), "Unscaled observation circles retain their declared pixel radius");
   assert.deepEqual(env.errors, []);
 });
 
@@ -129,6 +135,24 @@ test("line renders full history and preserves a measured null as a gap", t => {
   assert.equal(paths.length, 2);
   assert.ok(paths.some(element => (element.getAttribute("d").match(/M/g) || []).length === 2), "A missing interior observation must break its series");
   assert.deepEqual(env.errors, []);
+});
+
+test("monochrome categories retain distinct symbols across time and filtering, and open bars retain outlines", t => {
+  const env = environment(t), instance = env.create();
+  const shapes = () => [...marks(chart(instance), "dot")].map(mark => mark.getAttribute("d"));
+  const initial = shapes();
+  assert.equal(new Set(initial).size, 2, "Categories must remain distinguishable without color");
+  instance.seek(2020);
+  assert.deepEqual(shapes(), initial, "Time must not reassign category symbols");
+  instance.setState({filters: {group: ["Research"]}});
+  assert.deepEqual(shapes(), [initial[0]], "A filtered category keeps its original symbol");
+  const symbol = marks(chart(instance), "dot")[0];
+  symbol.dispatchEvent(new env.window.MouseEvent("click", {bubbles: true}));
+  assert.deepEqual(plain(instance.getState().selected), ["a"], "Symbol paths retain record selection");
+  instance.setState({view: "bar", filters: {}, selected: []});
+  const bars = [...marks(chart(instance), "bar")];
+  assert.ok(bars.some(mark => mark.getAttribute("fill") === "#fff"), "At least one category has a white fill");
+  assert.ok(bars.every(mark => (mark.getAttribute("stroke") || mark.parentNode.getAttribute("stroke")) === "#111"), "White-filled bars remain visible through their outlines");
 });
 
 test("bar and histogram produce quantitative marks and table view exposes records", t => {
@@ -175,7 +199,7 @@ test("time scrub, category filter, search, and undo update one shared cohort", t
 test("clicking a visible scatter mark selects its observation", t => {
   const env = environment(t), instance = env.create();
   const point = marks(chart(instance), "dot")[0];
-  const coordinates = {bubbles: true, clientX: Number(point.getAttribute("cx")), clientY: Number(point.getAttribute("cy"))};
+  const coordinates = {bubbles: true, clientX: position(point).x, clientY: position(point).y};
   const movement = new env.window.MouseEvent("pointermove", coordinates);
   Object.defineProperty(movement, "pointerType", {value: "mouse"});
   point.dispatchEvent(movement);
@@ -206,8 +230,8 @@ test("size-sorted scatter marks retain the entity identity at the clicked positi
   doc.views[0].size = "sample_size";
   const instance = env.create(doc);
   const points = [...marks(chart(instance), "dot")];
-  const highestMeasurement = points.reduce((first, second) => +first.getAttribute("cy") < +second.getAttribute("cy") ? first : second);
-  const coordinates = {bubbles: true, clientX: +highestMeasurement.getAttribute("cx"), clientY: +highestMeasurement.getAttribute("cy")};
+  const highestMeasurement = points.reduce((first, second) => position(first).y < position(second).y ? first : second);
+  const coordinates = {bubbles: true, clientX: position(highestMeasurement).x, clientY: position(highestMeasurement).y};
   highestMeasurement.dispatchEvent(new env.window.MouseEvent("click", coordinates));
   assert.deepEqual(plain(instance.getState().selected), ["b"]);
 });
@@ -420,11 +444,11 @@ test("historical point inspection seeks the clicked measurement of a repeated en
   const env = environment(t), instance = env.create();
   instance.setState({view: "line", mode: "snapshot", time: 2028});
   const points = [...marks(chart(instance), "dot")];
-  const earliestX = Math.min(...points.map(point => +point.getAttribute("cx")));
-  const earliestPoints = points.filter(point => +point.getAttribute("cx") === earliestX);
-  const firstAlpha = earliestPoints.reduce((first, second) => +first.getAttribute("cy") > +second.getAttribute("cy") ? first : second);
+  const earliestX = Math.min(...points.map(point => position(point).x));
+  const earliestPoints = points.filter(point => position(point).x === earliestX);
+  const firstAlpha = earliestPoints.reduce((first, second) => position(first).y > position(second).y ? first : second);
   firstAlpha.dispatchEvent(new env.window.MouseEvent("click", {
-    bubbles: true, clientX: +firstAlpha.getAttribute("cx"), clientY: +firstAlpha.getAttribute("cy")
+    bubbles: true, clientX: position(firstAlpha).x, clientY: position(firstAlpha).y
   }));
   assert.equal(instance.getState().time, 2020);
   assert.deepEqual(plain(instance.getState().selected), ["a"]);
@@ -445,7 +469,7 @@ test("Compare entities permits additive mark and table selection without modifie
   const clickPoint = index => {
     const point = marks(chart(instance), "dot")[index];
     point.dispatchEvent(new env.window.MouseEvent("click", {
-      bubbles: true, clientX: +point.getAttribute("cx"), clientY: +point.getAttribute("cy")
+      bubbles: true, clientX: position(point).x, clientY: position(point).y
     }));
   };
   clickPoint(0);

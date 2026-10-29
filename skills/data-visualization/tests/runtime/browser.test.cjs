@@ -24,7 +24,7 @@ const reports=[];
    assert.deepEqual(errors,[]);assert.deepEqual(external,[]);
    await page.screenshot({path:path.join(output,`${name}-desktop.png`),fullPage:true});
    const plot=page.locator('.plot svg');
-   const firstMark=plot.locator('[aria-label="dot"] circle').first();
+   const firstMark=plot.locator('[aria-label="dot"] circle,[aria-label="dot"] path').first();
    assert.ok(await firstMark.count(),'visible observation marks');
    await firstMark.click();
    assert.equal((await page.evaluate(()=>exploration.getState())).selected.length,1);

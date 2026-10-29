@@ -7,7 +7,7 @@ description: Create portable interactive data explorations, statistical plots, l
 
 Turn a question and its evidence into an explorable instrument. Author an `exploration.json`; the bundled engine provides the interface, charting, time controls, source inspection, and export. A resulting HTML file includes its renderer and data and works offline.
 
-The sibling relationship to system-drawings is the authoring architecture: declarative content, a reusable runtime, explicit provenance, inspection, and a portable result. Choose statistical encodings for data; do not force quantitative comparisons into three-dimensional solids.
+The sibling relationship to system-drawings includes its authoring architecture and minimalist 1970s NASA/IBM visual language: white paper, fine black rules, compact uppercase titles, monospace lettering, and plain square controls. Keep charts monochrome; distinguish categories with stable symbols, open/filled marks, line patterns, and labels. Use the shared theme in `assets/style.css`. Choose statistical encodings for data; do not force quantitative comparisons into three-dimensional solids.
 
 ## Work from the evidence
 
