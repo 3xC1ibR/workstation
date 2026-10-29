@@ -25,6 +25,7 @@ const directory=path.resolve(output);fs.mkdirSync(directory,{recursive:true});
   const initial=await page.evaluate(()=>exploration.getState());
   for(const [index,view] of document.views.entries()){
    await page.evaluate(id=>exploration.setState({view:id}),view.id);
+   await page.waitForFunction(()=>!exploration.audit().animating);
    const audit=await page.evaluate(()=>exploration.audit());
    assert.equal(audit.errors,0,view.id+' renders');assert.equal(audit.overflow,false,view.id+' has no horizontal overflow');
    const filename=`${String(index+1).padStart(2,'0')}-${view.id.replace(/[^a-zA-Z0-9_-]/g,'-')}.png`;
@@ -35,6 +36,7 @@ const directory=path.resolve(output);fs.mkdirSync(directory,{recursive:true});
   if(document.time){
    const earliest=await page.evaluate(()=>DataExplorationCore.frames(exploration.getDocument())[0]);
    await page.evaluate(time=>exploration.seek(time),earliest);
+   await page.waitForFunction(()=>!exploration.audit().animating);
    await page.screenshot({path:path.join(directory,'first-frame.png'),fullPage:true});
    const count=await page.evaluate(()=>DataExplorationCore.frames(exploration.getDocument()).length);
    if(count>1){
@@ -45,7 +47,7 @@ const directory=path.resolve(output);fs.mkdirSync(directory,{recursive:true});
   }
   await page.evaluate(state=>exploration.setState(state),initial);
   await page.setViewportSize({width:390,height:844});
-  await page.waitForFunction(()=>!exploration.audit().overflow);
+  await page.waitForFunction(()=>!exploration.audit().overflow&&!exploration.audit().animating);
   await page.screenshot({path:path.join(directory,'mobile.png'),fullPage:true});
   report.mobile=await page.evaluate(()=>exploration.audit());
   assert.deepEqual(report.errors,[]);assert.deepEqual(report.externalRequests,[]);

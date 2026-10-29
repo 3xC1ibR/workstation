@@ -29,6 +29,9 @@ Each instance owns its Shadow DOM, styles, state, timers, event listeners, and r
 | `getRows()` | Copy of observations shown by the active view, including full history for `timeMode:"all"` |
 | `getSummary()` | Counts reconciled to the source and active view; full-history views include `frameVisible` for the selected frame |
 | `select(entityKeys)` | Highlight entities without changing the cohort denominator |
+| `focusEntity(entityKey)` | Open an existing full-history line view for a repeated entity; returns false if no meaningful history exists |
+| `focusCohort(field, value)` | Open a focused cohort for an observed field value, retaining the parent comparison |
+| `back()` | Return from sources/data or restore the exact parent query and selection; returns whether navigation occurred |
 | `seek(observedTime)` | Snap to the nearest observed time; ties choose earlier |
 | `play()` / `stop()` | Step through observed frames / stop immediately |
 | `setPresentation("chart"\|"data"\|"sources")` | Change representation of the exploration |
@@ -44,11 +47,15 @@ The UI SVG download also embeds view, state, and source metadata in an SVG `meta
 
 ## Interactions
 
-Search and category filters define the cohort. Clicking a legend category isolates it; clicking further categories adds or removes them; clearing the last category returns to all. Clicking a plotted observation selects it; Shift-click adds or removes an entity. The Compare entities toggle permits additive selection by touch or unmodified click, in both charts and tables. The Data tab provides keyboard access to every record. Selection remains stable when an entity has no observation in the current frame, and the inspector labels that state. Clicking an observation from a repeated entity seeks that observation's date so the inspector displays the clicked measurement, not an arbitrary later record. Data, CSV, evidence exports, and view counts use the same active-view time semantics.
+The opening surface is the drawing, a view selector, and the observed-time transport. Explore opens filters, saved questions, comparison/region tools, and exports. Selecting a mark reveals its data sheet alongside the drawing. Every mark supports Enter/Space, and the Data presentation remains a readable alternative. Previous/next observation controls permit precise inspection of dense clusters without targeting a tiny mark. Closing inspection clears its emphasis; Escape closes an open sheet, then navigates to the parent when pressed again.
+
+Search and category filters define the cohort. Clicking a legend category isolates it; clicking further categories adds or removes them; clearing the last category returns to all. Shift-click adds or removes an entity. The Compare entities toggle permits additive selection by touch or unmodified click. Selection remains stable when an entity has no observation in the current frame, and the inspector labels that state. Clicking another historical observation of the same entity selects its exact date. Data, CSV, evidence exports, and view counts use the same active-view time semantics.
+
+The inspector offers Open observed history when the document contains repeated observations and a line view with `timeMode:"all"` and x equal to the time field. It also offers meaningful declared categorical cohorts. Each descent stores the parent state; the return control restores its filters, time, view, and selection. Undo includes this navigation context. Evidence exports include the parent states. Shared URLs preserve the resulting query, but do not recreate the local navigation history.
 
 Select region enables a D3 two-dimensional brush for numeric/date scatter and line axes. Dragging selects data coordinates and applies them across views. Clear region resets the brush. Changing views clears the previous coordinate region. `Undo` restores the previous query state. Saved questions apply declarative state changes and display their explanatory text.
 
-Playback is discrete over observed frames. `snapshot` shows exactly one time; `cumulative` shows history through that time. A `timeMode:"all"` view shows the full history of the cohort and says so. Fixed axes, identity, units, and category colors persist across frames. Reduced-motion users retain arrows and the keyboard-accessible slider; playback is not started for them. No autoplay occurs on page load.
+Playback is discrete over observed frames. Snapshot marks move between their measured positions through interruptible native browser animations; cumulative marks enter at their observed positions. A short transition label identifies movement between observed dates. Full-history line views retain their history and move a faint time cursor. A change during motion starts from the current visible position. Fixed axes, identity, units, and category symbols persist. The animation does not modify data or export intermediate values. Reduced-motion users receive immediate updates with arrows and the keyboard-accessible slider; playback is not started for them. No autoplay occurs on page load. Motion duration and easing are shared tokens in `style.css`.
 
 ## Extensions and scale
 

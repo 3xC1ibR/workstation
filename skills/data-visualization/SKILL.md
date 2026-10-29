@@ -7,7 +7,7 @@ description: Create portable interactive data explorations, statistical plots, l
 
 Turn a question and its evidence into an explorable instrument. Author an `exploration.json`; the bundled engine provides the interface, charting, time controls, source inspection, and export. A resulting HTML file includes its renderer and data and works offline.
 
-The sibling relationship to system-drawings includes its authoring architecture and minimalist 1970s NASA/IBM visual language: white paper, fine black rules, compact uppercase titles, monospace lettering, and plain square controls. Keep charts monochrome; distinguish categories with stable symbols, open/filled marks, line patterns, and labels. Use the shared theme in `assets/style.css`. Choose statistical encodings for data; do not force quantitative comparisons into three-dimensional solids.
+The sibling relationship to system-drawings includes its authoring architecture, exploration model, and minimalist 1970s NASA/IBM visual language: white paper, fine black rules, compact uppercase titles, monospace lettering, and plain square controls. Start with the drawing. A selected mark reveals its data sheet; useful cohorts and repeated entities can open focused views with an exact return path. Reveal filters, guided questions, and export controls through Explore. Keep charts monochrome; distinguish categories with stable symbols, open/filled marks, line patterns, and labels. Use the shared theme in `assets/style.css`. Choose statistical encodings for data; do not force quantitative comparisons into three-dimensional solids.
 
 ## Work from the evidence
 
@@ -38,7 +38,9 @@ Read [the document specification](references/specification.md) and [authoring gu
 
 Every observation needs a stable entity key; an entity/time pair must be unique. Declare types and units. Preserve missing values as null. Describe confidence intervals and estimates. Views support scatterplots, lines, bars, histograms, and tables; use combinations that answer distinct questions about the same observations.
 
-Time has an explicit mode: `snapshot` shows an observed frame; `cumulative` reveals observations through that frame. A history view can use `timeMode: "all"` for static comparison. Playback advances through actual observed values. It does not manufacture measurements between them. Keep scales and identity stable, and retain a pause/scrub/static route for people who cannot or do not want to follow motion.
+Time has an explicit mode: `snapshot` shows an observed frame; `cumulative` reveals observations through that frame. A history view can use `timeMode: "all"` for static comparison with a moving observed-time cursor. Playback advances through actual observed values. Marks move gracefully between snapshot positions, while cumulative observations enter at their measured positions. This motion preserves orientation; it does not create intermediate data. Coordinates, inspected records, and exports retain exact observations. Keep scales and identity stable, and retain a pause/scrub/static route for people who cannot or do not want to follow motion.
+
+Give the document a concise `caption` for the essential measurement or denominator caveat that must remain visible. Keep longer explanations in source notes and the on-demand data sheet. For repeated entities, author a full-history line view whose x field is the observed-time field; the inspector then offers Open observed history automatically. Single observations remain inspectable without invented deeper levels.
 
 Saved questions are inspectable view-state presets: a useful comparison, a selected entity, or a cohort. Ground their explanatory text in executed calculations. They are not evidence that a model analyzed the dataset at runtime.
 

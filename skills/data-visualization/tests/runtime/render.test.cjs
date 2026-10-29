@@ -50,8 +50,9 @@ function fixture() {
   };
 }
 
-function environment(t, {reducedMotion = false} = {}) {
+function environment(t, {reducedMotion = false, recordAnimations = false} = {}) {
   const errors = [], requests = [], timers = new Map(), observers = new Set(), mediaListeners = new Set();
+  const recordedAnimations = [];
   let timerId = 0;
   class Resources extends ResourceLoader {
     fetch(url) { requests.push(url); return Promise.resolve(Buffer.from("")); }
@@ -62,6 +63,11 @@ function environment(t, {reducedMotion = false} = {}) {
     runScripts: "dangerously", pretendToBeVisual: true, url: "https://example.test/exploration/", virtualConsole, resources: new Resources()
   });
   const window = dom.window;
+  if (recordAnimations) window.Element.prototype.animate = function (keyframes, options) {
+    const animation = {element: this, keyframes, options, cancelled: false, cancel() { this.cancelled = true; }};
+    recordedAnimations.push(animation);
+    return animation;
+  };
   window.ResizeObserver = class {
     constructor(callback) { this.callback = callback; observers.add(this); }
     observe() {}
@@ -89,7 +95,7 @@ function environment(t, {reducedMotion = false} = {}) {
   t.after(() => window.close());
   const create = (doc = fixture(), options = {}, id = "first") => window.DataExploration.create(window.document.getElementById(id), doc, {styles: source["style.css"], restoreURL: false, ...options});
   return {
-    window, errors, requests, timers, observers, mediaListeners, create,
+    window, errors, requests, timers, observers, mediaListeners, recordedAnimations, create,
     tick() { for (const [id, timer] of [...timers]) if (timers.has(id)) timer.callback(); }
   };
 }
@@ -491,4 +497,96 @@ test("Compare entities permits additive mark and table selection without modifie
   clickRecord("Beta");
   assert.deepEqual(plain(instance.getState().selected).sort(), ["a", "b"]);
   assert.equal(instance.getRows().length, 2);
+});
+
+test("drawing starts without a data sheet and inspection remains keyboard accessible", t => {
+  const env = environment(t), instance = env.create(), root = shadow(instance);
+  assert.equal(root.querySelector('.sidebar').hidden, true);
+  assert.equal(instance.audit().panel, null);
+  const mark = marks(chart(instance), 'dot')[0];
+  assert.equal(mark.getAttribute('tabindex'), '0');
+  mark.dispatchEvent(new env.window.KeyboardEvent('keydown', {key: 'Enter', bubbles: true}));
+  assert.equal(instance.audit().panel, 'inspect');
+  assert.equal(root.querySelector('.sidebar').hidden, false);
+  assert.equal(root.activeElement, root.querySelector('.sidebar'));
+  button(instance, 'Close data sheet').click();
+  assert.equal(instance.audit().panel, null);
+  assert.deepEqual(plain(instance.getState().selected), []);
+  button(instance, 'Explore').click();
+  assert.equal(instance.audit().panel, 'explore');
+  assert.equal(button(instance, 'Explore').getAttribute('aria-expanded'), 'true');
+  root.dispatchEvent(new env.window.KeyboardEvent('keydown', {key: 'Escape', bubbles: true}));
+  assert.equal(instance.audit().panel, null);
+});
+
+test("focused histories and nested cohorts restore exact parent comparisons", t => {
+  const env = environment(t), instance = env.create();
+  instance.setState({time: 2020, search: 'Alpha', selected: ['a']});
+  const parent = plain(instance.getState());
+  assert.equal(instance.focusEntity('a'), true);
+  assert.equal(instance.audit().depth, 1);
+  assert.equal(instance.getState().view, 'line');
+  assert.deepEqual(plain(instance.getRows()).map(row => row.year), [2020, 2024, 2028]);
+  assert.ok(instance.getRows().every(row => row.entity === 'a'));
+  assert.equal(instance.focusCohort('group', 'Research'), true);
+  assert.equal(instance.audit().depth, 2);
+  assert.equal(instance.exportEvidence().navigation.parents.length, 2);
+  instance.back();
+  assert.equal(instance.audit().depth, 1);
+  instance.back();
+  assert.deepEqual(plain(instance.getState()), parent);
+  assert.equal(instance.audit().panel, 'inspect');
+  assert.equal(instance.audit().depth, 0);
+  instance.setPresentation('sources');
+  assert.equal(instance.audit().panel, null);
+  instance.back();
+  assert.equal(instance.audit().presentation, 'chart');
+  assert.deepEqual(plain(instance.getState()), parent);
+});
+
+test("observed-frame motion preserves exact coordinates, cancels cleanly, and respects reduced motion", t => {
+  const env = environment(t, {recordAnimations: true}), instance = env.create();
+  instance.seek(2020);
+  const movements = env.recordedAnimations.filter(animation => animation.element.hasAttribute('data-observation-key') && animation.keyframes[0].transform);
+  assert.ok(movements.length > 0, 'Repeated entities should move between observed positions');
+  assert.ok(movements.every(animation => animation.options.duration === 420));
+  assert.equal(instance.audit().animating, true);
+  const rows = instance.getRows();
+  const svg = chart(instance);
+  for (const mark of marks(svg, 'dot')) {
+    const row = rows[Number(mark.dataset.rowIndex)];
+    const location = position(mark);
+    assert.equal(location.x, svg.scale('x').apply(row.year));
+    assert.equal(location.y, svg.scale('y').apply(row.value));
+  }
+  assert.deepEqual(plain(instance.exportEvidence().rows).map(row => row.year), [2020, 2020]);
+  instance.seek(2024);
+  assert.ok(movements.every(animation => animation.cancelled), 'A new frame interrupts previous motion');
+  instance.dispose();
+  assert.ok(env.recordedAnimations.every(animation => animation.cancelled));
+  const quiet = environment(t, {recordAnimations: true, reducedMotion: true}), reduced = quiet.create();
+  reduced.seek(2020);
+  assert.equal(quiet.recordedAnimations.length, 0);
+  assert.equal(reduced.audit().animating, false);
+});
+
+test("undo restores focus context and repeated-entity record navigation retains inspection", t => {
+  const env = environment(t), instance = env.create();
+  const initial = plain(instance.getState());
+  instance.focusCohort('group', 'Research');
+  assert.equal(instance.audit().depth, 1);
+  button(instance, 'Undo').click();
+  assert.equal(instance.audit().depth, 0);
+  assert.equal(instance.audit().focus, 'Overview');
+  assert.deepEqual(plain(instance.getState()), initial);
+  instance.focusEntity('a');
+  const first = [...marks(chart(instance), 'dot')][0];
+  first.dispatchEvent(new env.window.MouseEvent('click', {bubbles: true}));
+  assert.equal(instance.getState().time, 2020);
+  button(instance, 'Next observation').click();
+  assert.equal(instance.getState().time, 2024);
+  assert.deepEqual(plain(instance.getState().selected), ['a']);
+  assert.equal(instance.audit().panel, 'inspect');
+  assert.equal(shadow(instance).querySelectorAll('[data-time-cursor]').length, 1);
+  assert.equal(instance.focusCohort('group', 'Unknown group'), false);
 });

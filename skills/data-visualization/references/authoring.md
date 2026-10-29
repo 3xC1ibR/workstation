@@ -26,11 +26,13 @@ Use aligned position or length for precise comparison. A histogram answers a dis
 
 Keep units in field definitions and axes. Explain uncertainty type, interval level, and missing data. A bootstrap interval for a fitted mean is not the range of individual outcomes. If only point estimates exist, do not fabricate uncertainty.
 
-Time playback complements analysis. Offer a history view or static comparison for tasks requiring memory across many frames. Preserve entity keys and colors across frames. Do not ease election totals into synthetic intermediate election results. Smooth transitions can communicate an interface change, but measured values must retain their observed-time meaning.
+Time playback complements analysis. Offer a history view or static comparison for tasks requiring memory across many frames. Preserve entity keys and symbols across frames. Smooth movement connects two observed positions for orientation; the active date, inspected values, and exports always refer to exact source observations. Never label an in-between position as a newly measured election result. Full-history line views use a moving observed-time cursor rather than concealing the trajectory.
 
 ## Compose useful linked views
 
 The primary view should answer the headline question at a glance. Additional views should expose a different comparison, distribution, or source table. Filters define a cohort; selection highlights entities without silently changing aggregate denominators. Show enough context that the reader can distinguish the full dataset, filtered cohort, current time frame, and selected records.
+
+Begin with the drawing and its essential `caption`. Keep methodology, filters, and longer explanations in the on-demand data sheet. Author a full-history line view with x equal to the time field when repeated entities benefit from deeper inspection; the engine can then open a focused history and restore the exact parent comparison. Previous/next record controls provide a precise route through dense marks, including on phones. Avoid adding a drill-down simply to create another level.
 
 Saved questions may reveal a verified discrepancy, isolate a cohort, switch a threshold, or reset to the earliest time. Their body text should say how to investigate and state only computed findings. Never attach causal language to a descriptive association without a justified identification design.
 

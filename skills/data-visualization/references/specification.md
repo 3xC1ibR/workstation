@@ -8,6 +8,7 @@ An exploration is data, provenance, view declarations, and optional saved questi
   "id": "example",
   "title": "A question answered with data",
   "subtitle": "One concise statement of scope.",
+  "caption": "The essential measurement or denominator caveat, always visible beside the sheet register.",
   "category": "Research",
   "dataset": {
     "id": "observations",
