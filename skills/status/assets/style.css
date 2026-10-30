@@ -7,6 +7,7 @@
   --page-width: 1120px; --metric-width: 210px; --column-width: 110px;
   --record-width: 160px; --text-column-width: 320px;
   --control-height: 44px; --radius: 0;
+  --layer-menu: 1;
   --mono: ui-monospace, Menlo, Consolas, "Courier New", monospace;
   --display: "Helvetica Neue", Helvetica, Arial, sans-serif;
   color-scheme: light;

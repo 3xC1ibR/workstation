@@ -59,6 +59,12 @@ retained HTML document in a separate tab. Filters and search operate on the
 collection; Undo restores the last dismissal. Empty, loading, and failed states
 are plain text in the sheet. No nested report viewer or overlay is needed.
 
+Filter menus use the sheet's paper, ink, monospace type, square corners, and
+one-pixel rules even while open. Enhance the native selects with labelled
+combobox/listbox controls to avoid operating-system colors and shadows. Preserve
+arrow-key navigation, Home/End, type-to-select, Enter/Space, Escape cancellation,
+Tab traversal, and outside-click dismissal. Options wrap on narrow screens.
+
 ## Decision record
 
 - 2026-10-29: Reuse system-drawings visual language. Markdown profiles customize
@@ -68,3 +74,5 @@ are plain text in the sheet. No nested report viewer or overlay is needed.
   the status skill and styled exactly like its HTML sheets. This supersedes the
   mistaken application integration. Retained reports and reversible dismissal
   remain available regardless of the generating agent or workspace.
+- 2026-10-30: Style open filter menus as part of the report sheet; native macOS
+  popup styling was inconsistent with the requested monochrome design.

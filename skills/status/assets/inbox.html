@@ -16,8 +16,8 @@
       <p id="report-counts" class="meta" aria-live="polite">Shared collection</p>
     </header>
     <form class="collection-controls" role="search">
-      <label>Show<select id="report-view"><option value="inbox">Inbox</option><option value="dismissed">Dismissed</option><option value="all">All reports</option></select></label>
-      <label>Project<select id="report-project"><option value="">All projects</option></select></label>
+      <div class="collection-filter"><label id="report-view-label" for="report-view">Show</label><select id="report-view"><option value="inbox">Inbox</option><option value="dismissed">Dismissed</option><option value="all">All reports</option></select></div>
+      <div class="collection-filter"><label id="report-project-label" for="report-project">Project</label><select id="report-project"><option value="">All projects</option></select></div>
       <label class="collection-search">Search<input id="report-search" type="search" placeholder="Title, agent, project, or provider"></label>
       <button id="refresh-reports" type="button">Refresh</button>
     </form>
