@@ -55,3 +55,11 @@ agent-coord:
 
 ## Naming
 Every name you choose, for files, scripts, directories, functions, variables, classes, commits, branches, anything, must use precise professional vocabulary. Choose the word a 1972 IBM engineer would write in a specification. No slang, no casual shorthand, no cute or clever names, no words borrowed from chat culture. This applies universally, not only to the one example that follows: a script that deploys dashboards is `deploy_dashboards.sh`, not `push_dashboards.sh`. That is one illustration of the principle, not the extent of it.
+
+## Outcomes over methods
+When I specify how to do something, treat it as my best guess, not a requirement, unless I say it's required.
+First figure out what outcome I'm after. If there's a path that is materially better for that outcome (simpler, more robust, cheaper, or reuses something that exists):
+- If doing it my way would be expensive or hard to undo, stop and propose the alternative in 2–3 sentences: what changes and what I gain. If I still want my way, do it without re-arguing.
+- Otherwise, do it my way and note the alternative in one line at the end.
+- If you're running unattended, do it my way and flag the alternative.
+Don't propose alternatives that are merely different. If you can't name a concrete gain, follow my method.
