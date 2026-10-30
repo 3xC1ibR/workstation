@@ -33,6 +33,8 @@ Do not replace a requested complete article with a summary, rewrite, excerpt, or
 
 Check `phomemo-print/references/setup.md` and the current loaded roll. Letter output was physically verified on the included roll and is the working default; check the label or measurement when replacing it. **Standard full-width paper is Letter 215.9/216 mm or A4 210 mm, not receipt paper.** A driver default does not identify what is loaded.
 
+Inspect an existing source PDF before rebuilding it. Measure its actual body type size, page dimensions, printable bounds, and figure readability. If it already meets the user's reading preference and fits the loaded media, preserve that layout when reflow would add pages or damage figures. The first article trial found that the government-services paper's original Letter PDF already uses 10 pt body text and 17 pages; its reflowed draft grew to 24 pages. Publisher margins can be retained for such an existing edition; the defaults below apply when a new layout is needed. See [the first article record](references/first_article.md).
+
 Use these starting parameters, then adjust from the physical calibration result:
 
 | Property | Starting layout |
