@@ -46,11 +46,11 @@ The exact installed PPD defines:
 
 At the initial safe margins, the content width is 190.5 mm for Letter and about 184.6 mm for A4. After the successful physical test, Ronnie requested extending the borders. The revised layout uses 10 mm left/right and 12 mm top/bottom: content width 195.9 mm for Letter or 190 mm for A4. Both settings are inside the PPD's imageable area. The revised margins have only been checked in the rendered preview; they have not been sent as a second print.
 
-The additional fixed sizes are 110, 80, and 53 mm wide. Custom width/height support is declared, up to 613 x 5700 points, but custom long-page printing has not been tested. Standard pagination is the established starting point.
+The additional fixed sizes are 110, 80, and 53 mm wide. Custom width/height support is declared up to 613 x 5700 points. A later 215.9 x 320 mm sideways-scroll test was submitted as `M832D-Q769-3`; see [the scroll test record](scroll_test.md) for its outcome. Longer article-length custom pages remain untested.
 
 Driver defaults were A4, 300 dpi, grayscale, continuous media, printer-default darkness, zero offsets, rotation 0, and line enhancement off. Only media was changed for the first calibration; darkness and recognition values remain at vendor defaults.
 
-The printer uses direct thermal monochrome output and one-sided pages. The supplied internal roll's ability to feed multiple logical pages, physical page length, and tear behavior must be established by observation. Do not assume an automatic cutter or duplex printing.
+The printer uses direct thermal monochrome output and one-sided pages. The initial article job demonstrated multi-page feeding on the roll but was canceled after 8 reported pages. The user found that the output curls up and wants to read rolled stock as a sideways scroll. Folded sheets are expected 2026-10-31 and should use regular pagination once loaded. Do not assume an automatic cutter or duplex printing.
 
 ## First calibration
 
@@ -65,7 +65,7 @@ The printer uses direct thermal monochrome output and one-sided pages. The suppl
 - Ronnie confirmed “it printed” and supplied a photograph showing all four border edges and readable text. Physical output is confirmed. The paper is curled as expected for roll media; no clipped text or missing border is visible in the photograph.
 - Ronnie selected **10 pt** as comfortable and requested extending the borders. Article defaults are now 10 pt body / approximately 13.5 pt leading with the revised margins above.
 - Revised preview: `~/.local/state/phomemo-printer/calibration_letter_revised.pdf`; not submitted. The revised generator's article sample uses the selected 10 pt size.
-- Source checks: both skill frontmatter validators passed; PDF preflight passed for Letter; an A4 mismatch and reuse of the existing print receipt were refused without submitting another job. The article skill is an installed instruction workflow; a complete bookmarked article has not yet been processed or printed with it. Validation was performed by the implementing agent, with no independent review.
+- Source checks: both skill frontmatter validators passed; PDF preflight passed for Letter; an A4 mismatch and reuse of the existing print receipt were refused without submitting another job. Later article and scroll trials are recorded in their respective skill references. Validation was performed by the implementing agent, with no independent review.
 
 ## Primary references
 

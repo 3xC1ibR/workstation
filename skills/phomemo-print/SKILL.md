@@ -17,12 +17,34 @@ lpoptions -p M832D-Q769 -l
 
 Use USB on macOS. The manufacturer's guide reserves Bluetooth for phones and tablets. Use thermal paper, power on the printer, close the cover, and confirm paper is loaded. If setup or troubleshooting is needed, read [the setup record](references/setup.md).
 
-The queue is set to **Letter**, 300 dpi, grayscale, continuous media, and one-sided output. Letter output was physically verified on the included roll and remains the working default. The roll's exact labeled width was not measured; check the label when changing media. Do not infer physical width from the driver's original default, which was A4.
+The queue's base setting is **Letter**, 300 dpi, grayscale, continuous media, and one-sided output. Letter output was physically verified on the included roll. Ronnie now prefers a sideways scroll layout for rolled paper because loose pages curl up; use normal portrait pagination for straight folded sheets once they are actually loaded. The folded sheets were ordered with expected arrival 2026-10-31; the date alone does not establish which media is loaded. The roll's exact labeled width was not measured; check the label when changing media.
 
 - Letter: 215.9 mm wide, 279.4 mm page length; often labeled 216 mm or 8.5 inches.
 - A4: 210 mm wide, 297 mm page length.
 - This is a full-width portable printer. Do not format its standard roll as an 80 mm receipt.
-- For a different loaded width, inspect its driver setting and reformat the document. The supplied helpers deliberately support portrait Letter and A4 only.
+- For a different loaded width, inspect its driver setting and reformat the document. The submission helper supports Letter, A4, and bounded custom roll dimensions.
+
+## Rolled paper: sideways scrolls
+
+Use a horizontal reading surface: the roll's **length runs left to right**, each reading column runs top to bottom, and subsequent columns continue to the right. Keep 10 pt text and comfortable line lengths. Do not create a single article-length line or make the user tear off individual Letter pages.
+
+The physical PDF remains narrow and long, with its width matching the roll. Rotate the **content** 90 degrees; do not use the PDF rotation flag or an additional CUPS landscape rotation. The helper explicitly requests portrait physical media. This separates the feed geometry from the reading direction.
+
+The first scroll test uses one 215.9 x 320 mm custom page, with three reading columns and 10 pt text. Source and preview details are in [the scroll test record](references/scroll_test.md). Generate the short test with:
+
+```sh
+~/.local/state/phomemo-printer/venv/bin/python /opt/projects/workstation/skills/phomemo-print/scripts/create_scroll_test.py ~/.local/state/phomemo-printer/scroll_test_2026-10-30/sideways_scroll_test.pdf
+```
+
+Preflight a prepared scroll PDF with:
+
+```sh
+~/.local/state/phomemo-printer/venv/bin/python /opt/projects/workstation/skills/phomemo-print/scripts/print_pdf.py /absolute/path/scroll.pdf --media Roll --roll-width-mm 215.9 --roll-length-mm 320
+```
+
+For an authorized physical print, add `--submit --receipt /absolute/path/to/an/unused_runtime_receipt.json`. Set the length from the actual PDF, not from this example. Custom roll media is a per-job option; the base Letter queue remains available for folded sheets. The installed PPD limits custom media to 613 x 5700 points (about 216.25 mm wide and 2010.83 mm long). Do not submit an arbitrary article-length page past that limit. Longer scrolls require separately validated segmentation and feed behavior.
+
+The 320 mm custom setting has been preflighted; printer acceptance and physical orientation are recorded separately. Do not call the layout physically approved until the user confirms it.
 
 ## Prepare a PDF
 
