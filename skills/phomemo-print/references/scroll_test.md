@@ -28,6 +28,6 @@ Source helper: `scripts/create_scroll_test.py`. Runtime files: `~/.local/state/p
 - `print_receipt.json`: exact submission, checksum, job ID, and recorded result.
 - `validation.json`: dimensions, content orientation, one-page check, and negative preflight checks.
 
-The one-page PDF and reading preview passed visual review. Preflight accepted the exact custom geometry and refused an oversized 2100 mm length and a mismatched Letter request without submitting them. Physical feed length, orientation, and reading comfort still require the user's observation; record that separately from spooler completion.
+The one-page PDF and reading preview passed visual review. Preflight accepted the exact custom geometry and refused an oversized 2100 mm length and a mismatched Letter request without submitting them.
 
-Submitted once as `M832D-Q769-3` at 13:52:09 CDT. The printer returned to idle at 13:53:06 CDT; the exact CUPS terminal state is retained in the runtime receipt. No second strip has been submitted. Physical orientation is awaiting the user's response to the test.
+Submitted once as `M832D-Q769-3` at 13:52:09 CDT. The printer returned to idle at 13:53:06 CDT. The user approved the physical result ("that's beautiful") and asked to print the article in this configuration at **9 pt**. The intended sideways orientation is physically approved; no exact feed-length measurement was supplied. Nine points is now the article body-size preference. No second test strip has been submitted.

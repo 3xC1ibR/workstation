@@ -1,0 +1,2 @@
+-r ../phomemo-print/requirements.txt
+beautifulsoup4==4.15.0

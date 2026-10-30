@@ -26,7 +26,7 @@ The queue's base setting is **Letter**, 300 dpi, grayscale, continuous media, an
 
 ## Rolled paper: sideways scrolls
 
-Use a horizontal reading surface: the roll's **length runs left to right**, each reading column runs top to bottom, and subsequent columns continue to the right. Keep 10 pt text and comfortable line lengths. Do not create a single article-length line or make the user tear off individual Letter pages.
+Use a horizontal reading surface: the roll's **length runs left to right**, each reading column runs top to bottom, and subsequent columns continue to the right. Ronnie approved this orientation and selected **9 pt body text** for articles after the 10 pt test. Keep comfortable line lengths. Do not create a single article-length line or make the user tear off individual Letter pages.
 
 The physical PDF remains narrow and long, with its width matching the roll. Rotate the **content** 90 degrees; do not use the PDF rotation flag or an additional CUPS landscape rotation. The helper explicitly requests portrait physical media. This separates the feed geometry from the reading direction.
 
@@ -44,11 +44,11 @@ Preflight a prepared scroll PDF with:
 
 For an authorized physical print, add `--submit --receipt /absolute/path/to/an/unused_runtime_receipt.json`. Set the length from the actual PDF, not from this example. Custom roll media is a per-job option; the base Letter queue remains available for folded sheets. The installed PPD limits custom media to 613 x 5700 points (about 216.25 mm wide and 2010.83 mm long). Do not submit an arbitrary article-length page past that limit. Longer scrolls require separately validated segmentation and feed behavior.
 
-The 320 mm custom setting has been preflighted; printer acceptance and physical orientation are recorded separately. Do not call the layout physically approved until the user confirms it.
+The 320 mm custom setting completed as job M832D-Q769-3, and the user approved the physical orientation. The test used 10 pt; article text was then requested at 9 pt. Longer sections still need their own preflight and completion checks.
 
 ## Prepare a PDF
 
-Use the PDF skill when creating or editing PDFs. Preserve the requested document's content. Use the loaded paper size, black text on white, and one-sided pages. On the first physical calibration Ronnie found **10 pt comfortable** and asked to extend the borders. The revised defaults are **10 mm left/right margins and 12 mm top/bottom margins**, with 10 pt body text at about 13.5 pt leading. These remain inside the driver's declared imageable area; the original 12.7 mm border was physically verified, while the revised margins have been checked in the PDF preview only. Render and inspect the PDF before printing. Already formatted documents may need reflow; do not silently shrink a wide page until the text is unreadable.
+Use the PDF skill when creating or editing PDFs. Preserve the requested document's content. Use the loaded paper size, black text on white, and one-sided pages. Ronnie initially found 10 pt comfortable, then selected **9 pt article body text** after approving the sideways test. Use about 12 pt leading. The revised margins are **10 mm across the roll and 12 mm at its feed ends**; the approved scroll test includes an additional 4 mm text inset inside its border. Render and inspect the PDF before printing. Already formatted documents may need reflow; do not silently shrink a wide page until the text is unreadable.
 
 Reusable helpers use an isolated environment outside the source repository:
 

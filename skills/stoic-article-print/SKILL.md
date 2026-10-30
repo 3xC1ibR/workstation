@@ -33,9 +33,9 @@ Do not replace a requested complete article with a summary, rewrite, excerpt, or
 
 Check `phomemo-print/references/setup.md` and the current loaded roll. Letter output was physically verified on the included roll and is the working default; check the label or measurement when replacing it. **Standard full-width paper is Letter 215.9/216 mm or A4 210 mm, not receipt paper.** A driver default does not identify what is loaded.
 
-**Use the layout for the loaded paper.** On 2026-10-30 Ronnie reported that rolled output curls into itself and requested sideways scroll reading. With rolled stock, lay out successive upright reading columns along the roll's length, so it can be unrolled left to right and kept whole. Use `phomemo-print` for physical custom-media dimensions and the short orientation test. Keep 10 pt type; reflow source text and figures into the scroll's reading height rather than shrinking whole portrait pages. A single line extending for the article's entire length is not the intended layout.
+**Use the layout for the loaded paper.** On 2026-10-30 Ronnie reported that rolled output curls into itself and requested sideways scroll reading. They approved the physical three-column test and selected **9 pt** article text. With rolled stock, lay out successive upright reading columns along the roll's length, so it can be unrolled left to right and kept whole. Use `phomemo-print` for physical custom-media dimensions. Reflow source text and figures into the scroll's reading height rather than shrinking whole portrait pages. A single line extending for the article's entire length is not the intended layout.
 
-Ronnie ordered straight folded sheets, expected 2026-10-31. After those sheets arrive and are loaded, use normal portrait pages and continuous multi-page feeding. Confirm the loaded stock; do not switch modes merely because a date passed. The normal-page defaults below apply to folded sheets. Custom roll limits and the unconfirmed first scroll test are documented in `phomemo-print/references/scroll_test.md`.
+Ronnie ordered straight folded sheets, expected 2026-10-31. After those sheets arrive and are loaded, use normal portrait pages and continuous multi-page feeding. Confirm the loaded stock; do not switch modes merely because a date passed. The normal-page defaults below apply to folded sheets. Custom roll limits and the approved first scroll test are documented in `phomemo-print/references/scroll_test.md`.
 
 For **normal page printing**, inspect an existing source PDF before rebuilding it. Measure its actual body type size, page dimensions, printable bounds, and figure readability. If it already meets the user's reading preference and fits the loaded media, preserve that layout when reflow would add pages or damage figures. The first article trial found that the government-services paper's original Letter PDF already uses 10 pt body text and 17 pages; its reflowed draft grew to 24 pages. Publisher margins can be retained for such an existing edition. That 17-page job was canceled after 8 reported pages; do not resume it without a new request. See [the first article record](references/first_article.md).
 
@@ -46,20 +46,34 @@ Use these starting parameters, then adjust from the physical calibration result:
 | Page | Portrait Letter 215.9 x 279.4 mm, or A4 210 x 297 mm to match loaded media |
 | Margins | 10 mm left/right; 12 mm top/bottom |
 | Available width | 195.9 mm on Letter; 190 mm on A4 |
-| Body | 10 pt, approximately 13.5 pt leading, single column |
+| Body | 9 pt, approximately 12 pt leading, single column |
 | Color | Black text on white; figures converted thoughtfully for monochrome thermal output |
 | Graphics | Sharp at the printer's 300 dpi, readable labels, distinguishable line styles |
 | Delivery | One-sided; logical pages rather than an untested article-length custom sheet |
 
-Ronnie selected 10 pt after reading the physical calibration on 2026-10-30 and requested wider borders. The first print's 12.7 mm border was physically confirmed. The revised 10/12 mm margins remain inside the exact driver's printable area, but have only been checked in a PDF preview; do not describe them as physically calibrated yet. For article pages, no visible border is required: use that space for readable content. The photograph suggests that mid-gray shades may reproduce quite dark, so inspect essential figure distinctions carefully.
+Ronnie initially selected 10 pt after the physical calibration on 2026-10-30, then requested 9 pt for the article after approving the sideways scroll. The approved scroll uses the revised 10/12 mm margins with a 4 mm content inset. For normal article pages, no visible border is required. The photograph suggests that mid-gray shades may reproduce quite dark, so inspect essential figure distinctions carefully.
 
-Keep prose lines comfortable to follow. At 10 pt, full-width lines can become long; use two columns with an approximately 8 mm gap when that improves a prose article, allowing wide figures or tables to span the page. Preserve reading order and keep the selected 10 pt size rather than reducing type to fit dense content.
+Keep prose lines comfortable to follow. At 9 pt, full-width lines can become long; use two columns with an approximately 8 mm gap when that improves a prose article, allowing wide figures or tables to span the page. Preserve reading order and keep the selected 9 pt size rather than reducing type to fit dense content.
 
 Extract semantic article content, not screenshots of the webpage. Remove navigation, ads, promotions, cookie banners, and comments unless requested. Preserve original wording, headings, essential images and captions, tables, code, footnotes, and references. Include title, author, publication date when available, and source URL.
 
 Reflow wide tables and code at the content level; split tables or wrap code without changing meaning. Prefer readable text to shrinking a whole source PDF. Preserve correct reading order when converting a two-column paper to one column. For figures, avoid pale labels, dense gray backgrounds, and color-only distinctions. Use black lines, dashes, patterns, and explicit labels where conversion would otherwise lose meaning; preserve scientific values and explain any material editorial change.
 
 Use actual fonts and rendered page widths to check fit. Keep headings with their following paragraph, avoid orphaned lines, and add unobtrusive article/page identifiers. Avoid a large cover or contents page for a single short article. Do not assume a roll has unlimited capacity: report page count and estimated paper length (`pages x page length`) before an article batch. The purchased bundle's “23 pieces” is not a measured remaining-paper count.
+
+## Build and print a complete scroll
+
+`scripts/create_article_scroll.py` accepts a **complete cleaned article element** with local image assets. It retains original wording, uses embedded fonts, 9 pt text with 12 pt leading, reading columns about 90.7 mm wide, and wider panels for tables and wide figures. It does not fetch articles or establish reproduction permission. Install `requirements.txt` into the existing Phomemo runtime environment if needed.
+
+```sh
+~/.local/state/phomemo-printer/venv/bin/python /opt/projects/workstation/skills/stoic-article-print/scripts/create_article_scroll.py /absolute/path/cleaned_article.html /absolute/path/new_runtime_edition --title 'Article title' --author 'Author names' --date 'Publication date' --source-url https://example.com/article --license 'Applicable license' --license-url https://example.com/license --font-size 9
+```
+
+The output directory must be empty. The builder creates `article_scroll.pdf` for review, individual `article_scroll_section_NN.pdf` files for printing, and a manifest with exact custom dimensions, source checksum, tables, figures, column count, and total paper length. Each section stays within the driver's custom-length limit. The combined review PDF can contain different page lengths; **print individual section files with their manifest lengths**, rather than forcing the combined file to one common media size.
+
+Validate text completeness against the cleaned source, inspect every reading column and wide panel, and preflight every section through `phomemo-print`. For an authorized full-article print, submit sections in order, retaining a separate receipt for each. Wait for a section's successful terminal state before starting the next; stop on cancellation, error, or missing paper. Keep the paper uncut between sections. Small leading/trailing margins at driver section boundaries are expected; do not describe an article-length scroll beyond the driver limit as a single custom page.
+
+The first full 9 pt scroll edition is recorded in [the scroll article record](references/scroll_article.md).
 
 ## Verify before submission
 
