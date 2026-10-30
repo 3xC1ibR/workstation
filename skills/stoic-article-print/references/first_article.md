@@ -13,6 +13,7 @@ Selected: **Characterizing Agentic Flooding of Government Services**, Chris Schm
 - The exact source snapshot was previously verified for the FedEx collection at `/opt/projects/playground/stoic-print-collection-2026-10-20/sources/22-flooding-original.pdf`.
 - This print edition and its submission receipt are stored under `~/.local/state/phomemo-printer/article_editions/2026-10-30/government_services_article/`.
 - Submitted once as `M832D-Q769-2` at 13:34:45 CDT. The printer accepted the job and reported page progress. The runtime manifest and receipt retain its eventual completion state; physical print quality is recorded only after a user observation.
+- The user requested cancellation while printing. CUPS confirmed `canceled` at 13:40:34 CDT, with 8 of the planned 17 pages reported completed. Do not resume or reprint this canceled article without a new request.
 
 ## Useful negative results
 
