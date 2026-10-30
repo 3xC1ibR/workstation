@@ -86,14 +86,22 @@ python3 -B <skill-directory>/scripts/build_status.py /absolute/path/status.json 
 
 Use the actual workspace, stable agent name, and provider; omit unknown agent or
 provider values rather than inventing them. The builder automatically retains a
-copy in the global Status inbox, shown on Ribbon Field's **Status** page. This
-works across agents, providers, and workspace directories on the same host.
-Report generation does not require the app to be running. A dismissal applies
+copy in the shared Status collection, a standalone page owned by this skill and
+styled like its reports. It works across agents, providers, and workspace
+directories on the same host, without Ribbon Field or another agent application.
+Report generation does not require the viewer to be running. A dismissal applies
 only to that report; later reports still enter the inbox. Read
 [references/inbox.md](references/inbox.md) for registration, existing reports,
 and reports originating on another machine. Use `--no-register` for test fixtures
 or previews, never as the routine delivery path. If registration fails, retain
 the report and report the delivery failure rather than claiming it is in the inbox.
+
+To open or start the collection, run
+`python3 -B <skill-directory>/scripts/status_server.py start` and use the printed
+local URL (default `http://127.0.0.1:8766/`). On macOS, `install` keeps the viewer
+available across login sessions. See the inbox reference for service management.
+Do not add the viewer to another application or publish reports to a remote
+service unless the user requests that integration.
 
 Use the bundled renderer so content can change without design drift. It produces
 an offline snapshot; reloading the HTML does not retrieve fresh data. Verify

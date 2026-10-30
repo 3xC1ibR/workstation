@@ -1,59 +1,89 @@
-# Shared Status inbox
+# Standalone Status collection
 
-Ribbon Field's **Status** page (`/status` on its existing server) collects reports
-independently of the current project or conversation. The Inbox view contains
-undismissed reports. Dismissed and All reports views retain history; Restore or
-Undo puts a report back in the inbox. These actions do not archive its thread,
-delete files, or suppress the next report from its agent.
+The skill's own page collects generated HTML reports across agents, providers,
+and project directories. It uses the same monochrome stylesheet as the reports.
+Open a title to read its retained HTML in a separate tab. Dismiss removes that
+report from Inbox; Dismissed and All reports retain it, and Restore or Undo brings
+it back. Future reports from the same agent still appear.
+
+The viewer has no Ribbon Field dependency. Existing standalone reports remain
+portable HTML files, readable and printable without a running viewer.
+
+## Open the collection
+
+```sh
+python3 -B <skill-directory>/scripts/status_server.py start
+```
+
+Use the printed URL, normally `http://127.0.0.1:8766/`. The viewer starts detached
+from the invoking agent and reuses an existing viewer serving that inbox. It
+binds only to the local machine. `--port` chooses a different port; it never
+replaces another service occupying the requested port.
+
+On macOS, keep the page available after login with:
+
+```sh
+python3 -B <skill-directory>/scripts/status_server.py install
+```
+
+This installs `~/Library/LaunchAgents/com.workstation.status.plist`. The service
+log is `<inbox>/viewer/service.log`. Running `install` again reloads the viewer
+after a skill update, preserving reports and dismissal state. To stop login startup, use
+`launchctl bootout gui/$(id -u)/com.workstation.status`, then remove that plist.
+If a manually started viewer already occupies the port, stop that specific
+viewer before installing login startup. Do not stop unrelated processes.
+
+For an isolated development session, run `serve --inbox /temporary/inbox --port 0`
+in a terminal. It prints its selected URL and stops with Control-C. Production
+and test receipts must use separate inbox directories.
 
 ## Automatic registration
 
-The standard `build_status.py` command registers every generated report by
-default. Provide `--workspace`, `--agent`, `--provider`, and, when known,
-`--thread-id` to identify its origin. The thread ID defaults from Agent Coord or
-Codex environment context when available. Unknown metadata remains unknown.
+`build_status.py` registers every generated report by default. Provide actual
+`--workspace`, `--agent`, `--provider`, and, when known, `--thread-id` metadata.
+The thread ID defaults from existing agent environment context when available.
+Unknown metadata remains unknown.
 
-The default inbox is `~/.local/state/agent-status/inbox`. All workspaces and
-providers running under this user share it. `AGENT_STATUS_INBOX` can select a
-different directory for an isolated test or an intentionally shared installation;
-the producer and Ribbon Field must use the same directory.
+The default inbox is `~/.local/state/agent-status/inbox`. `AGENT_STATUS_INBOX`
+selects another directory for producers; the viewer accepts the same variable
+or `--inbox`. All producers and the collection must use the same inbox.
+Registration works even when the viewer is stopped. New reports appear while
+the page is open or when it is refreshed.
 
-Snapshots are immutable. Re-registering the same document and origin is
-idempotent and preserves dismissal. A newly generated document creates a new
-inbox item, including when its originating `status.html` path is reused. The
-retained copy survives removal of the original report file.
+Snapshots are immutable. Registering the same document and origin again preserves
+the original copy and dismissal state. A new report creates a new item, even
+when the agent reuses its output filename. Removing the original file does not
+remove its retained copy.
 
-To register an existing JSON/HTML report without regenerating its observations:
+To register an existing report without changing its observations:
 
 ```sh
 python3 -B <skill-directory>/scripts/register_status.py /path/status.json \
   --html /path/status.html --workspace /absolute/project/path \
-  --agent stable-agent-name --provider codex
+  --agent stable-agent-name --provider claude
 ```
 
-Do not register validation fixtures or illustrative previews as operational
-reports. Do not alter `generated_at` merely to make an old report look current.
+Do not register test fixtures or previews as operational reports. Do not change
+`generated_at` merely to make an old report look current.
 
 ## Other machines
 
-The inbox spans providers and project directories, not separate unconnected
-machines automatically. For an agent on another machine, transfer its JSON and
-HTML to the inbox host through the existing authorized connection, then run the
-registration command there. Keep the original workspace, agent, and provider
-metadata. Do not create a publicly exposed server or upload private reports to
-an unrelated service. Paired Ribbon Field devices use the same host's dismissal
-state; they do not keep separate browser-only copies of it.
+An agent on a different machine can transfer its JSON and HTML to the collection
+host through an existing authorized connection, then run the registration command
+there with its original workspace, agent, and provider metadata. Independent
+machines do not automatically share local directories. Do not expose the local
+viewer publicly or upload private reports to another service without a request.
 
 ## Storage contract
 
-Each producer publishes an immutable `reports/<sha256>/` directory containing
-`manifest.json`, `report.json`, and `report.html`, via an atomic directory rename.
-The version-1 manifest holds ID, title, subject, summary, generated and received
-timestamps, plus origin metadata. The ID hashes the canonical document and
-origin. Hidden staging directories are never displayed. User dismissal is stored
-separately in `dismissed/<sha256>.json` and is not changed by producers.
+Each producer publishes `reports/<sha256>/manifest.json`, `report.json`, and
+`report.html` via an atomic directory rename. The version-1 manifest records
+title, subject, summary, generation and receipt times, and origin metadata. The
+ID hashes the canonical document and origin. Hidden staging directories are
+never listed. Dismissal is stored separately in `dismissed/<sha256>.json` and
+is never changed by report generation. Previous inbox records remain compatible.
 
-Only explicitly registered files are served, in an isolated report viewer.
-Scripts and network requests inside report HTML are disabled; native evidence
-disclosures still work. The inbox refreshes while open; the report itself remains
-a snapshot of its recorded observation time.
+Only registered reports are served. Report HTML cannot execute scripts or make
+network requests; native evidence disclosures and explicit source links work.
+The page refreshes its collection; individual reports retain their recorded
+observation times.
