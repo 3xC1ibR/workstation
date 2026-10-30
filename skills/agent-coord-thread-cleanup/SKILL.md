@@ -11,7 +11,7 @@ Use the installed Agent Coord CLI and the `agent-coord:manage-threads` skill whe
 
 ## Review completion
 
-Inventory globally with `agent-coord thread list`, then read `thread list --archived` and `project list`. The CLI calls named groups “projects”; a thread's actual directory is its directory project. Do not limit discovery to the current working directory unless the user requests that scope.
+Inventory globally with `agent-coord thread list`, then read `thread list --archived` and `project list`. The CLI calls named groups “projects”. The inventory's `project_cwd` identifies the directory project that owns a thread; `cwd` identifies its execution directory and can differ. Match groups to `project_cwd`, and verify the saved membership rather than inferring it from the execution directory. Do not limit discovery to the current working directory unless the user requests that scope.
 
 Keep a before snapshot and action receipts outside repositories, under the local Agent Coord state directory. Preserve thread identifiers, titles, original groups and placement so results can be verified and parent-to-child group changes can be reconciled.
 
