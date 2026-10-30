@@ -140,5 +140,3 @@ class StatusServerTests(unittest.TestCase):
         self.assertEqual(self.request("/api/config", headers={"Host": "untrusted.invalid"})[0], 403)
         for body in ([], {"id": self.identifier}, {"id": self.identifier, "dismissed": False, "extra": True}):
             self.assertEqual(self.request("/api/dismiss", body)[0], 400)
-
-
