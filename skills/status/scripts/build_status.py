@@ -6,6 +6,7 @@ import argparse
 from datetime import datetime
 import html
 import json
+import os
 from pathlib import Path
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
@@ -183,14 +184,25 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("document", type=Path)
     parser.add_argument("--output", required=True, type=Path)
+    parser.add_argument("--workspace", default=os.getcwd(), help="Origin workspace shown in the shared Status inbox")
+    parser.add_argument("--agent", help="Stable agent name, when known")
+    parser.add_argument("--provider", help="Producing provider, when known")
+    parser.add_argument("--thread-id", default=os.environ.get("AGENT_COORD_SESSION_ID") or os.environ.get("CODEX_THREAD_ID"))
+    parser.add_argument("--no-register", action="store_true", help="Build a preview or test fixture without adding it to the inbox")
     args = parser.parse_args()
     try:
-        result = render(json.loads(args.document.read_text(encoding="utf-8")))
+        document = json.loads(args.document.read_text(encoding="utf-8"))
+        result = render(document)
     except (ValueError, KeyError, OSError) as error:
         parser.error(str(error))
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(result, encoding="utf-8")
     print(args.output.resolve())
+    if not args.no_register:
+        from register_status import register
+        identifier = register(document, result, workspace=args.workspace, agent=args.agent,
+                              provider=args.provider, thread_id=args.thread_id)
+        print(f"Status inbox receipt: {identifier}")
 
 
 if __name__ == "__main__":

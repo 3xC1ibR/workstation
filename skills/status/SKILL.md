@@ -49,7 +49,8 @@ and the skill repository.
 Use existing project records and read-only service queries. Prefer the
 authoritative source for each fact, retaining its observation time and scope.
 Reading status does not authorize experiments, submissions, resource changes,
-messages to other agents, scheduled polling, or publication.
+messages to other agents, scheduled polling, or public publication. Registering
+the generated report in the user's local Status inbox is part of delivery.
 
 - Separate official results, experimental results, and agent interpretation.
 - Report the latest meaningful event time, not a file's modification time or a
@@ -78,9 +79,21 @@ Store generated JSON, HTML, and screenshots outside the repository, for example
 `~/.local/state/agent-status/<workspace>/<agent-or-project>/`. Build with:
 
 ```sh
-python3 <skill-directory>/scripts/build_status.py /absolute/path/status.json \
-  --output /absolute/path/status.html
+python3 -B <skill-directory>/scripts/build_status.py /absolute/path/status.json \
+  --output /absolute/path/status.html --workspace /absolute/project/path \
+  --agent stable-agent-name --provider codex
 ```
+
+Use the actual workspace, stable agent name, and provider; omit unknown agent or
+provider values rather than inventing them. The builder automatically retains a
+copy in the global Status inbox, shown on Ribbon Field's **Status** page. This
+works across agents, providers, and workspace directories on the same host.
+Report generation does not require the app to be running. A dismissal applies
+only to that report; later reports still enter the inbox. Read
+[references/inbox.md](references/inbox.md) for registration, existing reports,
+and reports originating on another machine. Use `--no-register` for test fixtures
+or previews, never as the routine delivery path. If registration fails, retain
+the report and report the delivery failure rather than claiming it is in the inbox.
 
 Use the bundled renderer so content can change without design drift. It produces
 an offline snapshot; reloading the HTML does not retrieve fresh data. Verify

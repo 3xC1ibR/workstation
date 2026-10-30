@@ -49,3 +49,6 @@ areas. Print output expands evidence.
 - 2026-10-29: Reuse system-drawings visual language. Markdown profiles customize
   expected coverage; agents must add material findings beyond configured fields.
   Generated artifacts are offline snapshots with source observation times.
+- 2026-10-30: Register completed reports in Ribbon Field's shared Status inbox.
+  The inbox uses that application's auxiliary-page grammar; each retained report
+  preserves this monochrome sheet. Dismissal is reversible and report-specific.
