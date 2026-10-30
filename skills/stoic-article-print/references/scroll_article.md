@@ -19,3 +19,9 @@ Runtime edition: `~/.local/state/phomemo-printer/article_editions/2026-10-30/gov
 - The combined `article_scroll.pdf` is for review; the section files are submitted individually, with a separate receipt for each. The runtime manifest is the current source of truth for exact job IDs and terminal results.
 
 The original 17-page portrait job `M832D-Q769-2` remains canceled. The new scroll is a distinct user-authorized print. Do not retry an uncertain section or continue after cancellation or a reported printer fault without reconciling the current job state.
+
+## Print outcome
+
+Sections 1 and 2 completed as `M832D-Q769-4` at 14:13:56 CDT and `M832D-Q769-5` at 14:19:42 CDT. Section 3 was submitted as `M832D-Q769-6` at 14:20:56 CDT. The user reported that the paper had run out, had no more stock, and accepted stopping until tomorrow. The unfinished job was canceled at 14:25:57 CDT; no print jobs remain queued.
+
+The last fully printed column in section 3 is unknown. Its prepared file contains columns 41–56, including appendix material and references. Keep the complete edition and receipts. A later continuation requires a new request and a check of the loaded stock: use sideways scrolls for a new roll or normal portrait pages for folded sheets. Do not automatically resume the old custom-roll job when new paper is loaded.
