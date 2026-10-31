@@ -95,7 +95,9 @@ def create_scroll(arguments):
     add(Paragraph(html.escape(arguments.title), title))
     add(Paragraph(html.escape(arguments.author), metadata))
     add(Paragraph(html.escape(arguments.date) + "<br/>" + html.escape(arguments.source_url), metadata))
-    add(Paragraph(html.escape(arguments.license) + " | " + html.escape(arguments.license_url) + f"<br/>Scroll adaptation: reflowed at {size:g} pt; source wording retained.", metadata))
+    license_text = " | ".join(html.escape(value) for value in (arguments.license, arguments.license_url) if value)
+    adaptation = f"Scroll adaptation: reflowed at {size:g} pt; source wording retained."
+    add(Paragraph((license_text + "<br/>" if license_text else "") + adaptation, metadata))
 
     def make_table(node):
         raw_rows = []
@@ -298,8 +300,8 @@ def main():
     parser.add_argument("--author", required=True)
     parser.add_argument("--date", required=True)
     parser.add_argument("--source-url", required=True)
-    parser.add_argument("--license", required=True)
-    parser.add_argument("--license-url", required=True)
+    parser.add_argument("--license", default="", help="Optional source license metadata, when known")
+    parser.add_argument("--license-url", default="", help="Optional source license URL, when known")
     parser.add_argument("--font-size", type=float, default=9)
     create_scroll(parser.parse_args())
 

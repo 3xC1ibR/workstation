@@ -25,9 +25,9 @@ Honor explicit selections and exclusions. Otherwise make routine choices using t
 - Usually skip API references, setup guides, command-heavy quickstarts, configuration instructions, troubleshooting pages, changelogs, indexes, and pages requiring a live interface.
 - Judge actual content: technical subject matter is welcome when it provides substantial standalone reading.
 - Preserve relative order, remove duplicates, and normally skip bookmarks whose notes already contain `#printed`, unless the user wants a reprint. Printing is not evidence that an article has been read.
-- Record each exclusion and its reason. Distinguish suitability from unavailable or incomplete content and permission to reproduce it.
+- Record each exclusion and its reason. Distinguish suitability from unavailable or incomplete content.
 
-Do not replace a requested complete article with a summary, rewrite, excerpt, or silently truncated extraction. Use user-supplied copies or material with applicable reproduction permission; inspect license evidence when needed. Do not bypass access controls. If complete reproduction is unavailable, report the specific gap and offer an authorized source copy or a clearly labeled summary as a separate choice.
+Do not replace a requested complete article with a summary, rewrite, excerpt, or silently truncated extraction. For Ronnie's personal printing, work from the complete article at the supplied public URL; do not require an upload or an explicit reuse license as a routine prerequisite. Preserve attribution and source links. Do not bypass access controls. Request a source copy only when the complete text or essential figures cannot be retrieved through normal access, and describe the actual missing content.
 
 ## Reflow for the actual paper
 
@@ -63,10 +63,10 @@ Use actual fonts and rendered page widths to check fit. Keep headings with their
 
 ## Build and print a complete scroll
 
-`scripts/create_article_scroll.py` accepts a **complete cleaned article element** with local image assets. It retains original wording, uses embedded fonts, 9 pt text with 12 pt leading, reading columns about 90.7 mm wide, and wider panels for tables and wide figures. It does not fetch articles or establish reproduction permission. Install `requirements.txt` into the existing Phomemo runtime environment if needed.
+`scripts/create_article_scroll.py` accepts a **complete cleaned article element** with local image assets. It retains original wording, uses embedded fonts, 9 pt text with 12 pt leading, reading columns about 90.7 mm wide, and wider panels for tables and wide figures. It does not fetch articles. License metadata is optional and should be included only when known. Install `requirements.txt` into the existing Phomemo runtime environment if needed.
 
 ```sh
-~/.local/state/phomemo-printer/venv/bin/python /opt/projects/workstation/skills/stoic-article-print/scripts/create_article_scroll.py /absolute/path/cleaned_article.html /absolute/path/new_runtime_edition --title 'Article title' --author 'Author names' --date 'Publication date' --source-url https://example.com/article --license 'Applicable license' --license-url https://example.com/license --font-size 9
+~/.local/state/phomemo-printer/venv/bin/python /opt/projects/workstation/skills/stoic-article-print/scripts/create_article_scroll.py /absolute/path/cleaned_article.html /absolute/path/new_runtime_edition --title 'Article title' --author 'Author names' --date 'Publication date' --source-url https://example.com/article --font-size 9
 ```
 
 The output directory must be empty. The builder creates `article_scroll.pdf` for review, individual `article_scroll_section_NN.pdf` files for printing, and a manifest with exact custom dimensions, source checksum, tables, figures, column count, and total paper length. Each section stays within the driver's custom-length limit. The combined review PDF can contain different page lengths; **print individual section files with their manifest lengths**, rather than forcing the combined file to one common media size.
