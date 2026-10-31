@@ -35,7 +35,7 @@ Check `phomemo-print/references/setup.md` and the current loaded roll. Letter ou
 
 **Use the layout for the loaded paper.** On 2026-10-30 Ronnie reported that rolled output curls into itself and requested sideways scroll reading. They approved the physical three-column test and selected **9 pt** article text. With rolled stock, lay out successive upright reading columns along the roll's length, so it can be unrolled left to right and kept whole. Use `phomemo-print` for physical custom-media dimensions. Reflow source text and figures into the scroll's reading height rather than shrinking whole portrait pages. A single line extending for the article's entire length is not the intended layout.
 
-Ronnie ordered straight folded sheets, expected 2026-10-31. After those sheets arrive and are loaded, use normal portrait pages and continuous multi-page feeding. Confirm the loaded stock; do not switch modes merely because a date passed. The normal-page defaults below apply to folded sheets. Custom roll limits and the approved first scroll test are documented in `phomemo-print/references/scroll_test.md`.
+On 2026-10-31 Ronnie confirmed 8.5 x 11 inch sheets and approved the physical portrait test's margins. The test used 9 pt text; Ronnie then corrected the requested sheet body text size to **8 pt**. Use normal portrait pages and continuous multi-page feeding for sheets, with 8 pt article text and about 11 pt leading. The 8 pt revision is prepared but has not been physically tested. Confirm the loaded stock when changing media. The normal-page defaults below apply to sheets; rolled scrolls retain 9 pt text. Custom roll limits and the approved first scroll test are documented in `phomemo-print/references/scroll_test.md`.
 
 For **normal page printing**, inspect an existing source PDF before rebuilding it. Measure its actual body type size, page dimensions, printable bounds, and figure readability. If it already meets the user's reading preference and fits the loaded media, preserve that layout when reflow would add pages or damage figures. The first article trial found that the government-services paper's original Letter PDF already uses 10 pt body text and 17 pages; its reflowed draft grew to 24 pages. Publisher margins can be retained for such an existing edition. That 17-page job was canceled after 8 reported pages; do not resume it without a new request. See [the first article record](references/first_article.md).
 
@@ -46,14 +46,14 @@ Use these starting parameters, then adjust from the physical calibration result:
 | Page | Portrait Letter 215.9 x 279.4 mm, or A4 210 x 297 mm to match loaded media |
 | Margins | 10 mm left/right; 12 mm top/bottom |
 | Available width | 195.9 mm on Letter; 190 mm on A4 |
-| Body | 9 pt, approximately 12 pt leading, single column |
+| Body | 8 pt, approximately 11 pt leading; choose columns for comfortable line lengths |
 | Color | Black text on white; figures converted thoughtfully for monochrome thermal output |
 | Graphics | Sharp at the printer's 300 dpi, readable labels, distinguishable line styles |
 | Delivery | One-sided; logical pages rather than an untested article-length custom sheet |
 
-Ronnie initially selected 10 pt after the physical calibration on 2026-10-30, then requested 9 pt for the article after approving the sideways scroll. The approved scroll uses the revised 10/12 mm margins with a 4 mm content inset. For normal article pages, no visible border is required. The photograph suggests that mid-gray shades may reproduce quite dark, so inspect essential figure distinctions carefully.
+Ronnie initially selected 10 pt after the physical calibration on 2026-10-30, then requested 9 pt for the article after approving the sideways scroll. The Letter sheet test on 2026-10-31 used 9 pt in two columns with an 8 mm gap; Ronnie approved its margins and subsequently selected 8 pt. See `phomemo-print/references/setup.md` for the physical test record. The approved scroll uses the revised 10/12 mm margins with a 4 mm content inset. For normal article pages, no visible border is required. The photograph suggests that mid-gray shades may reproduce quite dark, so inspect essential figure distinctions carefully.
 
-Keep prose lines comfortable to follow. At 9 pt, full-width lines can become long; use two columns with an approximately 8 mm gap when that improves a prose article, allowing wide figures or tables to span the page. Preserve reading order and keep the selected 9 pt size rather than reducing type to fit dense content.
+Keep prose lines comfortable to follow. At 8 pt, full-width sheet lines can become long; use two columns with an approximately 8 mm gap when that improves a prose article, allowing wide figures or tables to span the page. Preserve reading order and the selected size for the loaded stock rather than reducing type to fit dense content.
 
 Extract semantic article content, not screenshots of the webpage. Remove navigation, ads, promotions, cookie banners, and comments unless requested. Preserve original wording, headings, essential images and captions, tables, code, footnotes, and references. Include title, author, publication date when available, and source URL.
 

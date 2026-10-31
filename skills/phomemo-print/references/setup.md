@@ -44,7 +44,7 @@ The exact installed PPD defines:
 | Letter | 612 x 792 | x=23..589, y=30..762 | 36 points / 12.7 mm on all sides |
 | A4 | 595 x 842 | x=21..574, y=30..812 | 36 points / 12.7 mm on all sides |
 
-At the initial safe margins, the content width is 190.5 mm for Letter and about 184.6 mm for A4. After the successful physical test, Ronnie requested extending the borders. The revised layout uses 10 mm left/right and 12 mm top/bottom: content width 195.9 mm for Letter or 190 mm for A4. Both settings are inside the PPD's imageable area. The revised margins have only been checked in the rendered preview; they have not been sent as a second print.
+At the initial safe margins, the content width is 190.5 mm for Letter and about 184.6 mm for A4. After the successful physical test, Ronnie requested extending the borders. The revised layout uses 10 mm left/right and 12 mm top/bottom: content width 195.9 mm for Letter or 190 mm for A4. Both settings are inside the PPD's imageable area. These margins were preview-only at the initial calibration; the later Letter sheet test below received physical approval.
 
 The additional fixed sizes are 110, 80, and 53 mm wide. Custom width/height support is declared up to 613 x 5700 points. A later 215.9 x 320 mm sideways-scroll test was submitted as `M832D-Q769-3`; see [the scroll test record](scroll_test.md) for its outcome. Longer article-length custom pages remain untested.
 
@@ -63,9 +63,20 @@ The printer uses direct thermal monochrome output and one-sided pages. The initi
 - Submitted once at 2026-10-30 13:07:24 CDT. CUPS accepted job `M832D-Q769-1`.
 - CUPS Get-Job-Attributes returned job-state `9` (completed), one impression, and one media sheet completed at 13:08:10 CDT. The printer returned to idle.
 - Ronnie confirmed “it printed” and supplied a photograph showing all four border edges and readable text. Physical output is confirmed. The paper is curled as expected for roll media; no clipped text or missing border is visible in the photograph.
-- Ronnie selected **10 pt** as comfortable and requested extending the borders. Article defaults are now 10 pt body / approximately 13.5 pt leading with the revised margins above.
+- Ronnie initially selected **10 pt** as comfortable and requested extending the borders. The initial article defaults were 10 pt body / approximately 13.5 pt leading with the revised margins above; subsequent scroll and sheet preferences supersede them.
 - Revised preview: `~/.local/state/phomemo-printer/calibration_letter_revised.pdf`; not submitted. The revised generator's article sample uses the selected 10 pt size.
 - Source checks: both skill frontmatter validators passed; PDF preflight passed for Letter; an A4 mismatch and reuse of the existing print receipt were refused without submitting another job. Later article and scroll trials are recorded in their respective skill references. Validation was performed by the implementing agent, with no independent review.
+
+## Letter sheet test, 2026-10-31
+
+- Ronnie confirmed the new sheets are **8.5 x 11 inches (Letter)**.
+- Printed only page 1 of the complete *Self-Reliance* edition: portrait, two columns with an 8 mm gap, **9 pt body / 12 pt leading**, black on white, one-sided, actual size, 300 dpi.
+- Outer margins: **10 mm left/right and 12 mm top/bottom**. The text and rendered pixels of the extracted test page exactly matched the reviewed full edition.
+- Job `M832D-Q769-7` was submitted at 16:37:36 UTC and completed in CUPS at 16:38:20 UTC. One impression and one sheet were reported; the queue returned to idle with no jobs pending.
+- Runtime directory: `~/.local/state/phomemo-printer/article_editions/2026-10-31/self_reliance_letter_9pt/`. Test PDF: `first_page_test.pdf`; receipt: `test_print_receipt.json`; SHA-256: `343bd12955efbc49a982095257db4edc79debe62d3b1aff31939ef06a257e2f2`.
+- Ronnie confirmed the physical output looks great and explicitly approved the margins. Physical output and margins are confirmed for the **9 pt test**.
+- Ronnie then corrected the requested sheet font size to **8 pt**. Current sheet preference is **8 pt body / about 11 pt leading**, preserving the approved margins; rolled scrolls retain 9 pt / about 12 pt leading.
+- The complete 8 pt sheet revision is prepared under `~/.local/state/phomemo-printer/article_editions/2026-10-31/self_reliance_letter_8pt/`. It has **not** been physically printed or approved at that size. No additional print was authorized by the font correction.
 
 ## Primary references
 

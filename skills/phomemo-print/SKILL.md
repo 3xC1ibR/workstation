@@ -17,7 +17,7 @@ lpoptions -p M832D-Q769 -l
 
 Use USB on macOS. The manufacturer's guide reserves Bluetooth for phones and tablets. Use thermal paper, power on the printer, close the cover, and confirm paper is loaded. If setup or troubleshooting is needed, read [the setup record](references/setup.md).
 
-The queue's base setting is **Letter**, 300 dpi, grayscale, continuous media, and one-sided output. Letter output was physically verified on the included roll. Ronnie now prefers a sideways scroll layout for rolled paper because loose pages curl up; use normal portrait pagination for straight folded sheets once they are actually loaded. The folded sheets were ordered with expected arrival 2026-10-31; the date alone does not establish which media is loaded. The roll's exact labeled width was not measured; check the label when changing media.
+The queue's base setting is **Letter**, 300 dpi, grayscale, continuous media, and one-sided output. Letter output was physically verified on the included roll. Ronnie prefers a sideways scroll layout for rolled paper because loose pages curl up; use normal portrait pagination for straight folded sheets. On 2026-10-31 Ronnie confirmed **8.5 x 11 inch sheets** and approved the margins of a 9 pt portrait test, then selected **8 pt** for sheet articles. The 8 pt revision has been prepared but not physically tested. Confirm the actual stock when changing media; the roll's exact labeled width was not measured.
 
 - Letter: 215.9 mm wide, 279.4 mm page length; often labeled 216 mm or 8.5 inches.
 - A4: 210 mm wide, 297 mm page length.
@@ -48,7 +48,7 @@ The 320 mm custom setting completed as job M832D-Q769-3, and the user approved t
 
 ## Prepare a PDF
 
-Use the PDF skill when creating or editing PDFs. Preserve the requested document's content. Use the loaded paper size, black text on white, and one-sided pages. Ronnie initially found 10 pt comfortable, then selected **9 pt article body text** after approving the sideways test. Use about 12 pt leading. The revised margins are **10 mm across the roll and 12 mm at its feed ends**; the approved scroll test includes an additional 4 mm text inset inside its border. Render and inspect the PDF before printing. Already formatted documents may need reflow; do not silently shrink a wide page until the text is unreadable.
+Use the PDF skill when creating or editing PDFs. Preserve the requested document's content. Use the loaded paper size, black text on white, and one-sided pages. Use **8 pt article body text with about 11 pt leading for sheets**, and **9 pt with about 12 pt leading for rolled scrolls**. Ronnie selected 8 pt after approving the margins of the 9 pt Letter test; do not describe 8 pt output as physically verified yet. Sheet margins are **10 mm left/right and 12 mm top/bottom**. For scrolls these margins run across the roll and at its feed ends; the approved scroll test includes an additional 4 mm text inset inside its border. Render and inspect the PDF before printing. Already formatted documents may need reflow; do not silently shrink a wide page until the text is unreadable.
 
 Reusable helpers use an isolated environment outside the source repository:
 
