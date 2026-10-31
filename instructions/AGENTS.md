@@ -30,6 +30,24 @@ When creating or updating a personal skill, edit the source in `workstation`, va
 Keep generated runtime state, logs, and credentials outside the skill source and repository. Bundled and plugin-managed skills remain managed by their providers.
 
 
+# Walle project archives
+
+Inactive projects on Walle can be archived to the private S3 bucket
+`walle-backups-392424878485-us-east-1`. Their local directory trees remain as
+pointers. Before treating an empty project as missing or starting work in it,
+look for `ARCHIVE.md` and `ARCHIVE.json` in that directory or its parents.
+Preserve those records and `FILE_INDEX.txt`; restore the contents before using
+the project. Empty archived `.git` directories are not working repositories.
+
+Follow `/opt/projects/workstation/docs/project-archives.md` for archival and
+restoration. Use `/opt/projects/workstation/scripts/archive_directory.py` to
+verify uploads and restore the exact recorded S3 version. Remove local payloads
+only for user-authorized directories after verification. Do not propagate local
+deletions to S3 or expire referenced archives. Manage the bucket through
+`/opt/projects/infra/walle-backups/terraform/`. Keep credentials and runtime
+receipts outside Git.
+
+
 # Relevant projects
 rig: 
 - agent harness
