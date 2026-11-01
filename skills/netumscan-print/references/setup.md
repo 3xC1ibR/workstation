@@ -83,6 +83,6 @@ The first graphic is a four-workstream status strip, 576 x 2752 dots (72 x 344 m
 - Status inbox report ID: `dd7fea3670e5439484a2c9f948c372ac1725f0d833e9d970e2c8679478d05ffe`.
 - Submission record: `~/.local/state/netumscan-printer/status_raster_print_2026-10-31/receipt.json`.
 - Sent once at 2026-11-01 00:18:48 UTC. All 198331 bytes transferred; hardware status was ready before and after. Payload SHA-256: `05043d20994f929ffc6402ee156ab44ff716fc109b51fa601588cdb646d508e5`.
-- Graphic legibility and cutter result await physical feedback. Do not describe this first raster output as physically verified until that feedback arrives.
+- Ronnie confirmed the raster status strip was **clear and readable**. This physically verifies the graphics path and the 24-pixel (~8.5 pt) body layout. Cutter action was not separately confirmed.
 
 Offline raster checks reconstructed an asymmetric 9 x 129 dot pattern from the emitted bands, verifying black/white polarity, white padding, row order, exact lengths, 128-row splitting, and a single final cut. Blank, overly wide, and overly long PNGs were rejected. These checks submitted no additional print.
