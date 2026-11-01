@@ -97,6 +97,16 @@ Ronnie requested two article pages in the existing sideways scroll style and spe
 - Artifact directory: `~/.local/state/netumscan-printer/article_scroll_7_5pt_2026-10-31/`. Contains `create_scroll.py` (run with the existing Phomemo environment), `excerpt.txt`, `manifest.json`, `reading_scroll.png`, `physical_scroll.png`, and reading-window previews.
 - Added explicit `--maximum-length-mm`, capped at 2048 mm, while retaining the default 512 mm bound. Negative checks verified the unchanged default rejection and absolute ceiling, and successful preparation under an explicit longer bound.
 - Submitted once using `--maximum-length-mm 1442` at 2026-11-01 00:30:21 UTC. All 831331 bytes transferred by 00:30:24 UTC; status ready before and after. Payload SHA-256 `c92fab785841ae1fe905748fdbed990dadf55f3f2d4cdf77a08ab00a58adc489`.
-- Print record: `~/.local/state/netumscan-printer/article_scroll_7_5pt_print_2026-10-31/receipt.json`. One final partial-cut command; no cuts between columns. Physical legibility, orientation, and cutting await user feedback.
+- Print record: `~/.local/state/netumscan-printer/article_scroll_7_5pt_print_2026-10-31/receipt.json`. One final partial-cut command; no cuts between columns. Ronnie called the physical output **perfect**, approving the 7.5 pt sideways layout. Cutting was not separately reported.
 
 No Stoic state or Phomemo preferences were changed. No extra physical calibration strip was sent.
+
+## Roll-paper economics
+
+Ronnie purchased nominal 3 1/8 inch x 230 foot stock; the installed sample roll is much shorter and was already nearly exhausted. Treat the new stock as 70.104 m per full roll. Exact pack price and roll count remain unknown.
+
+The 2634-word, 1442 mm trial consumes 2.057% of a nominal full roll before additional feed/cut margins. Theoretical capacity is 48.6 identical samples / 128054 words; use about 45-48 samples or 120000 words as an approximate usable allowance. Paper area is equivalent to 1.90 US Letter sheets, using the labeled 3 1/8 inch width. It matched two densely typeset 8 pt, two-column source pages. A calculated single-column Letter model (one-inch margins, Vera Sans, 6 pt paragraph gaps, title allowance) takes five pages at both 11 pt / 14 pt leading and 12 pt / 15 pt leading. The conventional page comparison is modeled, not physically printed.
+
+For similar prose, the observed rate is about 0.547 m per 1000 words. At an illustrative $2 per roll, paper alone costs about 1.56 cents per 1000 words or 4.11 cents for the actual trial. Exclude the printer purchase, electricity, wear, tax/shipping and unusable ends from this figure. Denser typography accounts for much of the page-count difference; a normal printer can also use compact layouts and duplex printing. Do not claim the roll is always cheaper than a laser printer.
+
+Calculations and page-model assumptions are saved in the trial's runtime `paper_economics.json`. No additional print was sent for this analysis.
