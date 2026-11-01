@@ -112,3 +112,9 @@ For similar prose, the observed rate is about 0.547 m per 1000 words. At an illu
 At Ronnie's actual $4.99 per roll, the trial costs about 10.26 cents in paper. Scaled prose estimates: 1000 words 3.90 cents, 2500 words 9.74 cents, 5000 words 19.48 cents, and 10000 words 38.97 cents, before feed/cut waste. These are marginal paper costs, not the total cost of printer ownership.
 
 Calculations and page-model assumptions are saved in the trial's runtime `paper_economics.json`. No additional print was sent for this analysis.
+
+## Length ceiling and chunked transfer, 2026-11-01
+
+Ronnie questioned the 2048 mm ceiling; it was arbitrary. The only real constraint was a single `printer.write` of the whole payload with one 30 s timeout, which a printer throttling the host to print speed could exceed on a long job and leave a partial print. The helper now writes 64 KiB chunks, each with a 30 s timeout, and stops recording at the first short write. `--maximum-length-mm` accepts up to 70000 mm (one nominal 230 ft roll) and still requires `--image`.
+
+Offline validation: 70001 mm and a text job with the flag are rejected; a mock-printer submission of a 576 x 42000 dot image (5.25 m) sent 47 chunks of at most 65536 bytes, all with a 30000 ms timeout, totalling the full 3026643-byte payload, and recorded `usb_transfer_complete`. No physical print was sent for this change. Article editions prepared with it: `~/.local/state/netumscan-printer/article_scrolls_2026-11-01/` (Tail End 1635 mm, The Psychology of Money 5305 mm, In Praise of Idleness 2691 mm), one job per article.

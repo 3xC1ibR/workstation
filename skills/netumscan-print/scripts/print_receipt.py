@@ -17,7 +17,10 @@ COLUMNS = 48
 MAX_LINES = 120
 MAX_IMAGE_WIDTH = 576
 MAX_IMAGE_HEIGHT = 4096
-MAX_EXTENDED_IMAGE_HEIGHT = 16384
+MAX_EXTENDED_LENGTH_MM = 70000  # one nominal 230 ft roll; a software guard, not a hardware limit
+MAX_EXTENDED_IMAGE_HEIGHT = MAX_EXTENDED_LENGTH_MM * 8
+USB_CHUNK_BYTES = 65536
+USB_CHUNK_TIMEOUT_MS = 30000
 
 
 def timestamp():
@@ -81,7 +84,7 @@ def prepare_payload(text, calibration):
 def prepare_image(path, maximum_height=MAX_IMAGE_HEIGHT):
     from PIL import Image, ImageOps
     if not 1 <= maximum_height <= MAX_EXTENDED_IMAGE_HEIGHT:
-        raise ValueError("Image height limit must be between 1 and 16384 dots.")
+        raise ValueError(f"Image height limit must be between 1 and {MAX_EXTENDED_IMAGE_HEIGHT} dots.")
     with Image.open(path) as original:
         if original.format != "PNG" or getattr(original, "n_frames", 1) != 1:
             raise ValueError("Image input must be a single-frame PNG.")
@@ -163,13 +166,13 @@ def main():
     source.add_argument("--text", help="Receipt text; typography is normalized to CP437.")
     source.add_argument("--file", type=Path, help="UTF-8 text file to wrap at 48 columns.")
     source.add_argument("--image", type=Path, help="Single-frame PNG, up to 576 x 4096 pixels; one pixel per dot.")
-    parser.add_argument("--maximum-length-mm", type=int, help="Explicit image length bound, 1-2048 mm; default 512 mm.")
+    parser.add_argument("--maximum-length-mm", type=int, help=f"Explicit image length bound, 1-{MAX_EXTENDED_LENGTH_MM} mm; default 512 mm.")
     parser.add_argument("--submit", action="store_true", help="Print one copy and make one partial cut.")
     parser.add_argument("--output-directory", type=Path, help="New runtime directory; must not already exist.")
     arguments = parser.parse_args()
     if arguments.maximum_length_mm is not None:
-        if not arguments.image or not 1 <= arguments.maximum_length_mm <= 2048:
-            parser.error("--maximum-length-mm requires --image and a value from 1 to 2048")
+        if not arguments.image or not 1 <= arguments.maximum_length_mm <= MAX_EXTENDED_LENGTH_MM:
+            parser.error(f"--maximum-length-mm requires --image and a value from 1 to {MAX_EXTENDED_LENGTH_MM}")
     if arguments.status:
         if arguments.submit or arguments.output_directory:
             parser.error("--status cannot be combined with --submit or --output-directory")
@@ -228,7 +231,15 @@ def main():
         record.update(state="submission_started", submitted_at=timestamp())
         save_record(receipt, record)
         transfer_started = True
-        transferred = printer.write(0x01, payload, timeout=30000 if image_preview is not None else 10000)
+        # Chunked writes keep each USB timeout independent of job length; the printer
+        # throttles the host to its print speed, so one long write could time out mid-job.
+        transferred = 0
+        for offset in range(0, len(payload), USB_CHUNK_BYTES):
+            chunk = payload[offset:offset + USB_CHUNK_BYTES]
+            written = printer.write(0x01, chunk, timeout=USB_CHUNK_TIMEOUT_MS)
+            transferred += written
+            if written != len(chunk):
+                break
         record["bytes_transferred"] = transferred
         if transferred != len(payload):
             raise RuntimeError(f"Partial USB transfer: {transferred}/{len(payload)} bytes; inspect output before retrying.")
