@@ -103,10 +103,12 @@ No Stoic state or Phomemo preferences were changed. No extra physical calibratio
 
 ## Roll-paper economics
 
-Ronnie purchased nominal 3 1/8 inch x 230 foot stock; the installed sample roll is much shorter and was already nearly exhausted. Treat the new stock as 70.104 m per full roll. Exact pack price and roll count remain unknown.
+Ronnie purchased nominal 3 1/8 inch x 230 foot stock, paying $4.99 for one roll to get it quickly; cheaper options are available. The installed sample roll is much shorter and was already nearly exhausted. Treat the new stock as 70.104 m per full roll.
 
 The 2634-word, 1442 mm trial consumes 2.057% of a nominal full roll before additional feed/cut margins. Theoretical capacity is 48.6 identical samples / 128054 words; use about 45-48 samples or 120000 words as an approximate usable allowance. Paper area is equivalent to 1.90 US Letter sheets, using the labeled 3 1/8 inch width. It matched two densely typeset 8 pt, two-column source pages. A calculated single-column Letter model (one-inch margins, Vera Sans, 6 pt paragraph gaps, title allowance) takes five pages at both 11 pt / 14 pt leading and 12 pt / 15 pt leading. The conventional page comparison is modeled, not physically printed.
 
 For similar prose, the observed rate is about 0.547 m per 1000 words. At an illustrative $2 per roll, paper alone costs about 1.56 cents per 1000 words or 4.11 cents for the actual trial. Exclude the printer purchase, electricity, wear, tax/shipping and unusable ends from this figure. Denser typography accounts for much of the page-count difference; a normal printer can also use compact layouts and duplex printing. Do not claim the roll is always cheaper than a laser printer.
+
+At Ronnie's actual $4.99 per roll, the trial costs about 10.26 cents in paper. Scaled prose estimates: 1000 words 3.90 cents, 2500 words 9.74 cents, 5000 words 19.48 cents, and 10000 words 38.97 cents, before feed/cut waste. These are marginal paper costs, not the total cost of printer ownership.
 
 Calculations and page-model assumptions are saved in the trial's runtime `paper_economics.json`. No additional print was sent for this analysis.
