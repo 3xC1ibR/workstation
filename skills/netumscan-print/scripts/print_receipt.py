@@ -17,6 +17,7 @@ COLUMNS = 48
 MAX_LINES = 120
 MAX_IMAGE_WIDTH = 576
 MAX_IMAGE_HEIGHT = 4096
+MAX_EXTENDED_IMAGE_HEIGHT = 16384
 
 
 def timestamp():
@@ -77,13 +78,15 @@ def prepare_payload(text, calibration):
     return text, data + b"\n\n\x1dVB\x00"
 
 
-def prepare_image(path):
+def prepare_image(path, maximum_height=MAX_IMAGE_HEIGHT):
     from PIL import Image, ImageOps
+    if not 1 <= maximum_height <= MAX_EXTENDED_IMAGE_HEIGHT:
+        raise ValueError("Image height limit must be between 1 and 16384 dots.")
     with Image.open(path) as original:
         if original.format != "PNG" or getattr(original, "n_frames", 1) != 1:
             raise ValueError("Image input must be a single-frame PNG.")
-        if not 1 <= original.width <= MAX_IMAGE_WIDTH or not 1 <= original.height <= MAX_IMAGE_HEIGHT:
-            raise ValueError(f"PNG must be at most {MAX_IMAGE_WIDTH} x {MAX_IMAGE_HEIGHT} pixels; reflow at 8 dots/mm.")
+        if not 1 <= original.width <= MAX_IMAGE_WIDTH or not 1 <= original.height <= maximum_height:
+            raise ValueError(f"PNG must be at most {MAX_IMAGE_WIDTH} x {maximum_height} pixels; reflow at 8 dots/mm.")
         rgba = original.convert("RGBA")
         paper = Image.new("RGBA", rgba.size, "white")
         paper.alpha_composite(rgba)
@@ -160,9 +163,13 @@ def main():
     source.add_argument("--text", help="Receipt text; typography is normalized to CP437.")
     source.add_argument("--file", type=Path, help="UTF-8 text file to wrap at 48 columns.")
     source.add_argument("--image", type=Path, help="Single-frame PNG, up to 576 x 4096 pixels; one pixel per dot.")
+    parser.add_argument("--maximum-length-mm", type=int, help="Explicit image length bound, 1-2048 mm; default 512 mm.")
     parser.add_argument("--submit", action="store_true", help="Print one copy and make one partial cut.")
     parser.add_argument("--output-directory", type=Path, help="New runtime directory; must not already exist.")
     arguments = parser.parse_args()
+    if arguments.maximum_length_mm is not None:
+        if not arguments.image or not 1 <= arguments.maximum_length_mm <= 2048:
+            parser.error("--maximum-length-mm requires --image and a value from 1 to 2048")
     if arguments.status:
         if arguments.submit or arguments.output_directory:
             parser.error("--status cannot be combined with --submit or --output-directory")
@@ -176,7 +183,8 @@ def main():
 
     image_preview = None
     if arguments.image:
-        image_preview, payload = prepare_image(arguments.image)
+        maximum_height = arguments.maximum_length_mm * 8 if arguments.maximum_length_mm is not None else MAX_IMAGE_HEIGHT
+        image_preview, payload = prepare_image(arguments.image, maximum_height)
         preview = f"Monochrome image: {image_preview.width} x {image_preview.height} dots\n"
     else:
         text = arguments.file.read_text(encoding="utf-8") if arguments.file else arguments.text

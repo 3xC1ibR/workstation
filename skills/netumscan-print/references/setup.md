@@ -86,3 +86,17 @@ The first graphic is a four-workstream status strip, 576 x 2752 dots (72 x 344 m
 - Ronnie confirmed the raster status strip was **clear and readable**. This physically verifies the graphics path and the 24-pixel (~8.5 pt) body layout. Cutter action was not separately confirmed.
 
 Offline raster checks reconstructed an asymmetric 9 x 129 dot pattern from the emitted bands, verifying black/white polarity, white padding, row order, exact lengths, 128-row splitting, and a single final cut. Blank, overly wide, and overly long PNGs were rejected. These checks submitted no additional print.
+
+## Two-page sideways article trial, 2026-10-31
+
+Ronnie requested two article pages in the existing sideways scroll style and specified **7.5 pt**. Used the first two pages of the local 8 pt Letter edition of Emerson's *Self-Reliance* as the exact excerpt boundary. Its source PDF is `~/.local/state/phomemo-printer/article_editions/2026-10-31/self_reliance_letter_8pt/self_reliance.pdf`, SHA-256 `69b8642a87586621df6fe641ce1b04f7f9ab72be0cc2a6618bd1aaf9c0359040`. The article's cleaned HTML supplied paragraph boundaries, epigraph line breaks, and emphasis. Removed only the source edition's running furniture and title block, replacing them with concise scroll attribution. This is an excerpt, not the complete essay; source page 2 ends mid-sentence.
+
+- 2634 words; 7.5 pt Bitstream Vera Sans (italics/bold retained), 10 pt leading. Fourfold supersampling before raster reduction preserves fractional font sizing.
+- 15 reading columns, each 90 mm wide with a 6 mm gap, on a 72 x 1442 mm printable image (576 x 11536 dots). The reading canvas was rotated clockwise for the physical feed, matching the Phomemo's approved orientation.
+- Exact non-whitespace character comparisons passed for source pages versus the HTML prefix and for the reflowed lines versus that prefix. Every column was inspected in reading order across five preview windows. Both epigraphs and all selected body text remain present.
+- Artifact directory: `~/.local/state/netumscan-printer/article_scroll_7_5pt_2026-10-31/`. Contains `create_scroll.py` (run with the existing Phomemo environment), `excerpt.txt`, `manifest.json`, `reading_scroll.png`, `physical_scroll.png`, and reading-window previews.
+- Added explicit `--maximum-length-mm`, capped at 2048 mm, while retaining the default 512 mm bound. Negative checks verified the unchanged default rejection and absolute ceiling, and successful preparation under an explicit longer bound.
+- Submitted once using `--maximum-length-mm 1442` at 2026-11-01 00:30:21 UTC. All 831331 bytes transferred by 00:30:24 UTC; status ready before and after. Payload SHA-256 `c92fab785841ae1fe905748fdbed990dadf55f3f2d4cdf77a08ab00a58adc489`.
+- Print record: `~/.local/state/netumscan-printer/article_scroll_7_5pt_print_2026-10-31/receipt.json`. One final partial-cut command; no cuts between columns. Physical legibility, orientation, and cutting await user feedback.
+
+No Stoic state or Phomemo preferences were changed. No extra physical calibration strip was sent.
