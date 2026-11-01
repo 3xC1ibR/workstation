@@ -72,3 +72,17 @@ There are no queued CUPS jobs for these submissions; the direct USB transfer is 
 - Operating manual: https://cdn.shopify.com/s/files/1/0591/6364/0002/files/80MM_Printer_Instruction_Manual.pdf?v=1718868045 . The roll-loading illustration is on PDF page 5; the built-in self-test instructions are on PDF page 3.
 
 The built-in self-test can distinguish a physical print problem from host-command trouble: switch off, hold FEED while switching on, then release when the PAPER OUT indicator lights. Do not keep holding FEED for several seconds; the manual describes a different hexadecimal-dump mode for that sequence. A self-test is another physical print and should be requested only when needed and authorized.
+
+## Experimental graphics, 2026-10-31
+
+Ronnie clarified that the intended use is experimental output rather than sales receipts, and requested a paper equivalent of the `status` skill. Added `Pillow==12.0.0` and `--image` support for bounded, single-frame PNGs. Native `GS v 0` raster commands carry 128-row bands at one pixel per dot. Transparency is composited on white, dithering is disabled, and row padding stays unprinted. Images wider than 576 dots, taller than 4096 dots, or entirely blank are rejected before USB submission.
+
+The first graphic is a four-workstream status strip, 576 x 2752 dots (72 x 344 mm of content), with 24-pixel monospace body text (about 8.5 pt), bold headings, and ruled sections. It summarizes saved Agent Coord reports for Canvas Browser, Ramble, the kernel campaign, and the printer experiment. Its older funding request is explicitly marked unverified; no live billing, judge, CI or deployment audit was performed. The full HTML was built by the unchanged status renderer, registered in the local Status inbox, and inspected at desktop and phone widths.
+
+- Runtime report and artwork: `~/.local/state/agent-status/projects/thermal_status_2026-10-31/` (`status.json`, `status.html`, `status_strip.png`, `render_status_strip.py`, and verification screenshots).
+- Status inbox report ID: `dd7fea3670e5439484a2c9f948c372ac1725f0d833e9d970e2c8679478d05ffe`.
+- Submission record: `~/.local/state/netumscan-printer/status_raster_print_2026-10-31/receipt.json`.
+- Sent once at 2026-11-01 00:18:48 UTC. All 198331 bytes transferred; hardware status was ready before and after. Payload SHA-256: `05043d20994f929ffc6402ee156ab44ff716fc109b51fa601588cdb646d508e5`.
+- Graphic legibility and cutter result await physical feedback. Do not describe this first raster output as physically verified until that feedback arrives.
+
+Offline raster checks reconstructed an asymmetric 9 x 129 dot pattern from the emitted bands, verifying black/white polarity, white padding, row order, exact lengths, 128-row splitting, and a single final cut. Blank, overly wide, and overly long PNGs were rejected. These checks submitted no additional print.

@@ -1,9 +1,9 @@
 ---
 name: netumscan-print
-description: Inspect and print text receipts on Ronnie's NetumScan NS8360L 80 mm thermal printer over USB on macOS, with hardware status checks and saved print receipts. Use phomemo-print for the full-width Phomemo printer.
+description: Print experimental status strips, text, and monochrome graphics on Ronnie's NetumScan NS8360L 80 mm thermal roll printer over USB on macOS, with hardware status checks and saved job records. Use phomemo-print for the full-width Phomemo printer.
 ---
 
-# NetumScan receipt printing
+# NetumScan experimental roll printing
 
 The NS8360L is physically verified over USB on this Mac. Use the native USB helper, not a CUPS queue. Its serial is `83600000000`, USB vendor/product `0416:5011`, interface 0, bulk OUT `01` and IN `81`. The printer reports `POS80 Printer USB`.
 
@@ -11,11 +11,14 @@ The NS8360L is physically verified over USB on this Mac. Use the native USB help
 ~/.local/bin/netumscan-print --status
 ~/.local/bin/netumscan-print --text 'Receipt text'
 ~/.local/bin/netumscan-print --file /absolute/path/receipt.txt
+~/.local/bin/netumscan-print --image /absolute/path/status_strip.png
 ```
 
-The last two commands prepare and preview only. For a user-authorized physical print, add `--submit`. Each submission prints one copy, feeds to the cutter, and requests one partial cut. `--test` prepares a short calibration receipt; it also needs `--submit` to print.
+Text, file, and image commands prepare and preview only. For a user-authorized physical print, add `--submit`. Each submission prints one copy, feeds to the cutter, and requests one partial cut. `--test` prepares a short calibration strip; it also needs `--submit` to print. Ronnie intends this printer for experimental artifacts, not sales receipts.
 
-The helper wraps text at 48 columns in the 12 x 24 dot font. The roll is 80 mm nominal; the documented printable width is 72 mm (576 dots at 203.2 dpi). It converts common typographic punctuation and encodes CP437. Unsupported characters, embedded control commands, empty text, and receipts exceeding 120 lines are rejected. PDF, images, and arbitrary Unicode require a separate rendering workflow; do not send them as receipt text or silently discard content.
+Text mode wraps at 48 columns in the 12 x 24 dot font, converts common typographic punctuation, and encodes CP437. Unsupported characters, embedded control commands, empty text, and prints exceeding 120 lines are rejected.
+
+Image mode accepts one PNG up to **576 x 4096 pixels**, printed at one pixel per hardware dot (8 dots/mm, 203.2 dpi). The roll is 80 mm nominal; its documented printable width is 72 mm. Prepare artwork at the intended size instead of shrinking an ordinary page. A 24-pixel font is about 8.5 pt on paper. Composite transparency on white; the helper converts to black and white without dithering, pads to complete bytes, and sends 128-row `GS v 0` raster bands. It saves the exact monochrome `preview.png`; inspect it before submission. PDF and arbitrary Unicode text require rendering into a correctly sized PNG first.
 
 The helper saves `preview.txt`, `payload.escpos`, and `receipt.json` under `~/.local/state/netumscan-printer/jobs/` before sending print data. An explicit `--output-directory` must name a new directory. It checks live printer status and serial identity, and does not retry an uncertain transfer. Inspect the existing record and physical output before deciding on another submission. A completed USB transfer and healthy status do not prove marks appeared on paper.
 

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Prepare or submit one bounded ESC/POS receipt to the verified USB printer."""
+"""Prepare or submit one bounded text or monochrome image print over USB."""
 
 import argparse
 from datetime import datetime, timezone
@@ -15,6 +15,8 @@ SERIAL_NUMBER = "83600000000"
 STATE_DIRECTORY = Path.home() / ".local/state/netumscan-printer"
 COLUMNS = 48
 MAX_LINES = 120
+MAX_IMAGE_WIDTH = 576
+MAX_IMAGE_HEIGHT = 4096
 
 
 def timestamp():
@@ -75,6 +77,34 @@ def prepare_payload(text, calibration):
     return text, data + b"\n\n\x1dVB\x00"
 
 
+def prepare_image(path):
+    from PIL import Image, ImageOps
+    with Image.open(path) as original:
+        if original.format != "PNG" or getattr(original, "n_frames", 1) != 1:
+            raise ValueError("Image input must be a single-frame PNG.")
+        if not 1 <= original.width <= MAX_IMAGE_WIDTH or not 1 <= original.height <= MAX_IMAGE_HEIGHT:
+            raise ValueError(f"PNG must be at most {MAX_IMAGE_WIDTH} x {MAX_IMAGE_HEIGHT} pixels; reflow at 8 dots/mm.")
+        rgba = original.convert("RGBA")
+        paper = Image.new("RGBA", rgba.size, "white")
+        paper.alpha_composite(rgba)
+        monochrome = paper.convert("L").convert("1", dither=Image.Dither.NONE)
+    if ImageOps.invert(monochrome.convert("L")).getbbox() is None:
+        raise ValueError("PNG contains no printable marks.")
+    padded_width = (monochrome.width + 7) // 8 * 8
+    padded = Image.new("1", (padded_width, monochrome.height), 1)
+    padded.paste(monochrome, (0, 0))
+    # ESC/POS uses 1 for printed dots. White padding must remain zero after inversion.
+    raster = bytes(value ^ 0xff for value in padded.tobytes())
+    row_bytes = padded_width // 8
+    payload = bytearray(b"\x1b@\x1ba\x00")
+    for row in range(0, monochrome.height, 128):
+        rows = min(128, monochrome.height - row)
+        payload.extend(b"\x1dv0\x00" + row_bytes.to_bytes(2, "little") + rows.to_bytes(2, "little"))
+        payload.extend(raster[row * row_bytes:(row + rows) * row_bytes])
+    payload.extend(b"\n\n\x1dVB\x00")
+    return monochrome, bytes(payload)
+
+
 def open_printer():
     import usb.core
     import usb.util
@@ -129,6 +159,7 @@ def main():
     source.add_argument("--test", action="store_true", help="Prepare the short calibration receipt.")
     source.add_argument("--text", help="Receipt text; typography is normalized to CP437.")
     source.add_argument("--file", type=Path, help="UTF-8 text file to wrap at 48 columns.")
+    source.add_argument("--image", type=Path, help="Single-frame PNG, up to 576 x 4096 pixels; one pixel per dot.")
     parser.add_argument("--submit", action="store_true", help="Print one copy and make one partial cut.")
     parser.add_argument("--output-directory", type=Path, help="New runtime directory; must not already exist.")
     arguments = parser.parse_args()
@@ -143,8 +174,13 @@ def main():
             usb.util.dispose_resources(printer)
         return
 
-    text = arguments.file.read_text(encoding="utf-8") if arguments.file else arguments.text
-    preview, payload = prepare_payload(text, arguments.test)
+    image_preview = None
+    if arguments.image:
+        image_preview, payload = prepare_image(arguments.image)
+        preview = f"Monochrome image: {image_preview.width} x {image_preview.height} dots\n"
+    else:
+        text = arguments.file.read_text(encoding="utf-8") if arguments.file else arguments.text
+        preview, payload = prepare_payload(text, arguments.test)
     directory = arguments.output_directory or (
         STATE_DIRECTORY / "jobs" / datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%S_%fZ"))
     directory = directory.expanduser().resolve()
@@ -152,12 +188,20 @@ def main():
         raise ValueError("Keep generated output outside the skill source directory.")
     directory.mkdir(parents=True, exist_ok=False)
     (directory / "preview.txt").write_text(preview, encoding="utf-8")
+    if image_preview is not None:
+        image_preview.save(directory / "preview.png")
     (directory / "payload.escpos").write_bytes(payload)
     record = {"created_at": timestamp(), "state": "prepared", "copies": 1,
               "vendor_id": "0416", "product_id": "5011", "serial": SERIAL_NUMBER,
               "payload_bytes": len(payload), "sha256": hashlib.sha256(payload).hexdigest(),
-              "columns": COLUMNS, "lines": len(preview.splitlines()),
               "cut": "partial", "physical_output": "unconfirmed", "directory": str(directory)}
+    if image_preview is not None:
+        record.update(mode="raster", image_width=image_preview.width,
+                      image_height=image_preview.height, feed_length_mm=image_preview.height / 8,
+                      image_source=str(arguments.image.resolve()),
+                      image_sha256=hashlib.sha256(arguments.image.read_bytes()).hexdigest())
+    else:
+        record.update(mode="text", columns=COLUMNS, lines=len(preview.splitlines()))
     receipt = directory / "receipt.json"
     save_record(receipt, record)
     if not arguments.submit:
@@ -176,7 +220,7 @@ def main():
         record.update(state="submission_started", submitted_at=timestamp())
         save_record(receipt, record)
         transfer_started = True
-        transferred = printer.write(0x01, payload, timeout=10000)
+        transferred = printer.write(0x01, payload, timeout=30000 if image_preview is not None else 10000)
         record["bytes_transferred"] = transferred
         if transferred != len(payload):
             raise RuntimeError(f"Partial USB transfer: {transferred}/{len(payload)} bytes; inspect output before retrying.")
