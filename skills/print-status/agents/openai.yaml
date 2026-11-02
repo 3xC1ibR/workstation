@@ -1,0 +1,6 @@
+interface:
+  display_name: "Print Status"
+  short_description: "Print one short status update on the NetumScan"
+  default_prompt: "Use $print-status to print a short update on the current work."
+policy:
+  allow_implicit_invocation: false
