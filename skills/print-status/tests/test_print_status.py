@@ -44,8 +44,8 @@ class PrintedStatusTests(unittest.TestCase):
         self.assertEqual(lines[result_line + 1], "")
         self.assertEqual(lines[next_line - 2:next_line], ["", ""])
         body_lines = lines[result_line + 2:next_line - 2]
-        for first, second in zip(body_lines, body_lines[1:]):
-            self.assertFalse(first and second, "Body lines need vertical whitespace.")
+        self.assertGreaterEqual(len(body_lines), 2)
+        self.assertTrue(all(body_lines), "Wrapped paragraph lines must stay together.")
 
     def test_reflow_does_not_insert_spaces_inside_long_identifiers(self):
         identifier = "A" * 95

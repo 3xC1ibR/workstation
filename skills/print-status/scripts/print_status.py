@@ -58,11 +58,11 @@ def prepare_receipt(text, subject=None, generated_at=None):
             heading, content = label.groups()
             section = heading
             if content:
-                section += "\n\n" + "\n\n".join(
+                section += "\n\n" + "\n".join(
                     textwrap.wrap(content, width=CONTENT_COLUMNS)
                 )
         else:
-            section = "\n\n".join(textwrap.wrap(normalized, width=CONTENT_COLUMNS))
+            section = "\n".join(textwrap.wrap(normalized, width=CONTENT_COLUMNS))
         sections.append(section)
 
     layout = "\n\n" + "\n".join(header) + "\n\n\n" + "\n\n\n".join(sections) + "\n\n"

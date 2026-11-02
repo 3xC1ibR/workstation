@@ -40,8 +40,9 @@ Pass text as a literal argument or stdin; never interpolate
 it into executable shell syntax.
 
 The command adds a local generation timestamp and generous whitespace: four-column
-side margins, a 40-column text measure, a blank line between wrapped body lines,
-and wider gaps between sections. Labels appear above their content, and the
+side margins, a 40-column text measure, normal single-spaced paragraphs,
+and wider gaps between sections. Keep wrapped lines within a paragraph together;
+use whitespace around each section. Labels appear above their content, and the
 subject has its own line. Paper is inexpensive; favor readability at a glance
 over minimizing strip length. Keep the update concise without packing its layout.
 
