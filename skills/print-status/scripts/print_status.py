@@ -5,14 +5,18 @@ import argparse
 from datetime import datetime, timezone
 import importlib.util
 from pathlib import Path
+import re
 import subprocess
 import sys
+import textwrap
 
 
 # Imported printer code must not leave bytecode in the version-controlled skill.
 sys.dont_write_bytecode = True
 
-MAXIMUM_LINES = 28
+MAXIMUM_LINES = 80
+CONTENT_COLUMNS = 40
+LEFT_MARGIN = " " * 4
 PRINTER_SCRIPT = (
     Path(__file__).resolve().parents[2]
     / "netumscan-print/scripts/print_receipt.py"
@@ -31,21 +35,40 @@ def prepare_receipt(text, subject=None, generated_at=None):
     formatter = importlib.util.module_from_spec(specification)
     specification.loader.exec_module(formatter)
 
-    body = formatter.prepare_text(text.strip())
-    title = "STATUS"
+    # Validate before interpreting paragraph boundaries or introducing whitespace.
+    formatter.prepare_text(text.strip())
+    header = ["STATUS"]
     if subject is not None:
         if not subject.strip() or "\n" in subject or "\r" in subject:
             raise ValueError("Subject must be one nonempty line.")
-        title = formatter.prepare_text("STATUS: " + subject.strip()).rstrip("\n")
-        if "\n" in title:
-            raise ValueError("Subject and STATUS heading must fit 48 columns.")
+        title = formatter.prepare_text(subject.strip()).rstrip("\n")
+        if "\n" in title or len(title) > CONTENT_COLUMNS:
+            raise ValueError(f"Subject must fit {CONTENT_COLUMNS} columns.")
+        header.extend(["", title])
     generated_at = generated_at or datetime.now().astimezone()
-    receipt = formatter.prepare_text(
-        f"{title}\nGenerated: {generated_at:%Y-%m-%d %H:%M %Z}\n"
-        + "-" * formatter.COLUMNS
-        + "\n"
-        + body
-    )
+    header.extend(["", f"Generated: {generated_at:%Y-%m-%d %H:%M %Z}"])
+
+    sections = []
+    for paragraph in text.replace("\r\n", "\n").replace("\r", "\n").split("\n"):
+        if not paragraph.strip():
+            continue
+        normalized = " ".join(formatter.normalize_text(paragraph).split())
+        label = re.fullmatch(r"([A-Za-z][A-Za-z0-9 /-]{0,31}:)(?:\s+(.*))?", normalized)
+        if label:
+            heading, content = label.groups()
+            section = heading
+            if content:
+                section += "\n\n" + "\n\n".join(
+                    textwrap.wrap(content, width=CONTENT_COLUMNS)
+                )
+        else:
+            section = "\n\n".join(textwrap.wrap(normalized, width=CONTENT_COLUMNS))
+        sections.append(section)
+
+    layout = "\n\n" + "\n".join(header) + "\n\n\n" + "\n\n\n".join(sections) + "\n\n"
+    receipt = formatter.prepare_text("\n".join(
+        LEFT_MARGIN + line if line else "" for line in layout.splitlines()
+    ) + "\n")
     if len(receipt.splitlines()) > MAXIMUM_LINES:
         raise ValueError(
             f"Status exceeds {MAXIMUM_LINES} printed lines including its heading; "

@@ -27,7 +27,7 @@ def timestamp():
     return datetime.now(timezone.utc).isoformat()
 
 
-def prepare_text(text):
+def normalize_text(text):
     replacements = str.maketrans({
         "\u2018": "'", "\u2019": "'", "\u201c": '"', "\u201d": '"',
         "\u2013": "-", "\u2014": "--", "\u2026": "...", "\u00a0": " ",
@@ -39,6 +39,11 @@ def prepare_text(text):
            for character in text):
         raise ValueError("Receipt text contains a control character; ESC/POS commands are not accepted as text.")
     text.encode("cp437", errors="strict")
+    return text
+
+
+def prepare_text(text):
+    text = normalize_text(text)
     lines = []
     for paragraph in text.splitlines():
         lines.extend(textwrap.wrap(paragraph, width=COLUMNS, replace_whitespace=False,

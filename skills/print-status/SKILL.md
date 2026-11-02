@@ -13,7 +13,9 @@ applies to the requested update, not later status requests or automatic printing
 ## One command
 
 Use the current conversation and authoritative project records to write a short
-update, usually 60–120 words. State the current result, material blockers or
+update, usually 60–120 words. Use a separate line for each short paragraph;
+labels such as `Result:`, `Blocker:`, and `Next:` become standalone headings.
+State the current result, material blockers or
 uncertainty, and next action with its owner. Put decision-changing information
 first. Do not invent progress or treat stale observations as current.
 
@@ -26,17 +28,27 @@ are required from the agent.
 Submit the update in one tool or shell call:
 
 ```sh
-~/.local/bin/print-status --subject 'Project name' --text 'Current result: ... Blocker: ... Next: owner and action.'
+~/.local/bin/print-status --subject 'Project name' <<'STATUS'
+Result: Current result and its significance.
+Blocker: Material uncertainty or impediment, if any.
+Next: Owner and action.
+STATUS
 ```
 
-The subject is optional. Multiline UTF-8 text can instead be supplied on stdin
-with a quoted heredoc. Pass text as a literal argument or stdin; never interpolate
+The subject is optional. UTF-8 text can also be supplied with `--text`.
+Pass text as a literal argument or stdin; never interpolate
 it into executable shell syntax.
 
-The command adds a local generation timestamp, normalizes punctuation, wraps at
-48 columns, checks a 28-line total limit, and calls the existing Netum helper
-once with submission enabled. It prints upright in the normal native text font,
-with one partial cut. It rejects empty, unsupported, control-containing, or
+The command adds a local generation timestamp and generous whitespace: four-column
+side margins, a 40-column text measure, a blank line between wrapped body lines,
+and wider gaps between sections. Labels appear above their content, and the
+subject has its own line. Paper is inexpensive; favor readability at a glance
+over minimizing strip length. Keep the update concise without packing its layout.
+
+The command normalizes punctuation, checks an 80-line total limit including
+whitespace, and calls the existing Netum helper once with submission enabled.
+It prints upright in the normal native text font, with one partial cut.
+It rejects empty, unsupported, control-containing, or
 overlong text before submission; shorten or rephrase rather than silently
 discarding material information. Event times and stale-data labels belong in
 the update: the generated timestamp does not refresh its evidence.
