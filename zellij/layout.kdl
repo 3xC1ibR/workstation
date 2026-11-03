@@ -1,7 +1,16 @@
 layout {
+cwd "/opt/projects/rig"
     pane
     pane split_direction="vertical" {
         pane
-        pane command="htop"
+        pane 
     }
+    floating_panes {
+       pane {
+           x "55%"
+           y "20%"
+           width "45%"
+           height "100%"
+       }
+}
 }

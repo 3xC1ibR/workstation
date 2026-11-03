@@ -1,0 +1,13 @@
+ctrl + T,  N (create new tab)
+Ctrl + P, D (split horizontal)
+Ctrl + P, R (split vertical)
+
+
+Ctrl + P, F (fullscreen focus)
+Ctrl + P, E (center focus)
+
+Ctrl + P, W (new center window)
+
+Ctrl + P, C (name pane)
+
+Crtl + N, hjkl+- (resize pane)

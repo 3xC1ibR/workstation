@@ -1,0 +1,22 @@
+layout {
+	cwd "/opt/projects/stoic"
+	pane split_direction="vertical" {
+		pane command="zsh" {
+			args "-c" "make run-vite"
+		}
+		pane command="zsh" {
+			args "-c" "ngrok http 5173"
+		}
+	}
+	pane command="zsh" {
+		args "-c" "make run"
+	}
+    floating_panes {
+       pane {
+           x "20%"
+           y "20%"
+           width "60%"
+           height "60%"
+       }
+    }
+}
