@@ -1,0 +1,4 @@
+interface:
+  display_name: "LLM Claim Revalidation"
+  short_description: "Experimental review of dated LLM findings"
+  default_prompt: "Use $llm-claim-revalidation to check whether this empirical LLM claim still supports my decision under current models and workload conditions."
