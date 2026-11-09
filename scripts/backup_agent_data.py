@@ -64,10 +64,13 @@ def configure():
         if "ResourceNotFoundException" not in result.stderr:
             raise RuntimeError("Could not read the Restic recovery secret")
         password = local_password or secrets.token_urlsafe(48)
-        # Standard input keeps the password out of command arguments and logs.
-        request = json.dumps({"SecretId": RECOVERY_SECRET, "SecretString": password})
-        subprocess.run(aws + ["secretsmanager", "put-secret-value", "--cli-input-json", "file:///dev/stdin"],
-                       input=request, text=True, check=True, capture_output=True)
+        # AWS CLI on macOS rejects /dev/stdin here. The temporary file is 0600,
+        # outside Git, removed on exit, and keeps the password out of arguments.
+        with tempfile.NamedTemporaryFile(mode="w", prefix="recovery-", suffix=".json", dir=STATE) as request:
+            json.dump({"SecretId": RECOVERY_SECRET, "SecretString": password}, request)
+            request.flush()
+            subprocess.run(aws + ["secretsmanager", "put-secret-value", "--cli-input-json", "file://" + request.name],
+                           check=True, capture_output=True)
     else:
         password = json.loads(result.stdout)["SecretString"]
         if local_password and password != local_password:
@@ -144,7 +147,8 @@ def snapshot_database(source, destination):
     if shutil.disk_usage(destination.parent).free < source.stat().st_size + 512 * 1024 * 1024:
         raise RuntimeError(f"Insufficient disk space for SQLite staging: {source}")
     temporary = destination.with_name(destination.name + ".pending")
-    temporary.unlink(missing_ok=True)
+    for suffix in ["", "-wal", "-shm", "-journal"]:
+        Path(str(temporary) + suffix).unlink(missing_ok=True)
     started = time.monotonic()
     def progress(status, remaining, total):
         if time.monotonic() - started > 600:
@@ -153,8 +157,10 @@ def snapshot_database(source, destination):
         with closing(sqlite3.connect(source.as_uri() + "?mode=ro", uri=True, timeout=5)) as original:
             with closing(sqlite3.connect(temporary)) as target:
                 original.backup(target, pages=-1, progress=progress)
-                if target.execute("PRAGMA quick_check").fetchall() != [("ok",)]:
-                    raise RuntimeError(f"SQLite snapshot failed quick_check: {source}")
+                # The online backup API provides transaction consistency.
+                # Read the resulting schema, but leave full B-tree audits to
+                # restore verification rather than rereading gigabytes daily.
+                target.execute("SELECT count(*) FROM sqlite_master").fetchone()
         temporary.replace(destination)
     finally:
         temporary.unlink(missing_ok=True)

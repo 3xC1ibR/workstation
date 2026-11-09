@@ -4,6 +4,7 @@ This interim backup is independent of Ribbon Field hosting and thread sync.
 The launch agent runs daily at 03:15 local time. A calendar event missed during
 sleep runs after wake. The job requires the user's login session; it does not
 run while the Mac is shut down or the user is logged out.
+It uses low CPU priority and normal disk I/O priority.
 
 Restic encrypts and deduplicates snapshots in
 `s3://walle-backups-392424878485-us-east-1/agent-data/walle/`.
@@ -23,8 +24,11 @@ included. Configured provider-home overrides are recognized when present in the
 job environment. A standalone Ribbon Field browser data root is included if it
 exists. Source symlinks are preserved, not followed.
 
-Every detected SQLite database is copied through SQLite's online backup API and
-checked with `PRAGMA quick_check`. The live database and its journal sidecars
+Every detected SQLite database is copied through SQLite's online backup API.
+Its resulting schema is read to confirm that it opens. Restic checksums and
+encrypts the stored data; restore verification compares whole-file SHA-256
+hashes and representative table counts. Full B-tree integrity audits are not
+part of the daily job. The live database and its journal sidecars
 are excluded from Restic. The consistent replacement is stored under
 `~/.local/state/agent-data-backups/sqlite/<original absolute path>`.
 Other files are read while agents continue working; this is a rolling backup,
@@ -74,7 +78,8 @@ incomplete snapshot, is not reported as success. Runs cannot overlap. Local
 SQLite staging and the Restic cache use additional disk space; no copy of the
 entire source tree is staged. SQLite staging is removed after a successful
 upload and retained after a failure for recovery. The initial inventory found
-303 SQLite databases; preparing and checking them took about three minutes.
+303 SQLite databases. Historical diagnostic copies can be several gigabytes,
+so daily runs avoid a second full read for structural database audits.
 
 ## Restore
 

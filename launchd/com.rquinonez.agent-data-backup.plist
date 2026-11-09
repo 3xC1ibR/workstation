@@ -10,8 +10,6 @@
   </array>
   <key>StartCalendarInterval</key>
   <dict><key>Hour</key><integer>3</integer><key>Minute</key><integer>15</integer></dict>
-  <key>ProcessType</key><string>Background</string>
-  <key>LowPriorityIO</key><true/>
   <key>Nice</key><integer>10</integer>
   <key>EnvironmentVariables</key>
   <dict><key>PATH</key><string>/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin</string></dict>

@@ -5,6 +5,7 @@ from pathlib import Path
 import shutil
 import sqlite3
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -54,6 +55,24 @@ class AgentDataBackupTests(unittest.TestCase):
     def test_staging_inside_source_is_rejected(self):
         with self.assertRaisesRegex(RuntimeError, "outside"):
             backup.prepare([self.root], self.state)
+
+    def test_interrupted_destination_wal_is_removed_before_restarting(self):
+        source = self.source / "history.sqlite"
+        with closing(sqlite3.connect(source)) as database:
+            database.execute("CREATE TABLE events (body TEXT)")
+            database.execute("INSERT INTO events VALUES ('current source')")
+            database.commit()
+        destination = self.state / "history.sqlite"
+        pending = destination.with_name(destination.name + ".pending")
+        subprocess.run([sys.executable, "-c",
+            "import os,sqlite3,sys; d=sqlite3.connect(sys.argv[1]); "
+            "d.execute('PRAGMA journal_mode=WAL'); d.execute('CREATE TABLE stale (body TEXT)'); "
+            "d.commit(); os._exit(0)", str(pending)], check=True)
+        self.assertTrue(Path(str(pending) + "-wal").exists())
+        backup.snapshot_database(source, destination)
+        with closing(sqlite3.connect(destination)) as database:
+            self.assertEqual(database.execute("SELECT body FROM events").fetchone(), ("current source",))
+            self.assertEqual(database.execute("SELECT count(*) FROM sqlite_master WHERE name='stale'").fetchone(), (0,))
 
     def test_retention_preserves_unrelated_settings_and_toml_sections(self):
         home = self.root / "home"
