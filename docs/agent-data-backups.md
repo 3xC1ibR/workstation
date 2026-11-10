@@ -112,3 +112,42 @@ Gemini `general.sessionRetention.enabled`. Unrelated settings are preserved.
 Original configuration files are saved under the runtime directory. Kimi has
 no verified corresponding retention setting; its native tree is backed up.
 Managed policy and per-session overrides can still take precedence.
+
+## Verified deployment
+
+The installed launch agent completed its first backup with exit code `0` on
+2026-11-10 at 00:18 UTC. Snapshot:
+
+```text
+a2bccc0958040933e4b356b3e1653ac369350f02925a59c4c23e92a012b45595
+```
+
+The snapshot contains 120,772 files and 32,467,550,970 source bytes, including
+304 online SQLite copies. Restic added 7,581,308,514 bytes of packed data.
+The initial upload took about 52 minutes after database preparation. Later
+snapshots reuse unchanged content. Local SQLite staging was removed after the
+successful upload; no source files were removed.
+
+Remote restore verification passed at 00:21 UTC. It restored sample Codex,
+Claude, Muse, and Kimi transcripts and the complete captured Ribbon Field and
+Codex metadata databases to an isolated directory. Whole-file SHA-256 hashes
+matched all six references. Database table counts matched, including 1,675
+Ribbon Field work threads, 26,477 coordination messages, 1,547 browser sessions,
+and 3,633 native Codex thread records. This verifies the sampled restored files;
+it is not a full restore of all 120,772 files.
+
+`restic check --read-data-subset=5%` checked repository structure and a sample
+of stored packs and reported no errors. The verified local restore copies were
+then removed. Evidence remains in:
+
+```text
+~/.local/state/agent-data-backups/last-run.json
+~/.local/state/agent-data-backups/verification-result.json
+~/.local/state/agent-data-backups/repository-check.log
+```
+
+The recovery password was compared between Keychain and Secrets Manager and
+matched. Live IAM policy checks confirmed data read/write access, denial of
+data and object-version deletion, and permission to remove temporary locks.
+The installed calendar remains daily at 03:15 local time. Current harness
+retention settings were rechecked after verification.
