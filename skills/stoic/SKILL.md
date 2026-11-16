@@ -15,6 +15,11 @@ Saving the conversation to Stoic is done by local hooks, not by anything you run
 - Claude Code: `~/.claude/hooks/stoic_claude_code_hook.py` (registered in `~/.claude/settings.json`)
 - Codex: `~/.codex/hooks/stoic_codex_hook.py` (registered in `~/.codex/hooks.json`)
 
+Both are installed copies. The source and tests are in the Stoic repository at
+`scripts/stoic_claude_code_hook.py` and `scripts/stoic_codex_hook.py`. Change them
+there and copy them back with mode 0700, following the "conversation sync" section
+of `src/llms.txt`.
+
 A prompt that begins with `use stoic`, `please use stoic`, `/stoic`, or `$stoic`
 turns sync on for the session. The hook then queues every later prompt and reply and
 sends each completed turn to `POST /api/codex/turns`. Earlier turns are not imported.
