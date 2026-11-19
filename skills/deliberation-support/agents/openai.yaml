@@ -1,0 +1,6 @@
+interface:
+  display_name: "Deliberation Support"
+  short_description: "Brief, agency-preserving protocol for decisions, learning, exploration, and venting"
+  default_prompt: "Use $deliberation-support while I think this through."
+policy:
+  allow_implicit_invocation: false
