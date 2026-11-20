@@ -53,9 +53,19 @@ off and discards that session's unsent turns.
    location history, calendar, records) until you have enough evidence to tailor the
    answer to the user. Prefer meaningful signal over continued development, and drive
    toward a concrete deliverable.
-4. **Do the work in the right place.** Use assistant jobs for follow-ups and programs
-   for larger projects. Repositories use Beads (`bd`) for fine-grained issues; Stoic
-   tracks the bigger picture.
+4. **Start strategic work from the project.** For a retrospective, roadmap or launch
+   discussion, read the project overview and the relevant KES evidence. Record
+   project direction, outcomes, success criteria, milestones and the source of
+   each decision. Keep proposed work distinct from user agreement. Use the
+   version advertised by the live API guide for project health, outcome-linked
+   metric definitions and optional integration metadata. Date a health assessment
+   when the evidence is reviewed. A missing measurement has no numeric value.
+5. **Use a program for a continuing agent responsibility.** A program may stand
+   alone or link to a project. Maintain its current approach and append dated
+   observations or actual attempts, their results and any adjustment. Keep the
+   source of a lesson so a fresh agent can check it. A project can have no
+   program. Schedule follow-ups separately when requested. Unit-of-work context
+   stays in the coding thread and repository issue tracker.
 
 ## Where each kind of data actually lives
 
