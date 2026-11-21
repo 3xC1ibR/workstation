@@ -48,6 +48,8 @@ off and discards that session's unsent turns.
    For an existing Stoic conversation, pass its `conversation_id` and the current
    `message`. Never use a Codex or Claude session ID as a Stoic conversation ID.
    Refresh the bundle when resuming work or after relevant Stoic state changes.
+   Its `long_term_memory` object contains the shared brief, `revision` and
+   `updated_at`; the save time does not establish the age of its claims.
 3. **Gather behavioral signal.** Use semantic search (`GET /api/search?mode=semantic`)
    and the relevant integrations (behaviors, patterns, preferences, time tracking,
    location history, calendar, records) until you have enough evidence to tailor the
@@ -66,6 +68,32 @@ off and discards that session's unsent turns.
    source of a lesson so a fresh agent can check it. A project can have no
    program. Schedule follow-ups separately when requested. Unit-of-work context
    stays in the coding thread and repository issue tracker.
+
+## Shared long-term memory
+
+In conversations where the user asks to use Stoic, maintain its shared personal
+brief when a durable fact, preference, constraint or accepted decision materially
+changes. Correct explicit mistakes and honor requests to remember or forget.
+Respect read-only requests and proposal-only reviews: discuss a proposed refresh
+with the user before saving it. Do not wait for a session-end hook to save a
+useful change. Conversation sync and KES extraction are separate from this brief.
+
+Use the memory contract advertised by the live API guide. Read the current brief
+from the context bundle or `GET /api/memories/long-term`. Submit the complete
+revised content to `PUT /api/memories/long-term` with its `expected_revision`.
+On 409, read again and reconcile; never overwrite a newer brief with a stale
+copy. After an uncertain write, read back and compare before another attempt.
+`POST /api/memories` stores individual memories and does not edit this brief.
+
+Keep the brief concise. Favor stable personal context, useful preferences,
+current constraints and lessons supported by dated evidence. Put source dates
+and record references in the text where available. Separate user statements and
+decisions from assistant hypotheses and suggestions. Date temporary facts and
+remove or qualify expired ones. A new save date does not reverify old claims.
+Keep project details in Projects, supporting strategies in Programs and detailed
+history in KES. Do not copy transcripts, daily logs, credentials or bulk health
+records. Preserve the user's opt-in boundary; unrelated conversations do not
+need Stoic memory.
 
 ## Where each kind of data actually lives
 
