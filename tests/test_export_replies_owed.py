@@ -64,6 +64,7 @@ def test_replies_in_live_wal_and_mixed_date_units(tmp_path, database, monkeypatc
     # Insertion order differs from event order. Raw dates cannot be compared.
     message(database, 1, (SECONDS - DAY) * BILLION, outgoing=1)
     message(database, 1, SECONDS, outgoing=0, association=2001)
+    message(database, 2, (SECONDS - 12 * DAY) * BILLION, outgoing=1)
     message(database, 2, (SECONDS - 7 * DAY) * BILLION)
     message(database, 2, SECONDS - 6 * DAY, outgoing=1)
     message(database, 2, SECONDS - 3 * DAY)
@@ -94,6 +95,7 @@ def test_replies_in_live_wal_and_mixed_date_units(tmp_path, database, monkeypatc
         "generated_at": "2026-11-21T13:00:00-06:00", "source_status": "ok",
         "replies_owed": [{
             "handle": EMAIL, "is_group": False, "display_name": None, "service": "iMessage",
+            "last_outbound_at": "2026-11-15T13:00:00-06:00",
             "last_inbound_at": "2026-11-19T13:00:00.123456-06:00",
             "waiting_days": 1, "inbound_count_since_last_reply": 2,
             "open_url": "sms://open?addresses=a%2Bb%40example.test",
@@ -115,14 +117,16 @@ def test_equal_timestamps_and_outbound_last(tmp_path, database):
     assert entry["last_inbound_at"] == "2026-11-21T13:00:00-06:00"
 
 
-def test_groups_opt_in_and_earliest_wait_first(tmp_path, database):
+def test_groups_opt_in_and_shortest_wait_first(tmp_path, database):
+    message(database, 1, SECONDS - 12 * DAY, outgoing=1)
+    message(database, 3, SECONDS - 12 * DAY, outgoing=1)
     message(database, 3, SECONDS - 9 * DAY)
     message(database, 3, SECONDS - 8 * DAY)
     message(database, 1, SECONDS)
     assert exporter.export(tmp_path, NOW) == 0
     assert [entry["is_group"] for entry in summary(tmp_path)["replies_owed"]] == [False]
     assert exporter.export(tmp_path, NOW, include_groups=True) == 0
-    group, direct = summary(tmp_path)["replies_owed"]
+    direct, group = summary(tmp_path)["replies_owed"]
     assert group["inbound_count_since_last_reply"] == 2
     assert group["handle"] == PHONE
     assert group["is_group"] and group["open_url"] == "sms://open?groupid=group-123"
@@ -131,6 +135,48 @@ def test_groups_opt_in_and_earliest_wait_first(tmp_path, database):
     database.commit()
     assert exporter.export(tmp_path, NOW) == 0
     assert summary(tmp_path)["replies_owed"] == [direct]
+
+
+def test_never_replied_is_opt_in_and_reactions_do_not_count(tmp_path, database):
+    message(database, 1, SECONDS - DAY, outgoing=1, association=2000)
+    message(database, 1, SECONDS)
+    assert exporter.export(tmp_path, NOW) == 0
+    assert summary(tmp_path)["replies_owed"] == []
+    assert exporter.export(tmp_path, NOW, include_never_replied=True) == 0
+    entry, = summary(tmp_path)["replies_owed"]
+    assert entry["last_outbound_at"] is None
+    assert entry["inbound_count_since_last_reply"] == 1
+
+
+@pytest.mark.parametrize(("handle", "short"), [
+    ("1", True), ("012345", True), ("1234567", False), ("+12345", False), ("a12345", False),
+])
+def test_short_code_filter_is_independent_of_conversation_history(tmp_path, database, handle, short):
+    database.execute("UPDATE handle SET id=? WHERE ROWID=1", (handle,))
+    message(database, 1, SECONDS - DAY, outgoing=1)
+    message(database, 1, SECONDS)
+    assert exporter.export(tmp_path, NOW, include_never_replied=True) == 0
+    assert len(summary(tmp_path)["replies_owed"]) == (0 if short else 1)
+    assert exporter.export(tmp_path, NOW, include_short_codes=True) == 0
+    entry, = summary(tmp_path)["replies_owed"]
+    assert entry["handle"] == handle
+
+
+def test_age_cutoff_uses_latest_inbound_and_all_time_outbound_history(tmp_path, database):
+    for chat in (1, 2):
+        message(database, chat, SECONDS - 365 * DAY, outgoing=1)
+    cutoff = (SECONDS - 180 * DAY) * BILLION
+    message(database, 1, cutoff)
+    message(database, 2, cutoff - 1)
+    assert exporter.export(tmp_path, NOW) == 0
+    entry, = summary(tmp_path)["replies_owed"]
+    assert entry["handle"] == PHONE
+    assert entry["waiting_days"] == 180
+    assert entry["last_outbound_at"] == "2025-11-21T13:00:00-06:00"
+    assert exporter.export(tmp_path, NOW, max_age_days=179) == 0
+    assert summary(tmp_path)["replies_owed"] == []
+    assert exporter.export(tmp_path, NOW, max_age_days=0) == 0
+    assert [row["handle"] for row in summary(tmp_path)["replies_owed"]] == [PHONE, EMAIL]
 
 
 def test_optional_contact_names(tmp_path, database):
@@ -146,6 +192,8 @@ def test_optional_contact_names(tmp_path, database):
             INSERT INTO ZABCDPHONENUMBER VALUES (1, '(312) 555-0100');
             INSERT INTO ZABCDEMAILADDRESS VALUES (2, 'A+B@EXAMPLE.TEST');
         """)
+    message(database, 1, SECONDS - 2, outgoing=1)
+    message(database, 2, SECONDS - 2, outgoing=1)
     message(database, 1, SECONDS)
     message(database, 2, SECONDS)
     assert exporter.export(tmp_path, NOW) == 0
@@ -155,8 +203,11 @@ def test_optional_contact_names(tmp_path, database):
 
 @pytest.mark.parametrize("failure", [PermissionError(), sqlite3.DatabaseError("authorization denied")])
 def test_permission_failure_replaces_previous_success(tmp_path, database, monkeypatch, failure):
+    message(database, 1, SECONDS - DAY, outgoing=1)
     message(database, 1, SECONDS)
     assert exporter.export(tmp_path, NOW) == 0
+
+    assert len(summary(tmp_path)["replies_owed"]) == 1
 
     def denied(path):
         raise failure
@@ -197,6 +248,11 @@ def test_signed_bundle_interface(tmp_path, monkeypatch):
     bundle = tmp_path / "Applications/RepliesOwedExporter.app"
     subprocess.run(["codesign", "--verify", "--strict", bundle], check=True)
     launcher = bundle / "Contents/MacOS/RepliesOwedExporter"
-    result = subprocess.run([launcher, "--help"], check=True, capture_output=True, text=True)
-    assert "--include-groups" in result.stdout
-    assert subprocess.run([launcher, "--database"]).returncode == 64
+    flags = ["--include-groups", "--include-never-replied", "--include-short-codes"]
+    result = subprocess.run([launcher, *flags, "--max-age-days", "180", "--help"],
+                            check=True, capture_output=True, text=True)
+    assert all(option in result.stdout for option in [*flags, "--max-age-days"])
+    subprocess.run([launcher, "--max-age-days=0", "--help"], check=True)
+    for invalid in (["--database"], ["--max-age-days"], ["--max-age-days", "-1"],
+                    ["--max-age-days=unknown"]):
+        assert subprocess.run([launcher, *invalid]).returncode == 64

@@ -1,9 +1,11 @@
 # Replies owed in Messages
 
 The exporter writes one row per conversation whose latest ordinary message came
-from someone else. By default it includes only one-to-one conversations. The
-macOS LaunchAgent refreshes the report at login and every 15 minutes while the
-Mac is awake.
+from someone else. By default it shows one-to-one conversations where you have
+sent an ordinary message at least once and the last inbound message arrived in
+the past 180 days. It skips senders whose handle consists of one to six digits.
+The macOS LaunchAgent refreshes the report at login and every 15 minutes while
+the Mac is awake.
 
 ## Install on Walle
 
@@ -32,10 +34,22 @@ Mac is awake.
    ```
 
 For an immediate refresh, run
-`open -g -W "$HOME/Applications/RepliesOwedExporter.app"`. To include group
-chats in a single refresh, append `--args --include-groups`. The next scheduled
-run restores the one-to-one report. For scheduled group inclusion, add those
-two strings at the end of the plist's `ProgramArguments` before loading it.
+`open -g -W "$HOME/Applications/RepliesOwedExporter.app"`. The supplied
+LaunchAgent uses the defaults. For a single refresh with different filters,
+append `--args` followed by any combination of these options.
+
+| Option | Effect |
+| --- | --- |
+| `--include-never-replied` | Include conversations with no prior outbound message. |
+| `--include-short-codes` | Include senders whose entire handle is one to six digits, including leading zeroes. |
+| `--max-age-days N` | Include a conversation if the latest inbound message is at most N × 24 hours old. The default is 180. Set N to 0 to disable the age limit. |
+| `--include-groups` | Include group conversations. |
+
+For example, to see first-time senders from the last seven days, append
+`--args --include-never-replied --max-age-days 7`. Each filter applies
+independently. The next scheduled run restores the defaults. To customize the
+scheduled report, add `--args` and each option and value as separate strings at
+the end of the plist's `ProgramArguments` before loading it.
 
 The app's signed native executable contains the exporter source. It starts a
 fixed Apple Command Line Tools Python with isolated imports, site initialization
@@ -70,10 +84,14 @@ stopped, or it could no longer publish the file.
 
 A source failure replaces previous results with an empty array and the failure
 status. A publication failure preserves the previous file. Successful rows are
-ordered by oldest last inbound first. Each row contains the sender's `handle`,
-optional `display_name`, the recorded `service`, `is_group`, `last_inbound_at`
-in America/Chicago, `waiting_days` in completed 24-hour periods since that
-message, and `inbound_count_since_last_reply`. Reactions and group-management
+ordered by shortest wait first. Each row contains the sender's `handle`,
+optional `display_name`, the recorded `service`, `is_group`, `waiting_days` in
+completed 24-hour periods since the latest inbound message, and
+`inbound_count_since_last_reply`. Compare `last_inbound_at` and
+`last_outbound_at` to see how long the conversation had been quiet. Both use
+America/Chicago with its UTC offset. The exporter checks the full history for
+the last outbound message, even when it predates the age window. A never-replied
+conversation has a null `last_outbound_at`. Reactions and group-management
 events neither create nor clear an obligation. The `open_url` opens Messages
 without sending. For an opted-in group, the URL targets the group and the count
 includes all participants since the user's last reply.
