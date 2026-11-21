@@ -26,8 +26,17 @@ sends each completed turn to `POST /api/codex/turns`. Earlier turns are not impo
 A prompt that begins with `stop using stoic`, `/stoic off`, or `$stoic off` turns sync
 off and discards that session's unsent turns.
 
-- Do not claim sync is on unless the hook's message "Stoic conversation sync is on for
-  this session." appeared. If it reported a missing token, tell the user sync stayed off.
+- Claude Code shows the hook's "Stoic conversation sync is on for this session." message
+  to the user, not to you, so its absence from your context proves nothing. Check the
+  marker instead: sync is on when
+  `~/.local/state/stoic-claude-code-sync/sessions/$(printf %s "$SESSION_ID" | shasum -a 256 | cut -c1-64).json`
+  exists, where `SESSION_ID` is the Claude Code session ID (the transcript file name
+  under `~/.claude/projects/`). In Codex the message is visible; rely on it there.
+  If the hook reported a missing token, tell the user sync stayed off.
+- A forked session has a new session ID and is not synced until a prompt in it begins
+  with `use stoic`, `/stoic`, or `$stoic`.
+- Images attached to a prompt, including image-only prompts, are uploaded with the turn
+  by the Claude Code hook (not the Codex hook).
 - Never upload turns yourself; the hook already does it, and duplicates are hard to remove.
 - If the user invoked this skill some other way (for example the model loaded it on its
   own), sync is off. Tell the user to begin a prompt with "use stoic" if they want it.
