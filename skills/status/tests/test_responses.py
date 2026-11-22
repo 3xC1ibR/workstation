@@ -168,14 +168,25 @@ class ResponseTests(unittest.TestCase):
         self.assertEqual(request("/api/report-responses/" + other_id, headers=portable)[0], 403)
         self.assertEqual(request("/api/dismiss", {"id": self.identifier, "dismissed": True}, portable)[0], 403)
 
-    def test_interactive_page_rejects_untrusted_retained_scripts_and_retains_answers(self):
+    def test_served_report_ignores_retained_markup_and_runs_only_service_scripts(self):
         self.reports.save_responses(self.identifier, {"proceed": False}, 0)
         original = self.root / "reports" / self.identifier / "report.html"
         original.write_text('<script>window.compromised=true</script>')
-        page, policy = self.reports.interactive_content(self.identifier, "http://127.0.0.1:8766")
+        server = make_server(self.root, 0)
+        worker = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": .01}, daemon=True)
+        worker.start()
+        self.addCleanup(worker.join, 2)
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        connection = http.client.HTTPConnection("127.0.0.1", server.server_port, timeout=5)
+        self.addCleanup(connection.close)
+        connection.request("GET", "/reports/" + self.identifier)
+        response = connection.getresponse()
+        page, policy = response.read().decode(), response.getheader("Content-Security-Policy")
         self.assertNotIn("window.compromised", page)
-        self.assertIn("script-src 'sha256-", policy)
-        self.assertNotIn("script-src 'unsafe-inline'", policy)
+        self.assertIn("script-src 'self'", policy)
+        self.assertNotIn("unsafe-inline", policy)
+        self.assertIn('src="/report.js"', page)
         self.assertEqual(self.reports.responses(self.identifier)["values"], {"proceed": False})
 
 

@@ -1,13 +1,16 @@
-"""Global generated status reports and durable, reversible user dismissal.
+"""Global generated status reports, their operations, and reversible user review state.
 
 Producers atomically publish immutable directories containing manifest.json,
-report.json and report.html. The inbox is independent of workspaces, providers,
-and any application. Only user review changes dismissal records.
+report.json and report.html. Reports sharing an operation identity are versions
+of one living operation report. The inbox is independent of workspaces,
+providers, and any application. Only user review changes dismissal and
+opened-version records.
 """
 from __future__ import annotations
 
 from datetime import datetime, timezone
 import fcntl
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -29,6 +32,65 @@ REPORT_CSP = ("default-src 'none'; style-src 'unsafe-inline'; img-src data:; "
               "base-uri 'none'; form-action 'none'; frame-ancestors 'none'; sandbox allow-popups allow-popups-to-escape-sandbox")
 
 
+def moment(value):
+    """Parse a timezone-aware ISO 8601 timestamp."""
+    parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+    if parsed.utcoffset() is None:
+        raise ValueError("Timezone required")
+    return parsed
+
+
+def read_text(path, maximum):
+    """Read a regular file without following links or exceeding the size limit."""
+    try:
+        descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
+        with os.fdopen(descriptor, "rb") as source:
+            metadata = os.fstat(source.fileno())
+            if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > maximum:
+                raise StatusError("The status record is not a supported file.")
+            content = source.read(maximum + 1)
+            if len(content) > maximum:
+                raise StatusError("The status record is too large.")
+            return content.decode("utf-8")
+    except (OSError, UnicodeError) as error:
+        raise StatusError("The status record cannot be read.") from error
+
+
+def write_json(path, value):
+    """Replace a JSON record atomically."""
+    path.parent.mkdir(parents=True, exist_ok=True)
+    descriptor, temporary = tempfile.mkstemp(prefix=".pending-", dir=path.parent)
+    try:
+        with os.fdopen(descriptor, "w", encoding="utf-8") as target:
+            json.dump(value, target, ensure_ascii=False, allow_nan=False)
+            target.flush()
+            os.fsync(target.fileno())
+        os.replace(temporary, path)
+    finally:
+        if os.path.exists(temporary):
+            os.unlink(temporary)
+
+
+def operation_identity(manifest):
+    """Stable identity shared by every version of one operation report.
+
+    An explicit operation key identifies the operation everywhere. Otherwise the
+    identity is the workspace with the stable agent name, then the originating
+    conversation, then the report title, so earlier snapshots group as far as
+    their recorded origin allows.
+    """
+    origin = manifest["origin"]
+    if origin.get("operation"):
+        basis = ["operation", origin["operation"]]
+    elif origin.get("agent"):
+        basis = ["agent", origin.get("workspace"), origin["agent"]]
+    elif origin.get("thread_id"):
+        basis = ["thread", origin.get("workspace"), origin["thread_id"]]
+    else:
+        basis = ["title", origin.get("workspace"), manifest["title"]]
+    return hashlib.sha256(json.dumps(basis, ensure_ascii=False, separators=(",", ":")).encode()).hexdigest()
+
+
 class StatusReports:
     def __init__(self, root=None):
         self.root = Path(root) if root is not None else Path(os.environ.get(
@@ -43,18 +105,7 @@ class StatusReports:
         return directory
 
     def _read(self, path, maximum):
-        try:
-            descriptor = os.open(path, os.O_RDONLY | os.O_NONBLOCK | os.O_NOFOLLOW)
-            with os.fdopen(descriptor, "rb") as source:
-                metadata = os.fstat(source.fileno())
-                if not stat.S_ISREG(metadata.st_mode) or metadata.st_size > maximum:
-                    raise StatusError("The status record is not a supported file.")
-                content = source.read(maximum + 1)
-                if len(content) > maximum:
-                    raise StatusError("The status record is too large.")
-                return content.decode("utf-8")
-        except (OSError, UnicodeError) as error:
-            raise StatusError("The status report cannot be read.") from error
+        return read_text(path, maximum)
 
     def _manifest(self, identifier):
         directory = self._directory(identifier)
@@ -82,7 +133,72 @@ class StatusReports:
                     raise ValueError("Invalid dismissal")
             except (ValueError, KeyError, TypeError) as error:
                 raise StatusError("The report's dismissal record is invalid.") from error
-        return {**manifest, "dismissed_at": dismissed_at}
+        return {**manifest, "dismissed_at": dismissed_at, "operation_id": operation_identity(manifest)}
+
+    def operations(self):
+        """Group retained reports into operations, newest version first."""
+        listing = self.list()
+        groups = {}
+        for report in listing["reports"]:          # already newest first
+            groups.setdefault(report["operation_id"], []).append(report)
+        operations = []
+        for identifier, versions in groups.items():
+            latest, opened = versions[0], self._opened(identifier)
+            operations.append({
+                "id": identifier, "title": latest["title"], "subject": latest["subject"], "summary": latest["summary"],
+                "origin": latest["origin"], "latest": latest["id"], "generated_at": latest["generated_at"],
+                "received_at": latest["received_at"], "dismissed_at": latest["dismissed_at"],
+                "response_field_count": latest.get("response_field_count") or 0,
+                "unread": opened.get("opened_report") != latest["id"], "opened_at": opened.get("opened_at"),
+                "threads": sorted({version["origin"].get("thread_id") for version in versions} - {None}),
+                "versions": [{"id": version["id"], "title": version["title"], "generated_at": version["generated_at"],
+                              "received_at": version["received_at"], "dismissed_at": version["dismissed_at"]}
+                             for version in versions]})
+        return {"operations": operations, "unreadable": listing["unreadable"]}
+
+    def operation(self, identifier):
+        if not isinstance(identifier, str) or not IDENTIFIER.fullmatch(identifier):
+            raise StatusError("Invalid operation identifier.")
+        for operation in self.operations()["operations"]:
+            if operation["id"] == identifier:
+                return operation
+        raise StatusError("This operation has no retained reports.")
+
+    def _opened(self, operation):
+        path = self.root / "operation-state" / (operation + ".json")
+        if not (path.exists() or path.is_symlink()):
+            return {}
+        try:
+            state = json.loads(self._read(path, 4096))
+            if not isinstance(state, dict) or not IDENTIFIER.fullmatch(state["opened_report"]):
+                raise ValueError("Invalid operation state")
+            moment(state["opened_at"])
+            return state
+        except (ValueError, KeyError, TypeError, AttributeError):
+            return {}                               # an unreadable record only makes the operation unread again
+
+    def mark_opened(self, report):
+        """Record that the user opened this version; only the latest version clears unread."""
+        manifest = self._manifest(report)
+        operation = self.operation(manifest["operation_id"])
+        if operation["latest"] == report:
+            write_json(self.root / "operation-state" / (operation["id"] + ".json"),
+                       {"opened_report": report, "opened_at": datetime.now(timezone.utc).isoformat()})
+        return {"operation": operation["id"], "latest": operation["latest"] == report}
+
+    def document(self, identifier):
+        """The validated report document, or None for a record retained as HTML only."""
+        self._manifest(identifier)
+        path = self._directory(identifier) / "report.json"
+        if not path.exists():
+            return None
+        from build_status import validate
+        try:
+            document = json.loads(self._read(path, 8 * 1024 * 1024))
+            validate(document)
+            return document
+        except (ValueError, KeyError, TypeError, AttributeError):
+            return None
 
     def list(self):
         reports, unreadable = [], 0
@@ -111,21 +227,6 @@ class StatusReports:
             return fields
         except (ValueError, AttributeError) as error:
             raise StatusError("The report's response fields cannot be read.") from error
-
-    def interactive_content(self, identifier, viewer_url):
-        """Render interactive reports from validated JSON, never arbitrary saved HTML."""
-        manifest = self._manifest(identifier)
-        if not manifest.get("response_field_count"):
-            return self.content(identifier), REPORT_CSP
-        from build_status import render, response_policy, validate
-        from response_access import connection
-        try:
-            document = json.loads(self._read(self._directory(identifier) / "report.json", 8 * 1024 * 1024))
-            validate(document)
-            access = connection(self.root, identifier, viewer_url)
-            return render(document, access), response_policy(document, access)
-        except (ValueError, KeyError) as error:
-            raise StatusError("The interactive report cannot be read.") from error
 
     def responses(self, identifier):
         manifest = self._manifest(identifier)

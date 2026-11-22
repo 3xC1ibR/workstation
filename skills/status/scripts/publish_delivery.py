@@ -1,0 +1,44 @@
+#!/usr/bin/env python3
+"""Publish unrequested work to the user's proactive feed on the review page."""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+
+from delivery_store import publish
+from register_status import inbox_directory
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("delivery", type=Path, help="JSON file: title, summary, and optional recommended_default, decision, category, links, thread, created_at")
+    parser.add_argument("--document", type=Path, help="Markdown file with the full delivery, retained and shown in the page")
+    parser.add_argument("--attach", type=Path, action="append", default=[], help="Text file retained with the delivery; repeat for each. "
+                        "Relative links to its file name in the document open the retained copy.")
+    parser.add_argument("--workspace", default=os.getcwd(), help="Workspace the work belongs to")
+    parser.add_argument("--agent", help="Stable name of the producing agent")
+    parser.add_argument("--provider", help="Producing provider, when known")
+    parser.add_argument("--thread-id", default=os.environ.get("AGENT_COORD_SESSION_ID") or os.environ.get("CODEX_THREAD_ID"),
+                        help="Ribbon Field conversation for discussion; defaults to the current conversation")
+    parser.add_argument("--inbox", type=Path, default=inbox_directory())
+    arguments = parser.parse_args()
+    try:
+        document = json.loads(arguments.delivery.read_text(encoding="utf-8"))
+        body = arguments.document.read_text(encoding="utf-8") if arguments.document else None
+        root = arguments.inbox.expanduser()
+        identifier = publish(document, workspace=arguments.workspace, agent=arguments.agent, provider=arguments.provider,
+                             thread_id=arguments.thread_id, body=body, attachments=arguments.attach, root=root)
+    except (ValueError, KeyError, OSError) as error:
+        parser.error(str(error))
+    from status_server import DEFAULT_PORT, saved_public_url
+    result = {"delivery": identifier, "local_url": f"http://127.0.0.1:{DEFAULT_PORT}/deliveries/{identifier}"}
+    public = saved_public_url(root)
+    if public:
+        result["url"] = f"{public}/deliveries/{identifier}"
+    print(json.dumps(result, indent=2))
+
+
+if __name__ == "__main__":
+    main()

@@ -1,9 +1,9 @@
 "use strict";
-// Shared by the report itself and its optional collection editor.
+// The response editor shown inside a report, portable or served.
 window.createStatusResponses = (report, {make, request, createPicker, pickers, time, expanded = false, initialState}) => {
   const details = make(expanded ? "div" : "details", null, "response-editor");
   const summary = make("summary", `Responses · ${report.response_field_count} fields`);
-  const status = make("p", "", "collection-note"), failure = make("p", "", "collection-error");
+  const status = make("p", "", "note"), failure = make("p", "", "failure");
   status.setAttribute("role", "status"); failure.setAttribute("role", "alert"); failure.hidden = true;
   const form = make("form"), fields = make("fieldset", null, "response-fields");
   const actions = make("div", null, "response-actions");
@@ -52,7 +52,7 @@ window.createStatusResponses = (report, {make, request, createPicker, pickers, t
       control.value = next.values[field.id] == null ? "" : String(next.values[field.id]);
       wrapper.append(label);
       if (field.help) {
-        const help = make("p", field.help, "collection-note"); help.id = control.id + "-help";
+        const help = make("p", field.help, "note"); help.id = control.id + "-help";
         control.setAttribute("aria-describedby", help.id); wrapper.append(help);
       }
       wrapper.append(control); fields.insertBefore(wrapper, actions); controls.set(field.id, control);

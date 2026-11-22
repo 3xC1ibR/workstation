@@ -1,6 +1,6 @@
 ---
 name: status
-description: Produce evidence-backed status sheets with configurable agent coverage and interactive response fields. Users edit and save answers directly in the report page; agents retrieve them as JSON. Use for progress reports, operational briefings, status questionnaires, reading saved responses, or configuring future reports. Include material information beyond configured questions. Not a replacement for narrow git status or architecture drawings.
+description: Publish evidence-backed operation reports and proactive deliveries to the user's review page, and read his responses as JSON. Use when the user asks for status or a progress report, when a .status profile applies, when you own a long-running operation, when you deliver unrequested finished work, when reading saved responses, or when configuring future reports. One-off tasks do not publish reports. Include material information beyond configured questions. Not a replacement for narrow git status or architecture drawings.
 ---
 
 # Status
@@ -8,6 +8,27 @@ description: Produce evidence-backed status sheets with configurable agent cover
 Answer what the user needs to know to understand the work and decide what happens
 next. Use one shared presentation and small, persistent profiles for different
 agents. The profile defines the **expected coverage, never the limit of disclosure**.
+
+The user reviews two kinds of work on one standalone review page: **operations**,
+each with one living report, and **proactive deliveries**. Tasks stay in their
+conversation.
+
+## When to publish
+
+Publish only what the review page is for. Most work publishes nothing.
+
+| Work | Publish | How |
+| --- | --- | --- |
+| A small one-off task: a fix, a feature, a request | Nothing. Answer in the conversation. | - |
+| An operation: a long-running effort you own, or one with a `.status/` profile | One living operation report; each build is a new version | `build_status.py --operation <key>` |
+| The user asks for status or a report | A report for that subject | `build_status.py` |
+| Finished work nobody requested (a proactive agent's result) | One delivery in the proactive feed | `publish_delivery.py` |
+| Something only the user can decide, do, approve, or provide | An ask in Ribbon Field, not a report | `agent-coord ask` |
+
+Do not write a report to mark a task done, to summarize a conversation, or
+because this skill is installed. Do not publish a delivery for requested work:
+reply where it was requested. When unsure whether your work is an operation,
+it is not; ask the user before starting a report series.
 
 ## Editorial judgment comes first
 
@@ -50,7 +71,7 @@ Use existing project records and read-only service queries. Prefer the
 authoritative source for each fact, retaining its observation time and scope.
 Reading status does not authorize experiments, submissions, resource changes,
 messages to other agents, scheduled polling, or public publication. Registering
-the generated report in the user's local Status inbox is part of delivery.
+the generated report on the user's review page is part of delivery.
 
 - Separate official results, experimental results, and agent interpretation.
 - Report the latest meaningful event time, not a file's modification time or a
@@ -81,34 +102,68 @@ Store generated JSON, HTML, and screenshots outside the repository, for example
 ```sh
 python3 -B <skill-directory>/scripts/build_status.py /absolute/path/status.json \
   --output /absolute/path/status.html --workspace /absolute/project/path \
-  --agent stable-agent-name --provider codex
+  --agent stable-agent-name --provider codex --operation holdco-1099-bridge
 ```
 
 Use the actual workspace, stable agent name, and provider; omit unknown agent or
-provider values rather than inventing them. The builder automatically retains a
-copy in the shared Status collection, a standalone page owned by this skill and
-styled like its reports. It works across agents, providers, and workspace
-directories on the same host, without Ribbon Field or another agent application.
-Report generation does not require the viewer to be running. A dismissal applies
-only to that report; later reports still enter the inbox. Read
-[references/inbox.md](references/inbox.md) for registration, existing reports,
-and reports originating on another machine. Use `--no-register` for test fixtures
-or previews, never as the routine delivery path. If registration fails, retain
-the report and report the delivery failure rather than claiming it is in the inbox.
+provider values rather than inventing them. The builder retains a copy in the
+review page's store. Reports with the same operation identity are **versions of
+one living report**: the page shows one row per operation with its latest
+version, marks it unread until the user opens that version, and keeps earlier
+versions as history. `--operation` names the operation explicitly (lowercase
+letters, digits, hyphens) and is the reliable choice for an effort that spans
+conversations or worktrees. Without it the identity is the workspace with the
+agent name, then the conversation. Keep one key for the life of the operation.
+Rebuild when the state materially changes, not on a timer; every build is a
+version the user may be asked to read. A dismissal lasts until the next version.
 
-To open or start the collection, run
+Report generation does not require the service to be running. The page works
+across agents, providers, and workspaces on the same host, without Ribbon Field.
+Read [references/review-page.md](references/review-page.md) for registration,
+the service, the tailnet address, storage, and measurement. Use `--no-register`
+for test fixtures or previews, never as the routine delivery path. If
+registration fails, retain the report and state the delivery failure rather than
+claiming it is on the page.
+
+To open or start the page, run
 `python3 -B <skill-directory>/scripts/status_server.py start` and use the printed
-local URL (default `http://127.0.0.1:8766/`). On macOS, `install` keeps the viewer
-available across login sessions. See the inbox reference for service management.
-Do not add the viewer to another application or publish reports to a remote
-service unless the user requests that integration.
+URL (default `http://127.0.0.1:8766/`). On macOS, `install` keeps it available
+across login sessions. Do not add the page to another application or publish
+reports to a remote service unless the user requests that integration.
+
+## Proactive deliveries
+
+When you finish work the user did not request, publish it to the proactive feed
+instead of writing a report. Give the title, a one-paragraph summary, your
+recommended default, the single decision if there is one, links, and a category:
+
+```sh
+python3 -B <skill-directory>/scripts/publish_delivery.py /absolute/path/delivery.json \
+  --document /absolute/path/delivery.md --attach /absolute/path/options.md \
+  --workspace /absolute/project/path --agent stable-agent-name --provider claude \
+  --thread-id <ribbon-field-conversation-for-discussion>
+```
+
+The command prints the delivery identifier and its page address. The user can
+read it, accept the recommended default or one of your options ("Do it"),
+dismiss it with a reason, or discuss it in the linked conversation. Read his
+responses on your next wake:
+
+```sh
+python3 -B <skill-directory>/scripts/read_responses.py --deliveries --agent stable-agent-name --since <last-read-time>
+```
+
+An acceptance is his approval of exactly the recommended default or option he
+chose; it does not extend to anything else. A dismissal with a reason is input
+for what you propose next. See [references/deliveries.md](references/deliveries.md)
+for the JSON shape, retained documents, and the response record.
 
 Use the bundled renderer so content can change without design drift. It produces
 an observation snapshot; reloading does not refresh project observations. Response
 fields retrieve their latest saved answers independently. Verify
 timestamps and coverage, open the result, and inspect desktop and narrow layouts.
 For template changes, read the interface-design skill and check expanded details,
-empty data, long text, and keyboard focus too.
+empty data, long text, keyboard focus, and the dark theme too.
 
 ## Ask questions and read responses
 
@@ -118,11 +173,11 @@ see [references/responses.md](references/responses.md) for the schema and workfl
 These are questions for the user, distinct from profile questions the agent
 answers. Keep decision-changing context visible in the report.
 
-The user edits the fields and chooses **Save responses directly in the open
-report page**, including its portable HTML file. Do not send the user to the
-collection to answer. The collection also offers the same editor. Answers persist
-outside the report snapshot, survive viewer restarts and dismissal, and are
-available to agents without a running viewer:
+The user edits the fields and chooses **Save responses** directly in the open
+report, whether he opened it from the review page (also from his phone) or as
+its portable HTML file. Answers persist outside the report snapshot, survive
+service restarts and dismissal, and are available to agents without a running
+service:
 
 ```sh
 python3 -B <skill-directory>/scripts/read_responses.py --report <inbox-receipt-id>
@@ -135,14 +190,16 @@ user with their save time, and distinguish unanswered fields from false or zero.
 Answers belong to one report and are not automatically copied to a later one.
 Saving makes answers available; it does not wake an agent, authorize unrelated
 actions, or create scheduled polling. Follow the existing task authorization.
-The local Status service must be running to save from the page. For reports with
+The Status service must be running to save from the page. For reports with
 questions, start or verify that service before delivery; use `--viewer-url` when
 its port differs from the default. Portable HTML contains access restricted to
 that report's answers and stays readable while the service is stopped; a failed
-save retains input and never claims success. Reports and answers on different machines need an authorized shared
-collection or transfer, as described in the inbox reference.
+save retains input and never claims success. Reports and answers on different
+machines need an authorized transfer, as described in the review-page reference.
 
-Deliver the artifact link and principal finding or next action. Include material
+Deliver the artifact link and principal finding or next action. Prefer the page
+address the builder's receipt maps to (`<page>/reports/<receipt-id>`) when the
+user may be on another device; a local file path opens only on this machine. Include material
 information in chat even if it cannot yet be represented well in the artifact.
 Identify stale or unavailable observations. Do not claim that building a status
 page advanced the underlying project.

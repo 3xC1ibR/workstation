@@ -17,8 +17,9 @@ The fragment belongs alongside `title`, `subject`, `summary`, and other report
 content. Build normally with `build_status.py` and retain its inbox receipt ID.
 Use the actual workspace and agent metadata so later queries can find answers.
 When delivering a report with questions, link the report itself. Its fields and
-Save responses control work directly in that page, including when the HTML file
-is opened locally. Start or verify the local Status service before delivery.
+Save responses control work directly in that page, whether it is opened from the
+review page, from the tailnet address on a phone, or as a local HTML file. Start
+or verify the Status service before delivery.
 Use `--viewer-url http://127.0.0.1:<port>` (or `AGENT_STATUS_URL`) if it uses another
 port. Preview builds using `--no-register` display fields but cannot save answers.
 
@@ -42,8 +43,7 @@ The user may revise saved answers. Each save replaces the report's current
 answers, increments its revision, and records a timezone-aware `updated_at`.
 Competing edits return a conflict and preserve unsaved input. **Discard edits and
 reload** explicitly loads the latest saved values before editing again.
-Collection refreshes preserve open editors and unsaved values. Leaving a page
-with unsaved changes prompts the browser's normal confirmation.
+Leaving a page with unsaved changes prompts the browser's normal confirmation.
 
 ## Agent retrieval
 
@@ -55,7 +55,7 @@ python3 -B <skill-directory>/scripts/read_responses.py \
   --thread-id <actual-conversation-id> --since 2026-11-21T18:00:00Z
 ```
 
-`--provider` further restricts origin. `--inbox` chooses a collection; otherwise
+`--provider` further restricts origin. `--inbox` chooses a store; otherwise
 the command honors `AGENT_STATUS_INBOX` and the default inbox path. A report,
 workspace, agent, or thread scope is required. Combine scopes to exclude unrelated
 agents. An exact report with inconsistent origin filters returns no matches.
@@ -65,7 +65,10 @@ Output is JSON: `responses` is a list of report records containing `id`, `title`
 has revision 0, an empty `values` object, and a null save time. `unreadable` reports
 collection coverage gaps; a corrupt selected response fails explicitly.
 `--since` selects save times strictly after the timestamp; it does not consume
-or acknowledge answers. Dismissed reports are included. No viewer process is needed.
+or acknowledge answers. Dismissed reports are included. No service is needed.
+Answers belong to one report version; a later version of the same operation
+starts unanswered. For responses to proactive deliveries, add `--deliveries`;
+see [deliveries.md](deliveries.md).
 
 Read responses at the next relevant task step. User-provided instructions are
 input to the existing assignment; a saved answer alone does not start work,
@@ -80,32 +83,33 @@ in `<inbox>/responses/<report-id>.json`, with a per-report lock and atomic file
 replacement. Regeneration, re-registration, dismissal, and restoring a report do
 not delete its saved answers. New reports begin unanswered even if field IDs match.
 
-The local viewer exposes `GET /api/responses/<report-id>` and
-`POST /api/responses` with `{id, revision, values}`. Writes require the same local
-Origin and `X-Status-Token` protection as dismissal. A stale revision returns
-HTTP 409. Read-only retrieval through the CLI is the usual agent interface.
-Registered report pages include the shared response editor. The service renders
-interactive reports from validated JSON and allows only the exact trusted client
-script through its content policy; arbitrary retained HTML remains sandboxed.
-Observations retain their recorded timestamps while answers load their current
-revision. Older registered reports gain the editor on refresh. Rebuild an older
-portable file from its original JSON without changing its observation times to
-give that file the editor and response connection.
+The service exposes `GET /api/responses/<report-id>` and `POST /api/responses`
+with `{id, revision, values}`. Writes require a trusted Origin (loopback or the
+configured public address) and the page's `X-Status-Token`, as dismissal does.
+A stale revision returns HTTP 409. Read-only retrieval through the CLI is the
+usual agent interface. The service renders every report from its validated JSON
+and runs only its own script files; markup retained in a report's HTML is never
+executed. Observations retain their recorded timestamps while answers load
+their current revision. Rebuild an older portable file from its original JSON
+without changing its observation times to give that file the current design
+and response connection.
 
 Portable files contain a random access key restricted to one report. It is stored
 under `<inbox>/response-keys/` outside the skill repository. The separate
 `/api/report-responses/<report-id>` route requires `X-Status-Report-Token` on both
 reads and writes, supports cross-origin local-file requests, and accepts only
 `{revision, values}` on save. A key cannot update another report, dismiss reports,
-or access the collection API. Do not publish a connected private report publicly.
-This service remains bound to loopback; another machine's localhost is not the
-collection host. The usual agent retrieval remains local and read-only.
+or access the page API. Do not publish a connected private report publicly.
+A portable file reaches the service at its loopback address, so it saves only
+on the machine running the service. From another device, open the report
+through the tailnet address of the review page, which uses the page token.
+The usual agent retrieval remains local and read-only.
 
 If the service is stopped or unreachable, the report still displays its questions
 and editable fields. Failed saves retain input and report the failure; they do not
 silently store browser-only answers that the agent cannot read. Restart the local
 service and retry. Leaving with unsaved input uses the browser's normal guard.
 
-After updating the skill, reload a running viewer: `status_server.py install`
-restarts its existing macOS login service; otherwise restart its specific `serve`
-process. `start` reports an older viewer instead of silently reusing it.
+After updating the skill, reload a running service: `status_server.py install`
+restarts its macOS login service; otherwise restart its specific `serve`
+process. `start` reports an older service instead of silently reusing it.

@@ -21,8 +21,10 @@ class ReportTests(unittest.TestCase):
         document["notices"] = [{"title": "New finding", "text": "Migration exceeds the release window."}]
         document["sections"] = [{"title": "Unrequested observation", "text": '<script>alert("x")</script>'}]
         document["sources"] = [{"label": "Untrusted address", "location": "javascript:alert(1)"}]
+        document["metrics"] = [{"label": "Routine metric", "value": "18 / 18"}]
         output = render(document)
-        self.assertLess(output.index("Migration exceeds"), output.index("Current release has"))
+        self.assertLess(output.index("Current release has"), output.index("Migration exceeds"))     # assessment, then exceptions,
+        self.assertLess(output.index("Migration exceeds"), output.index("Routine metric"))          # both before routine metrics
         self.assertIn("Unrequested observation", output)
         self.assertIn("&lt;script&gt;", output)
         self.assertNotIn("<script>", output)
@@ -33,8 +35,8 @@ class ReportTests(unittest.TestCase):
         document["metrics"] = [{"label": "Result", "value": "Passed", "observed_at": "2026-10-28T05:00:00Z", "freshness_minutes": 15},
                                {"label": "Unknown result", "value": None, "freshness_minutes": 15}]
         output = render(document)
-        self.assertIn("LAST KNOWN", output)
-        self.assertIn("OBSERVATION TIME UNKNOWN", output)
+        self.assertIn("Last known: refresh needed", output)
+        self.assertIn("Observation time unknown", output)
         self.assertIn("Unknown", output)
 
     def test_invalid_data_fails_instead_of_silently_dropping_content(self):

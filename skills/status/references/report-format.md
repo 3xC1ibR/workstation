@@ -2,6 +2,8 @@
 
 `scripts/build_status.py` reads UTF-8 JSON and emits self-contained HTML with the
 Python standard library. This is a presentation format, not a questionnaire.
+Each build is one version of its operation's living report; see
+[review-page.md](review-page.md) for operation identity and `--operation`.
 
 Required: `title`, `subject`, `generated_at` (ISO 8601 with timezone), `summary`.
 Optional `timezone` defaults to `UTC` and accepts an IANA name. Collections:
@@ -20,11 +22,11 @@ produce an error, not silent loss. Put additional subject matter in a section,
 notice, or summary. This structural format is **never a reason to omit information**.
 
 Retain sources and observation times where available. `freshness_minutes` marks
-old data `LAST KNOWN` relative to generation time, or `OBSERVATION TIME UNKNOWN`
-without a timestamp. Fresh snapshots may contain old events: use the snapshot's
+old data "Last known: refresh needed" relative to generation time, or
+"Observation time unknown" without a timestamp. Fresh snapshots may contain old events: use the snapshot's
 time for freshness and the event time in the value or detail. The file does not
 refresh its observations; response fields retrieve and save answers separately.
-The title block shows when observations were assembled.
+The report header states when observations were assembled.
 
 Illustrative example, not operational data:
 

@@ -1,4 +1,4 @@
 interface:
   display_name: "Status"
-  short_description: "Status sheets with editable user responses"
+  short_description: "Operation reports and proactive deliveries for review"
   default_prompt: "Use $status to show current progress, next steps, and anything else I should know."

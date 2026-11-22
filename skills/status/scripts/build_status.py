@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Validate a status document and build a portable HTML sheet with in-page responses."""
+"""Validate a status document and build a portable HTML report with in-page responses."""
 from __future__ import annotations
 
 import argparse
@@ -94,24 +94,33 @@ def escape(value):
 def response_script(document, connection):
     assets = Path(__file__).resolve().parents[1] / "assets"
     configuration = json.dumps({"fields": document["response_fields"], "connection": connection}, ensure_ascii=True).replace("<", "\\u003c")
-    return ("(() => {\nconst configuration = " + configuration + ";\n" +
+    return ("(() => {\nconst embeddedConfiguration = " + configuration + ";\n" +
             "\n".join((assets / name).read_text() for name in ("controls.js", "responses.js", "report.js")) + "\n})();")
 
 
 def response_policy(document, connection):
+    """Content policy for a portable report: only its exact embedded script may run."""
     digest = base64.b64encode(hashlib.sha256(response_script(document, connection).encode()).digest()).decode()
     origin = " ".join(["'self'"] + ([urlsplit(connection["url"]).scheme + "://" + urlsplit(connection["url"]).netloc] if connection else []))
     return (f"default-src 'none'; script-src 'sha256-{digest}'; style-src 'unsafe-inline'; img-src data:; "
             f"connect-src {origin}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 
 
-def render(document, connection=None):
+def render(document, connection=None, *, page=None):
+    """Build the report sheet.
+
+    Without `page` the result is a portable file with its style and response
+    editor embedded. The Status service passes `page` (base path, navigation
+    markup and a configuration object) to serve the same sheet with shared
+    assets and its own navigation.
+    """
     validate(document)
     generated = timestamp(document["generated_at"])
     zone = ZoneInfo(document.get("timezone", "UTC"))
 
     def time_text(value):
-        return timestamp(value).astimezone(zone).strftime("%Y-%m-%d %H:%M:%S %Z")
+        local = timestamp(value).astimezone(zone)
+        return f"{local:%b} {local.day}, {local.year}, {local.hour % 12 or 12}:{local:%M} {local:%p} {local:%Z}"
 
     def provenance(record):
         parts = []
@@ -123,16 +132,16 @@ def render(document, connection=None):
         state = ""
         if "freshness_minutes" in record:
             if not observed:
-                state = "OBSERVATION TIME UNKNOWN"
+                state = "Observation time unknown"
             else:
                 age = (generated - timestamp(observed)).total_seconds()
                 if age < -60:
-                    state = "OBSERVATION TIME AHEAD OF REPORT — VERIFY CLOCK"
+                    state = "Observation time ahead of report: verify clock"
                 elif age > record["freshness_minutes"] * 60:
-                    state = "LAST KNOWN — REFRESH NEEDED"
+                    state = "Last known: refresh needed"
         if state:
             parts.append(f'<span class="freshness">{escape(state)}</span>')
-        return '<div class="provenance">' + " · ".join(parts) + "</div>" if parts else ""
+        return '<div class="provenance">' + " · ".join(parts).replace(' · <span class="freshness">', ' <span class="freshness">') + "</div>" if parts else ""
 
     def table(section):
         if "columns" not in section:
@@ -143,7 +152,7 @@ def render(document, connection=None):
                    for index in range(len(section["columns"]))]
         heading = "".join(f'<th scope="col"{classes[index]}>{escape(column)}</th>' for index, column in enumerate(section["columns"]))
         rows = "".join("<tr>" + "".join(f"<td{classes[index]}>{escape(cell)}</td>" for index, cell in enumerate(row)) + "</tr>" for row in section["rows"])
-        return (f'<p class="scroll-note">Scroll table horizontally for all columns →</p>'
+        return (f'<p class="scroll-note">Scroll the table sideways for all columns.</p>'
                 f'<div class="table-region" tabindex="0" role="region" aria-label="{escape(section["title"])}">'
                 f'<table><thead><tr>{heading}</tr></thead><tbody>{rows}</tbody></table></div>')
 
@@ -153,31 +162,38 @@ def render(document, connection=None):
             return f'<a href="{escape(location)}" rel="noreferrer">{escape(location)}</a>'
         return f"<code>{escape(location)}</code>"
 
-    style = (Path(__file__).resolve().parents[1] / "assets/style.css").read_text()
-    if document.get("response_fields"):
-        style += "\n" + (Path(__file__).resolve().parents[1] / "assets/inbox.css").read_text()
+    assets = Path(__file__).resolve().parents[1] / "assets"
     subject = f'<p class="subject">{escape(document["subject"])}</p>'
     if len(document["subject"]) > 100:
-        subject = (f'<details class="subject-details"><summary>{escape(document["subject"][:60])}… — expand subject</summary>'
+        subject = (f'<details class="subject-details"><summary>{escape(document["subject"][:60])}… (show the full subject)</summary>'
                    f'<p class="subject">{escape(document["subject"])}</p></details>')
-    output = [f'<!doctype html><html lang="en"><head><meta charset="utf-8">'
+    if page:
+        base = escape(page["base"])
+        head = (f'<link rel="stylesheet" href="{base}/tokens.css"><link rel="stylesheet" href="{base}/style.css">'
+                f'<link rel="stylesheet" href="{base}/review.css">'
+                + "".join(f'<script src="{base}/{escape(name)}" defer></script>' for name in page["scripts"]))
+    else:
+        head = f'<style>{(assets / "tokens.css").read_text()}{(assets / "style.css").read_text()}</style>'
+    root = f' data-base="{escape(page["base"])}"' if page else ""
+    output = [f'<!doctype html><html lang="en"{root}><head><meta charset="utf-8">'
               f'<meta name="viewport" content="width=device-width, initial-scale=1">'
-              f'<title>{escape(document["title"])}</title><style>{style}</style></head><body><main>',
-              f'<header><div><h1>{escape(document["title"])}</h1>{subject}</div>'
-              f'<p class="meta">STATUS SHEET<br>Generated {escape(time_text(document["generated_at"]))}<br>Observation snapshot</p></header>']
+              f'<title>{escape(document["title"])}</title>{head}</head><body><main>',
+              page["navigation"] if page else "",
+              f'<article class="sheet"><header class="sheet-header"><h1>{escape(document["title"])}</h1>{subject}'
+              f'<p class="sheet-meta">Observations assembled {escape(time_text(document["generated_at"]))}. '
+              f'This report does not refresh them.</p></header>']
+    output.append(f'<p class="assessment text">{escape(document["summary"])}</p>')
     for notice in document.get("notices", []):
         output.append(f'<aside class="notice"><h2>{escape(notice["title"])}</h2><p class="text">{escape(notice["text"])}</p></aside>')
-    output.append(f'<p class="assessment text">{escape(document["summary"])}</p>')
     if document.get("metrics"):
         output.append('<dl class="metrics">')
         for metric in document["metrics"]:
-            output.append(f'<div class="metric"><dt>{escape(metric["label"])}</dt><dd class="value">{escape(metric["value"])}</dd>'
-                          f'<dd class="detail text">{escape(metric.get("detail", ""))}</dd><dd>{provenance(metric)}</dd></div>')
+            detail = f'<dd class="detail text">{escape(metric["detail"])}</dd>' if metric.get("detail") else ""
+            source = f'<dd>{provenance(metric)}</dd>' if provenance(metric) else ""
+            output.append(f'<div class="metric"><dt>{escape(metric["label"])}</dt><dd class="value">{escape(metric["value"])}</dd>{detail}{source}</div>')
         output.append('</dl>')
-    number = 0
     if document.get("response_fields"):
-        number += 1
-        output.append(f'<section id="status-response-fields"><h2 class="section-heading"><span class="reference">{number:02d}</span>Responses</h2>'
+        output.append('<section id="status-response-fields"><h2 class="section-heading">Your responses</h2>'
                       '<noscript><p>Enable JavaScript to edit and save responses in this page.</p><dl class="response-questions">')
         for field in document["response_fields"]:
             output.append(f'<dt>{escape(field["label"])}{" · Required" if field.get("required") else ""}</dt>'
@@ -186,29 +202,36 @@ def render(document, connection=None):
                 output.append(f'<dd class="text">Choices: {escape(" / ".join(field["options"]))}</dd>')
         output.append('</dl></noscript></section>')
     if document.get("actions"):
-        number += 1
-        output.append(f'<section><h2 class="section-heading"><span class="reference">{number:02d}</span>Next actions</h2><ol class="actions">')
+        output.append('<section><h2 class="section-heading">Next actions</h2><ol class="actions">')
         for action in document["actions"]:
-            output.append(f'<li><p class="action-title">{escape(action["action"])}</p>'
-                          f'<p class="label">{escape(action["owner"])} · {escape(action.get("status", "unspecified"))}</p>'
-                          f'<p class="text">{escape(action.get("reason", ""))}</p>{provenance(action)}</li>')
+            reason = f'<p class="text">{escape(action["reason"])}</p>' if action.get("reason") else ""
+            status = action.get("status", "status not stated")
+            state = ("settled" if status.lower().startswith(("done", "complete", "finished", "closed", "cancel"))
+                     else "blocked" if "block" in status.lower() else "open")
+            output.append(f'<li data-status="{state}"><p class="action-title">{escape(action["action"])}</p>'
+                          f'<p class="action-owner">{escape(action["owner"])} · <span class="action-status">{escape(status)}</span></p>'
+                          f'{reason}{provenance(action)}</li>')
         output.append('</ol></section>')
     for section in document.get("sections", []):
-        number += 1
-        heading = f'<span class="reference">{number:02d}</span> {escape(section["title"])}'
+        heading = escape(section["title"])
         if section.get("collapsed"):
             output.append(f'<details><summary>{heading}</summary>')
         else:
             output.append(f'<section><h2 class="section-heading">{heading}</h2>')
-        output.append(f'<p class="text">{escape(section.get("text", ""))}</p>{table(section)}{provenance(section)}')
+        text = f'<p class="text">{escape(section["text"])}</p>' if section.get("text") else ""
+        output.append(f'{text}{table(section)}{provenance(section)}')
         output.append('</details>' if section.get("collapsed") else '</section>')
     if document.get("sources"):
-        output.append('<details><summary>Source record</summary>')
+        output.append('<details><summary>Sources</summary>')
         for source in document["sources"]:
             output.append(f'<div class="source"><p>{escape(source["label"])}</p>{source_link(source["location"])}{provenance(source)}</div>')
         output.append('</details>')
-    output.append('<footer><span>STATUS / ENGINEERING RECORD</span><span>Source observation times govern freshness.</span></footer></main>')
-    if document.get("response_fields"):
+    output.append('</article>')
+    if page:
+        configuration = json.dumps(page["configuration"], ensure_ascii=True).replace("<", "\\u003c")
+        output.append(f'<script type="application/json" id="status-configuration">{configuration}</script>')
+    output.append('</main>')
+    if document.get("response_fields") and not page:
         output.append('<script>' + response_script(document, connection) + '</script>')
     output.append('</body></html>')
     return "\n".join(output)
@@ -222,6 +245,8 @@ def main():
     parser.add_argument("--agent", help="Stable agent name, when known")
     parser.add_argument("--provider", help="Producing provider, when known")
     parser.add_argument("--thread-id", default=os.environ.get("AGENT_COORD_SESSION_ID") or os.environ.get("CODEX_THREAD_ID"))
+    parser.add_argument("--operation", help="Stable operation key; later reports with the same key become new versions of one living report. "
+                        "Defaults to the workspace with the agent name, then the conversation.")
     parser.add_argument("--no-register", action="store_true", help="Build a preview or test fixture without adding it to the inbox")
     parser.add_argument("--viewer-url", default=os.environ.get("AGENT_STATUS_URL", "http://127.0.0.1:8766"), help="Local Status service used by the portable page's response editor")
     args = parser.parse_args()
@@ -234,15 +259,20 @@ def main():
     args.output.write_text(result, encoding="utf-8")
     print(args.output.resolve())
     if not args.no_register:
-        from register_status import register
+        from register_status import inbox_directory, register
         identifier = register(document, result, workspace=args.workspace, agent=args.agent,
-                              provider=args.provider, thread_id=args.thread_id, viewer_url=args.viewer_url)
+                              provider=args.provider, thread_id=args.thread_id, viewer_url=args.viewer_url,
+                              operation=args.operation)
         if document.get("response_fields"):
             from response_access import connection
-            from register_status import inbox_directory
             result = render(document, connection(inbox_directory(), identifier, args.viewer_url))
             args.output.write_text(result, encoding="utf-8")
         print(f"Status inbox receipt: {identifier}")
+        from status_server import DEFAULT_PORT, saved_public_url
+        print(f"Review page: http://127.0.0.1:{DEFAULT_PORT}/reports/{identifier}")
+        public = saved_public_url(inbox_directory())
+        if public:
+            print(f"Review page (tailnet): {public}/reports/{identifier}")
 
 
 if __name__ == "__main__":

@@ -1,0 +1,48 @@
+<!doctype html>
+<html lang="en" data-base="{{base}}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Review</title>
+  <link rel="stylesheet" href="{{base}}/tokens.css">
+  <link rel="stylesheet" href="{{base}}/style.css">
+  <link rel="stylesheet" href="{{base}}/review.css">
+  <script src="{{base}}/controls.js" defer></script>
+  <script src="{{base}}/review.js" defer></script>
+</head>
+<body>
+  <main class="review">
+    <header class="review-header">
+      <h1>Review</h1>
+      <form class="review-controls" role="search">
+        <div class="segmented" role="radiogroup" aria-label="Show">
+          <label><input type="radio" name="view" value="open" checked><span>Open</span></label>
+          <label><input type="radio" name="view" value="done"><span>Done</span></label>
+          <label><input type="radio" name="view" value="all"><span>All</span></label>
+        </div>
+        <input id="review-search" type="search" placeholder="Search" aria-label="Search titles, summaries, agents and projects">
+      </form>
+      <p id="review-counts" class="review-counts" aria-live="polite">Loading…</p>
+    </header>
+    <p id="review-error" class="failure" role="alert" hidden></p>
+    <p id="review-coverage" class="note" hidden></p>
+    <p id="review-source" class="source-note" role="status" hidden></p>
+    <section id="asks" class="review-section" aria-labelledby="asks-heading" hidden>
+      <h2 id="asks-heading">Needs you <span class="count"></span></h2>
+      <p class="section-note">Answered in Ribbon Field</p>
+      <ol class="rows"></ol>
+    </section>
+    <section id="deliveries" class="review-section" aria-labelledby="deliveries-heading" hidden>
+      <h2 id="deliveries-heading">Proactive work <span class="count"></span></h2>
+      <ol class="rows"></ol>
+    </section>
+    <section id="operations" class="review-section" aria-labelledby="operations-heading" hidden>
+      <h2 id="operations-heading">Operations <span class="count"></span></h2>
+      <ol class="rows"></ol>
+    </section>
+    <div id="review-empty" class="empty-state" hidden><h2></h2><p></p></div>
+    <noscript><p class="failure">Enable JavaScript to use the review page. Individual reports remain readable without it.</p></noscript>
+    <div id="review-notice" class="transient-notice" role="status" hidden><span></span><button id="review-undo" type="button" class="quiet">Undo</button></div>
+  </main>
+</body>
+</html>

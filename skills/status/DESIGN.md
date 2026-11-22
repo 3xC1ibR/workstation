@@ -1,90 +1,230 @@
-# Status sheet design contract
+---
+name: Status review page
+colors:
+  primary: "#2c50c8"        # --accent: unread marker, links, the one primary action
+  bg: "#f6f5f1"             # --canvas
+  surface: "#ffffff"        # --surface: lists and report sheets
+  surface-quiet: "#efede8"  # --surface-quiet: hover, table headings, response panel
+  fg: "#1b1b1f"             # --ink
+  fg-muted: "#5c5c66"       # --ink-secondary
+  fg-faint: "#6a6a73"       # --ink-tertiary: row metadata, at least 4.5:1 on every surface
+  border: "#e3e1da"         # --rule
+  border-strong: "#c9c6bd"  # --rule-strong: control outlines
+  danger: "#b3261e"         # --critical: blocking asks, failures
+  warning: "#a14a04"        # --attention: notices, stale or overdue, earlier version
+  success: "#17693f"        # --positive: accepted
+typography:
+  title:   { fontFamily: system-ui, fontSize: 28px, fontWeight: 680, lineHeight: 1.3 }
+  heading: { fontFamily: system-ui, fontSize: 19px, fontWeight: 600, lineHeight: 1.3 }
+  lead:    { fontFamily: system-ui, fontSize: 18px, lineHeight: 1.5 }
+  reading: { fontFamily: system-ui, fontSize: 16px, lineHeight: 1.62 }
+  body:    { fontFamily: system-ui, fontSize: 15px, lineHeight: 1.5 }
+  meta:    { fontFamily: system-ui, fontSize: 13px, lineHeight: 1.5 }
+  value:   { fontFamily: system-ui, fontSize: 22px, fontWeight: 600, lineHeight: 1.3 }
+rounded:
+  sm: 4px
+  control: 8px
+  container: 10px
+spacing:
+  1: 4px
+  2: 8px
+  3: 12px
+  4: 16px
+  5: 24px
+  6: 32px
+  7: 48px
+  8: 72px
+components:
+  list-row:
+    backgroundColor: "{colors.surface}"
+    textColor: "{colors.fg}"
+  button-primary:
+    backgroundColor: "{colors.primary}"
+    textColor: "#ffffff"
+---
+
+# Status review page design contract
 
 Before any UI change, read this contract and follow the interface-design skill.
+Implementation values live in `assets/tokens.css`; this file mirrors them and
+holds the rules. Add a token in both places.
 
-## Reference and purpose
+## Overview
 
-An auxiliary engineering sheet for the user supervising an agent or campaign:
-what happened, what matters now, and what happens next. Borrow the system-drawings
-workspace's 1970s IBM/NASA visual language: white paper, black line work, restrained
-uppercase labels, monospace values, reference numbers, and a ruled title block.
-Reference: `/opt/projects/system-drawings/DESIGN.md`.
+One standalone page where the owner reviews two kinds of agent work: **operations**
+(long-running efforts with a living report) and **proactive work** (finished,
+unrequested work an agent delivers). It also shows what agents are asking of
+him in Ribbon Field, without owning those asks. He opens it a few times a day,
+often on a phone, to decide what to read, act on, or dismiss.
 
-Observations are attributes and records, so tables and text carry them. Reserve
-three-dimensional geometry for explanations of system structure. A profile
-changes questions, scope, and ordering; it does not invent another theme.
+Feeling: a calm triage list. Posture: transient. It must read at a glance, so
+chrome is minimal and every row leads with what the item is. Light and dark
+themes follow the system. Reference applications, recorded as defaults the
+owner has not yet confirmed: **Linear Inbox** for triage and **Things** for calm
+lists.
 
-## Objects and hierarchy
+## Colors
 
-Objects: report, subject, observation, source, notice, action, section, response
-field, saved response.
-Actions: read, expand supporting evidence, follow a source, print. The shared
-collection adds filter, dismiss, and restore; dismissal applies to one report.
-Agents may attach response fields to a report. The report itself presents labeled
-controls and Save responses, including when opened from its portable HTML file.
-The collection offers the same editor as a convenience. Saving records user
-input separately from observations; it does not execute the next action.
+Colour carries state, never decoration. Most of every screen is ink on paper.
 
-Opening hierarchy: subject and observation context; urgent notices; assessment;
-requested observations; next actions; supporting sections and sources. Arbitrary
-additional sections are first-class content. Material caveats remain visible.
-Only background detail may start collapsed. Omit empty notice panels.
+- **Accent** marks unread items, links, and the single primary action of a view.
+- **Critical** marks a blocking ask and a failed request. Nothing else is red.
+- **Attention** marks report notices, stale or overdue asks, stale observations,
+  and the notice shown on an earlier version.
+- **Positive** marks an accepted delivery. Dismissed is neutral, not red.
+- A tint appears only behind the text whose state it marks.
 
-## Tokens and components
+## Typography
 
-Visual tokens live in `assets/style.css`: white paper, #111 ink, #555 secondary
-text, faint gray rules, a small typography scale, shared spacing, square edges.
-Titles use compact uppercase Helvetica-style lettering; other text uses system
-monospace. Metrics are open ruled rows, not decorative cards. Native details
-disclose evidence; semantic tables have column headers and explicit empty states.
-Wide tables scroll inside a labeled, keyboard-focusable region; the page fits a
-phone. Long text wraps without clipping.
+System sans-serif for everything; monospace only for code and file paths.
+Numbers use tabular figures. Titles are the strongest element of a row;
+metadata is one quiet style in every state. Unread raises the title's weight and
+shows the marker; it never dims the rest. No uppercase tracked labels above
+headings, and no reference numerals on sections.
 
-Compact tables display a horizontal-scroll cue and retain the first record
-column while scrolling. Descriptive columns have enough width for sentences.
-Long subject identifiers use an explicit expansion control; material findings
-are never automatically collapsed.
+## Layout
 
-No chromatic accents, gradients, shadows, icons, oversized numbers, rounded tiles,
-animation, or fixed overlays. Light paper is intentional under dark system
-preferences. Focus is a black outline; disclosure controls have generous touch
-areas. Print output expands evidence.
+A single centred column of 800 px on every page, so edges do not move between
+the list, a delivery, and a report. Spacing uses the 4 px scale. A row is a
+marker column, the content, and its age at the right. Row metadata holds at
+most three items: a state word, a kind or category, and an origin. Row actions
+appear over the age on hover or keyboard focus; a touch user responds on the
+item's own page, where controls reach 44 px. Reading text is limited to about 70
+characters. Wide tables scroll inside a labelled, focusable region, keep their
+first column while scrolling at phone width, and announce that they scroll.
 
-## Shared collection page
+## Elevation & Depth
 
-The Status collection is part of this skill and runs independently of any agent
-application. It imports the same `assets/style.css` as the generated sheets.
-Keep the same page width, ruled title block, typography, whitespace, square
-controls, and light paper under every system theme. Collection controls use
-these existing tokens; do not introduce an application theme.
+Flat. Layers, bottom to top: canvas; surfaces (lists, sheets); menus (version
+history, response choices); one transient notice. No shadows; a one-pixel rule
+separates a surface from the canvas.
 
-Use numbered, openly ruled rows with a report title, full assessment, origin,
-generation time, and a quiet Dismiss or Restore button. The title opens the
-retained HTML document in a separate tab. Filters and search operate on the
-collection; Undo restores the last dismissal. Empty, loading, and failed states
-are plain text in the sheet. No nested report viewer or overlay is needed.
+## Shapes
 
-Filter menus use the sheet's paper, ink, monospace type, square corners, and
-one-pixel rules even while open. Enhance the native selects with labelled
-combobox/listbox controls to avoid operating-system colors and shadows. Preserve
-arrow-key navigation, Home/End, type-to-select, Enter/Space, Escape cancellation,
-Tab traversal, and outside-click dismissal. Options wrap on narrow screens.
+Containers 10 px, controls 8 px, small insets 4 px. One-pixel rules. The unread
+marker is an 8 px disc. Chevrons are drawn with two borders; there is no icon set.
+
+## Components
+
+| Component | Variants | Use for | Do not use for |
+|---|---|---|---|
+| Row | unread, read, blocking, waiting, closed | One operation, delivery, or ask in a list | Anything with more than two actions |
+| Button | standard, primary, quiet | Primary: the one affirmative response on a delivery page. Quiet: dismiss, restore, undo, add a note | A primary button on every list row |
+| Segmented control | - | Open / Done / All | Navigation between pages |
+| Report sheet | portable, served | A status report and a delivery's detail | Lists |
+| Notice | attention | Material exceptions inside a report | Routine information |
+| Response panel | awaiting, accepted, dismissed | The owner's response to a delivery | Report response fields (those use the response editor) |
+| Response editor | - | Agent-defined questions inside a report | Delivery responses |
+| Version history | - | Earlier versions of an operation report | Anything else |
+| Transient notice | with Undo | Confirming a change that removed a row from view | States the page already shows |
+
+## Do's and Don'ts
+
+- Never use eyebrow labels: no small uppercase or tracked label above a heading
+  or value.
+- One primary button per view, at most. List rows use standard and quiet buttons.
+- Every reversible action offers Undo or Reopen instead of a confirmation.
+- Omit an empty section. Say plainly when a source is unavailable; never show
+  an unavailable source as an empty list.
+- No gradients, shadows, glass effects, decorative icons, entrance animation, or
+  cards inside cards.
+- Do not copy Ribbon Field asks into this store or resolve them here; link to
+  Ribbon Field.
+- Material findings in a report are never collapsed. Only background detail may
+  start collapsed, and print expands it.
+
+## Conceptual model
+
+### Objects
+
+| Object | Key attributes | Actions | Appears in |
+|---|---|---|---|
+| Operation | title, latest summary, origin, version count, unread, open asks | open, dismiss until next version, restore | Review list, report page |
+| Report version | observations, notices, metrics, actions, sections, response fields | read, answer response fields, open another version | Report page |
+| Delivery | title, summary, recommended default, decision, links, document, attachments, category, agent | read, do it (default or an option), dismiss with a reason, discuss in Ribbon Field, reopen | Review list, delivery page |
+| Ask (owned by Ribbon Field) | kind, title, blocking, what it unblocks, thread | open in Ribbon Field | Review list, report page of its operation |
+
+### Lexicon
+
+| Term | Means | Never call it |
+|---|---|---|
+| Operation | A long-running effort with one living report | campaign, project report |
+| Version | One retained report of an operation | snapshot, copy |
+| Delivery | Finished unrequested work handed to the owner | suggestion, notification |
+| Ask | Something an agent needs from the owner, kept in Ribbon Field | decision, question, task |
+| Dismiss | Remove from Open without acting | archive, delete |
+| Do it | Accept the recommended default or a listed option | approve, submit |
+
+## Motion
+
+Only a 120 ms colour transition on controls. Nothing moves on load.
+
+## States
+
+- **Empty:** one heading and one sentence saying what will appear here.
+- **Loading:** the counts line says "Loading…"; lists stay empty.
+- **Failure:** a critical-tinted message above the lists; unsaved input stays.
+- **Source unavailable:** "Asks unavailable" in the attention colour, with the
+  reason, directly under the header and in the counts line.
+- **Earlier version:** an attention notice with a link to the latest version.
+
+## Signature details
+
+1. The accent disc in the left margin is the only unread signal.
+2. A delivery row leads its second line with "Recommended:" so the default is
+   readable without opening the item.
+3. Report sheets open with the assessment in lead type; notices follow it, and
+   both precede any metric.
+4. Rows are fully clickable; row actions sit above that target and stay hidden
+   until hover or focus, so the resting list is titles, summaries, and ages.
 
 ## Decision record
 
+- 2026-11-22: Replace the monochrome engineering-sheet contract with this
+  review-page contract. The owner found the sheet "too minimalist and
+  limiting" and asked for an opinionated design with clear visual priority,
+  status colour used sparingly, real action controls, and phone readability.
+  Colour now carries state; type is system sans-serif; dark theme follows the
+  system. Linear Inbox and Things are the reference applications, as defaults
+  the owner has not confirmed.
+- 2026-11-22: First scoring round (design-hill-climb, two blind critics, Things
+  and Linear Inbox as references) found faint metadata, up to seven metadata
+  items per row, a column of twelve "Dismiss" labels, three page widths, and
+  the attention colour carrying three meanings. Changes: metadata ink raised to
+  4.5:1, three metadata items at most with the age right-aligned, row actions
+  shown on hover or focus only, one 800 px column, "asks open" in ink instead
+  of the attention colour, the assessment ahead of notices, finished actions
+  quieted, and one date format.
+- 2026-11-22: Reports become versions of living operations. Identity is an
+  explicit operation key, else workspace with agent name, else workspace with
+  conversation, else workspace with title, so the 34 earlier snapshots group
+  without rewriting them. Unread means a version newer than the last one
+  opened. Dismissal applies to the latest version and lapses when a new version
+  arrives, which preserves the earlier per-report dismissal records.
+- 2026-11-22: Add proactive deliveries as a second item type with recorded
+  responses (read, accepted, dismissed, discussed), each with its time. A
+  delivery retains its Markdown document and text attachments so it is readable
+  from a phone, where the Mac's file paths do not exist.
+- 2026-11-22: Asks are read from Ribbon Field's command-line listing on demand
+  and never stored. Ribbon Field offers no authenticated path for another page
+  to resolve an ask, so each ask links to its thread. When the listing is
+  unavailable the page states the reason.
+- 2026-11-22: Remove the response editor from list rows; responses are edited
+  in the report itself. Remove eyebrow labels, section reference numerals, the
+  ruled title block, and the custom filter menus of the earlier collection.
+- 2026-11-22: The service accepts one configured public address (a Tailscale
+  serve path) besides loopback. Pages use a path prefix chosen from the request
+  host, and writes accept that origin with the page token.
+- 2026-11-22: Record content-free usage events (page opens, item opens,
+  responses) to compare this page with Ribbon Field's overview.
 - 2026-11-22: Put editing and saving inside the open report. Portable files use
-  access restricted to their own report to reach the local answer store. Reuse
-  the existing response controls and protect unsaved input on failures.
-- 2026-11-21: Add report-specific response fields and durable user answers in the
-  existing collection rows. Reuse the sheet's controls and filter pickers; keep
-  portable snapshots inert, make save state explicit, and preserve unsaved input
-  during collection refreshes. Detect competing edits before replacing answers.
-- 2026-10-29: Reuse system-drawings visual language. Markdown profiles customize
-  expected coverage; agents must add material findings beyond configured fields.
-  Generated artifacts are offline snapshots with source observation times.
-- 2026-10-30: Keep the shared collection independent of Ribbon Field, owned by
-  the status skill and styled exactly like its HTML sheets. This supersedes the
-  mistaken application integration. Retained reports and reversible dismissal
-  remain available regardless of the generating agent or workspace.
-- 2026-10-30: Style open filter menus as part of the report sheet; native macOS
-  popup styling was inconsistent with the requested monochrome design.
+  access restricted to their own report to reach the local answer store.
+- 2026-11-21: Add report-specific response fields and durable user answers.
+  Make save state explicit and detect competing edits before replacing answers.
+- 2026-10-30: Keep the shared collection independent of Ribbon Field and owned
+  by the status skill. Retained reports and reversible dismissal remain
+  available regardless of the generating agent or workspace.
+- 2026-10-29: Markdown profiles customize expected coverage; agents must add
+  material findings beyond configured fields. Generated artifacts are offline
+  snapshots with source observation times. (The system-drawings visual language
+  adopted on this date was superseded on 2026-11-22.)

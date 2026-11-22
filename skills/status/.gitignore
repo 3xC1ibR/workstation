@@ -1,2 +1,4 @@
 __pycache__/
 *.pyc
+.design/shots/
+.design/hill-climb/

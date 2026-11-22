@@ -114,7 +114,8 @@ class StatusServerTests(unittest.TestCase):
             connection.close()
 
     def test_collection_and_reports_are_served_without_coordination_runtime(self):
-        for path in ("/", "/style.css", "/inbox.css", "/inbox.js", "/api/reports", "/health"):
+        for path in ("/", "/style.css", "/review.css", "/review.js", "/report_page.js", "/delivery.js", "/api/reports",
+                     "/api/review", "/health"):
             self.assertEqual(self.request(path)[0], 200)
         self.assertEqual(json.loads(self.request("/api/reports")[2])["reports"][0]["id"], self.identifier)
         self.assertEqual(self.request("/style.css")[2], (Path(__file__).resolve().parents[1] / "assets/style.css").read_bytes())
