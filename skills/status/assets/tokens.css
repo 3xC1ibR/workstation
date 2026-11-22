@@ -19,6 +19,7 @@
   --page-width: 720px; --page-inset: 32px; --page-top: 56px; --row-bleed: 20px; --measure: 68ch;
   --metric-width: 190px; --search-width: 200px; --cell-width: 96px; --record-width: 150px; --text-cell-width: 300px;
   --control-compact: 32px; --control-height: 36px; --touch-height: 44px;
+  --embedded-height: 480px; --embedded-application-height: 80vh;
   --layer-row-action: 1; --layer-menu: 2; --layer-notice: 3;
   --quick: 120ms;
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", system-ui, sans-serif;

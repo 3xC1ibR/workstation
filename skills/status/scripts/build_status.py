@@ -112,7 +112,8 @@ def render(document, connection=None, *, page=None):
     Without `page` the result is a portable file with its style and response
     editor embedded. The Status service passes `page` (base path, navigation
     markup, markup to place under the header, and a configuration object) to
-    serve the same sheet with shared assets and its own navigation.
+    serve the same sheet with shared assets and its own navigation; its
+    `after_summary` markup holds the sandboxed frame of an interactive document.
     """
     validate(document)
     generated = timestamp(document["generated_at"])
@@ -189,6 +190,8 @@ def render(document, connection=None, *, page=None):
               f'This report does not refresh them.</p></header>',
               page.get("after_header", "") if page else ""]
     output.append(f'<p class="assessment text">{escape(document["summary"])}</p>')
+    if page and page.get("after_summary"):
+        output.append(page["after_summary"])
     for notice in document.get("notices", []):
         output.append(f'<aside class="notice"><h2>{escape(notice["title"])}</h2><p class="text">{escape(notice["text"])}</p></aside>')
     if document.get("metrics"):
@@ -255,7 +258,11 @@ def main():
                         "Defaults to the workspace with the agent name, then the conversation.")
     parser.add_argument("--no-register", action="store_true", help="Build a preview or test fixture without adding it to the inbox")
     parser.add_argument("--viewer-url", default=os.environ.get("AGENT_STATUS_URL", "http://127.0.0.1:8766"), help="Local Status service used by the portable page's response editor")
+    from register_status import add_interactive_arguments, inbox_directory, interactive_arguments, register
+    add_interactive_arguments(parser)
     args = parser.parse_args()
+    if args.no_register and (args.interactive or args.embed):
+        parser.error("--interactive and --embed belong to the registered report; they have no effect with --no-register.")
     try:
         document = json.loads(args.document.read_text(encoding="utf-8"))
         result = render(document)
@@ -265,10 +272,12 @@ def main():
     args.output.write_text(result, encoding="utf-8")
     print(args.output.resolve())
     if not args.no_register:
-        from register_status import inbox_directory, register
-        identifier = register(document, result, workspace=args.workspace, agent=args.agent,
-                              provider=args.provider, thread_id=args.thread_id, viewer_url=args.viewer_url,
-                              operation=args.operation)
+        try:
+            identifier = register(document, result, workspace=args.workspace, agent=args.agent,
+                                  provider=args.provider, thread_id=args.thread_id, viewer_url=args.viewer_url,
+                                  operation=args.operation, **interactive_arguments(args, inbox_directory()))
+        except (ValueError, OSError) as error:
+            parser.error(str(error))
         if document.get("response_fields"):
             from response_access import connection
             result = render(document, connection(inbox_directory(), identifier, args.viewer_url))

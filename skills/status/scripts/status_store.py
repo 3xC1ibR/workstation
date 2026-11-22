@@ -18,6 +18,7 @@ import re
 import stat
 import tempfile
 
+import interactive_documents
 from status_fields import validate_fields, validate_values
 
 class StatusError(ValueError):
@@ -122,6 +123,7 @@ class StatusReports:
             origin = manifest["origin"]
             if not isinstance(origin, dict) or any(value is not None and not isinstance(value, str) for value in origin.values()):
                 raise ValueError("Invalid report origin")
+            interactive = interactive_documents.recorded(manifest)
         except (ValueError, KeyError, TypeError, AttributeError) as error:
             raise StatusError("The status report record is invalid.") from error
         state = self.root / "dismissed" / (identifier + ".json")
@@ -133,7 +135,7 @@ class StatusReports:
                     raise ValueError("Invalid dismissal")
             except (ValueError, KeyError, TypeError) as error:
                 raise StatusError("The report's dismissal record is invalid.") from error
-        return {**manifest, "dismissed_at": dismissed_at, "operation_id": operation_identity(manifest)}
+        return {**manifest, "dismissed_at": dismissed_at, "operation_id": operation_identity(manifest), "interactive": interactive}
 
     def operations(self):
         """Group retained reports into operations, newest version first."""
@@ -148,7 +150,7 @@ class StatusReports:
                 "id": identifier, "title": latest["title"], "subject": latest["subject"], "summary": latest["summary"],
                 "origin": latest["origin"], "latest": latest["id"], "generated_at": latest["generated_at"],
                 "received_at": latest["received_at"], "dismissed_at": latest["dismissed_at"],
-                "response_field_count": latest.get("response_field_count") or 0,
+                "response_field_count": latest.get("response_field_count") or 0, "interactive": latest["interactive"],
                 "unread": opened.get("opened_report") != latest["id"], "opened_at": opened.get("opened_at"),
                 "threads": sorted({version["origin"].get("thread_id") for version in versions} - {None}),
                 "versions": [{"id": version["id"], "title": version["title"], "generated_at": version["generated_at"],
@@ -199,6 +201,12 @@ class StatusReports:
             return document
         except (ValueError, KeyError, TypeError, AttributeError):
             return None
+
+    def interactive_document(self, identifier):
+        """The retained HTML of a version's interactive document. It is served only inside a sandbox."""
+        if (self._manifest(identifier)["interactive"] or {}).get("kind") != "document":
+            raise StatusError("This report has no retained interactive document.")
+        return self._read(self._directory(identifier) / interactive_documents.DOCUMENT_NAME, interactive_documents.DOCUMENT_LIMIT)
 
     def list(self):
         reports, unreadable = [], 0

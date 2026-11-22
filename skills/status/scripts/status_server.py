@@ -13,15 +13,17 @@ import sys
 import time
 import urllib.error
 import urllib.request
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
 
 from delivery_store import Deliveries
+from document_state import DocumentStates
+import interactive_documents
 from register_status import inbox_directory
 from response_access import response_key
 import review_pages
 from ribbon_field_asks import AskReader, for_operation
 from status_store import REPORT_CSP, ResponseConflict, StatusError, StatusReports
-from usage_events import UsageEvents
+from usage_events import INTERACTIVE_OPEN, UsageEvents
 
 ASSETS = Path(__file__).resolve().parents[1] / "assets"
 SERVICE = "workstation-status"
@@ -32,11 +34,19 @@ PAGE_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; connect-sr
             "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 FILES = {"/tokens.css": "text/css", "/style.css": "text/css", "/review.css": "text/css", "/controls.js": "text/javascript",
          "/responses.js": "text/javascript", "/report.js": "text/javascript", "/review.js": "text/javascript",
-         "/report_page.js": "text/javascript", "/delivery.js": "text/javascript", "/asks.js": "text/javascript"}
+         "/report_page.js": "text/javascript", "/delivery.js": "text/javascript", "/asks.js": "text/javascript",
+         "/embedded_host.js": "text/javascript", "/document_bridge.js": "text/javascript"}
+DOCUMENT_HELPER = "/document_bridge.js"            # loaded by sandboxed documents, whose origin is opaque
 POSTS = {"/api/dismiss": ({"id", "dismissed"}, set(), 4096),
          "/api/responses": ({"id", "revision", "values"}, set(), 4 * 1024 * 1024),
          "/api/delivery-response": ({"id", "action"}, {"choice", "note"}, 16 * 1024),
+         "/api/document-state": ({"kind", "id", "state"}, set(), 80 * 1024),
          "/api/events": ({"type"}, {"view", "item_kind", "item", "action", "narrow"}, 4096)}
+
+
+def page_policy(public):
+    """The policy of the service's own pages: they may frame this origin and the public one, and nothing else loosens."""
+    return PAGE_CSP + "; frame-src 'self'" + (" " + public[0] if public else "")
 
 
 def public_address(value):
@@ -53,10 +63,11 @@ def public_address(value):
 
 def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
     root = Path(root).resolve()
-    reports, deliveries, usage = StatusReports(root), Deliveries(root), UsageEvents(root)
+    reports, deliveries, usage, states = StatusReports(root), Deliveries(root), UsageEvents(root), DocumentStates(root)
     asks = ask_reader or AskReader()
     token = secrets.token_urlsafe(32)
     public = public_address(public_url)
+    policy = page_policy(public)
 
     class Handler(BaseHTTPRequestHandler):
         def setup(self):
@@ -68,7 +79,9 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
             if arguments and str(arguments[1] if len(arguments) > 1 else "").startswith(("4", "5")):
                 super().log_message(message, *arguments)
 
-        def send(self, status, content, content_type="application/json", *, policy=PAGE_CSP, cors=False, location=None):
+        def send(self, status, content, content_type="application/json", *, policy=policy, cors=False, location=None,
+                 framing="DENY", readers="same-origin"):
+            """`framing` and `readers` loosen only for a sandboxed document and for the helper such documents load."""
             if not isinstance(content, bytes):
                 content = json.dumps(content, ensure_ascii=False).encode("utf-8")
             self.send_response(status)
@@ -77,9 +90,11 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
             self.send_header("Cache-Control", "no-store")
             self.send_header("Content-Security-Policy", policy)
             self.send_header("X-Content-Type-Options", "nosniff")
-            self.send_header("X-Frame-Options", "DENY")
-            self.send_header("Cross-Origin-Resource-Policy", "same-origin")
+            self.send_header("X-Frame-Options", framing)
+            self.send_header("Cross-Origin-Resource-Policy", readers)
             self.send_header("Referrer-Policy", "no-referrer")
+            if readers == "cross-origin":
+                self.send_header("Access-Control-Allow-Origin", "*")
             if location:
                 self.send_header("Location", location)
             if cors and self.headers.get("Origin"):
@@ -124,14 +139,37 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
             except (ValueError, OSError):
                 return False
 
+        def public_url(self):
+            return public[0] + public[2] if public else None
+
+        def addresses(self):
+            """Link handling for the address this request arrived on."""
+            port = self.server.server_port
+            return review_pages.Addresses(self.base(), public, {f"http://127.0.0.1:{port}", f"http://localhost:{port}"})
+
+        def frame_source(self, interactive, route):
+            """Where the frame of an item's interactive document loads from; None when this address cannot show it."""
+            if interactive["kind"] == "document":
+                return f"{self.base()}{route}/interactive"
+            try:
+                interactive_documents.validate_address(interactive["address"], public[2] if public else "")
+            except ValueError:
+                return None                         # no public address, or the path belongs to the review page itself
+            return public[0] + interactive["address"] if self.remote() else None
+
+        def send_interactive_document(self, content):
+            """Agent-built HTML: always under the sandbox policy, so it never has this origin, in a frame or in a tab."""
+            self.send(200, content.encode("utf-8"), "text/html", policy=interactive_documents.DOCUMENT_POLICY, framing="SAMEORIGIN")
+
         def review(self):
             operations, delivered, listing = reports.operations(), deliveries.list(), asks.current()
+            for delivery in delivered["deliveries"]:
+                delivery.pop("document_state")       # the list needs no document data; agents read it with read_responses.py
             for operation in operations["operations"]:
                 operation["ask_count"] = len(for_operation(listing["asks"], operation)) if listing["available"] else None
                 operation["version_count"] = len(operation.pop("versions"))
             return {"operations": operations["operations"], "deliveries": delivered["deliveries"], "asks": listing,
-                    "unreadable": operations["unreadable"] + delivered["unreadable"],
-                    "public_url": public[0] + public[2] if public else None}
+                    "unreadable": operations["unreadable"] + delivered["unreadable"], "public_url": self.public_url()}
 
         def report_page(self, identifier):
             manifest = reports._manifest(identifier)
@@ -140,17 +178,66 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
                 return reports.content(identifier), REPORT_CSP          # retained HTML only: never run its scripts
             from build_status import render
             base, operation = self.base(), reports.operation(manifest["operation_id"])
-            fields = document.get("response_fields")
-            configuration = {"report": identifier, "operation": operation["id"], "latest": operation["latest"] == identifier,
+            fields, interactive = document.get("response_fields"), manifest["interactive"]
+            latest = operation["latest"] == identifier
+            configuration = {"report": identifier, "operation": operation["id"], "latest": latest,
                              "dismissed": bool(manifest["dismissed_at"])}
             if fields:
                 configuration["responses"] = {"fields": fields, "connection": {
                     "id": identifier, "url": f"{base}/api/report-responses/{identifier}",
                     "token": response_key(reports.root, identifier, create=True)}}
-            scripts = ("controls.js",) + (("responses.js", "report.js") if fields else ()) + ("asks.js", "report_page.js")
+            embedded = ""
+            if interactive:
+                configuration["embedded"] = {"kind": "report", "item": identifier, "latest": latest, "public_url": self.public_url()}
+                embedded = review_pages.interactive_section(
+                    interactive, self.frame_source(interactive, "/reports/" + identifier), manifest["title"],
+                    f"{self.public_url()}/reports/{identifier}" if public else None, "report")
+            scripts = (("controls.js",) + (("responses.js", "report.js") if fields else ()) + ("asks.js", "report_page.js")
+                       + (("embedded_host.js",) if interactive else ()))
             return render(document, page={"base": base, "scripts": scripts, "configuration": configuration,
                                           "navigation": review_pages.report_navigation(base, operation, identifier),
-                                          "after_header": review_pages.OPERATION_ASKS}), PAGE_CSP
+                                          "after_header": review_pages.OPERATION_ASKS, "after_summary": embedded}), policy
+
+        def delivery_page(self, record):
+            interactive, embedded = record["interactive"], ""
+            if interactive:
+                embedded = review_pages.interactive_section(
+                    interactive, self.frame_source(interactive, "/deliveries/" + record["id"]), record["title"],
+                    f"{self.public_url()}/deliveries/{record['id']}" if public else None, "delivery")
+            return review_pages.delivery_page(self.addresses(), record, deliveries.document(record["id"]), embedded, self.public_url())
+
+        def embedded_page(self):
+            """The page frame around another application on this host, named by ?address= and optionally ?from=<item>."""
+            query = parse_qs(urlsplit(self.path).query)
+            address, origin = query.get("address", [""])[0], query.get("from", [""])[0]
+            try:
+                interactive_documents.validate_address(address, public[2] if public else None)
+            except ValueError as error:
+                raise StatusError("This address cannot be shown inside the review page.") from error
+            back = None
+            for find, route in ((deliveries.record, "/deliveries/"), (reports._manifest, "/reports/")):
+                try:
+                    back = (route + origin, find(origin)["title"])
+                    break
+                except StatusError:
+                    continue
+            elsewhere = f"{self.public_url()}/embedded?address={address}" + (f"&from={origin}" if back else "") if public else None
+            return review_pages.embedded_page(self.base(), address, public[0] + address if self.remote() else None, back, elsewhere,
+                                              self.public_url())
+
+        def document_state_item(self, kind, identifier):
+            """(state key, whether this version may save) for the item a document state request names."""
+            if kind == "delivery":
+                record = deliveries.record(identifier)
+                if record["id"] != identifier or not record["interactive"]:
+                    raise StatusError("This delivery version has no interactive document.")
+                return record["series"], record["latest"]
+            if kind == "report":
+                manifest = reports._manifest(identifier)
+                if not manifest["interactive"]:
+                    raise StatusError("This report has no interactive document.")
+                return manifest["operation_id"], reports.operation(manifest["operation_id"])["latest"] == identifier
+            raise StatusError("Document state belongs to a delivery or a report.")
 
         def do_OPTIONS(self):
             path = self.route()
@@ -180,10 +267,10 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
                         return
                     self.send(200, review_pages.review_page(base).encode("utf-8"), "text/html")
                 elif path in FILES:
-                    self.send(200, (ASSETS / path[1:]).read_bytes(), FILES[path])
+                    self.send(200, (ASSETS / path[1:]).read_bytes(), FILES[path],
+                              readers="cross-origin" if path == DOCUMENT_HELPER else "same-origin")
                 elif path == "/health":
-                    self.send(200, {"service": SERVICE, "version": VERSION, "inbox": str(reports.root),
-                                    "public_url": public[0] + public[2] if public else None})
+                    self.send(200, {"service": SERVICE, "version": VERSION, "inbox": str(reports.root), "public_url": self.public_url()})
                 elif path == "/api/config":
                     self.send(200, {"token": token})
                 elif path == "/api/review":
@@ -197,7 +284,10 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
                         asks.invalidate()
                     operation, listing = reports.operation(path.removeprefix("/api/operations/")), asks.current()
                     self.send(200, {"operation": operation, "asks": {**listing, "asks": for_operation(listing["asks"], operation)},
-                                    "public_url": public[0] + public[2] if public else None})
+                                    "public_url": self.public_url()})
+                elif path.startswith("/api/document-state/"):
+                    kind, _, identifier = path.removeprefix("/api/document-state/").partition("/")
+                    self.send(200, states.read(self.document_state_item(kind, identifier)[0]))
                 elif path.startswith("/api/responses/"):
                     self.send(200, reports.responses(path.removeprefix("/api/responses/")))
                 elif cors:
@@ -207,21 +297,32 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
                         return
                     self.send(200, reports.responses(identifier), cors=True)
                 elif path.startswith("/reports/"):
-                    content, policy = self.report_page(path.removeprefix("/reports/"))
-                    self.send(200, content.encode("utf-8"), "text/html", policy=policy)
+                    identifier, _, rest = path.removeprefix("/reports/").partition("/")
+                    if rest == "interactive":
+                        self.send_interactive_document(reports.interactive_document(identifier))
+                    elif rest:
+                        raise StatusError("This page does not exist.")
+                    else:
+                        content, report_policy = self.report_page(identifier)
+                        self.send(200, content.encode("utf-8"), "text/html", policy=report_policy)
                 elif path.startswith("/operations/"):
                     operation = reports.operation(path.removeprefix("/operations/"))
                     self.send(302, b"", "text/plain", location=f"{base}/reports/{operation['latest']}")
                 elif path.startswith("/deliveries/"):
                     parts = path.removeprefix("/deliveries/").split("/")
-                    record = deliveries.record(parts[0])
+                    record = deliveries.record(parts[0])                # a version, or the latest version of a series
                     if len(parts) == 1:
-                        page = review_pages.delivery_page(base, record, deliveries.document(parts[0]))
+                        page = self.delivery_page(record)
+                    elif len(parts) == 2 and parts[1] == "interactive":
+                        self.send_interactive_document(deliveries.interactive_document(record["id"]))
+                        return
                     elif len(parts) == 3 and parts[1] == "attachments" and parts[2].isdecimal():
-                        page = review_pages.attachment_page(base, record, *deliveries.attachment(parts[0], int(parts[2])))
+                        page = review_pages.attachment_page(self.addresses(), record, *deliveries.attachment(record["id"], int(parts[2])))
                     else:
                         raise StatusError("This page does not exist.")
                     self.send(200, page.encode("utf-8"), "text/html")
+                elif path == "/embedded":
+                    self.send(200, self.embedded_page().encode("utf-8"), "text/html")
                 else:
                     self.send(404, {"error": "This page does not exist."})
             except StatusError as error:
@@ -257,12 +358,21 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
                     record = deliveries.respond(body["id"], body["action"], choice=body.get("choice"), note=body.get("note"))
                     if body["action"] != "read":
                         usage.record("response", item_kind="delivery", item=body["id"], action=body["action"], remote=self.remote())
+                    record.pop("document_state")
                     self.send(200, record)
+                elif path == "/api/document-state":
+                    key, latest = self.document_state_item(body["kind"], body["id"])
+                    if not latest:
+                        raise ResponseConflict("Only the interactive document of the latest version saves state.")
+                    saved = states.save(key, body["state"], body["id"])
+                    self.send(200, {name: saved[name] for name in ("saved_at", "revision", "version")})
                 else:
                     opened = None
                     if body["type"] not in {"page_open", "item_open", "ask_resolution"}:
                         raise ValueError("Pages report page_open, item_open and ask_resolution events only.")
-                    if body["type"] == "item_open" and body.get("item_kind") == "operation":
+                    if body["type"] == "item_open" and body.get("action") not in (None, INTERACTIVE_OPEN):
+                        raise ValueError("An item is opened, or its interactive document is.")
+                    if body["type"] == "item_open" and body.get("item_kind") == "operation" and not body.get("action"):
                         opened = reports.mark_opened(body.get("item"))
                     usage.record(body["type"], view=body.get("view"), item_kind=body.get("item_kind"), item=body.get("item"),
                                  action=body.get("action"), narrow=body.get("narrow"), remote=self.remote())

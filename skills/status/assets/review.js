@@ -58,16 +58,22 @@
     signature = ""; render(); notice(message); load(true);
   }
   const askRow = ask => window.StatusAsks.createAskRow(ask, {changed: askChanged, publicUrl: review.public_url});
+  // A delivery leaves Open once he has responded and has seen its latest version.
+  const settled = delivery => Boolean(delivery.response) && !delivery.unread;
   function deliveryRow(delivery) {
-    const response = delivery.response, closed = Boolean(response);
-    const outcome = !response ? null : response.type === "accepted" ? flag("Accepted", "outcome-accepted") : "Dismissed";
+    // A delivery is one row whatever its number of versions. A response stays with it; a version newer than the one
+    // he read makes the row unread again and names the version his response was given on.
+    const response = delivery.response, responded = Boolean(response);
+    const given = responded && response.version !== delivery.id ? ` version ${delivery.response_version_number || "earlier"}` : "";
+    const outcome = !response ? (delivery.version_count > 1 ? `Version ${delivery.version_count}` : null)
+      : response.type === "accepted" ? flag("Accepted" + given, "outcome-accepted") : "Dismissed" + given;
     const actions = [];
-    if (!closed && delivery.recommended_default) actions.push(["Do it", () => respond(delivery, "accept", "recommended_default")]);
-    actions.push(closed ? ["Reopen", () => respond(delivery, "reopen"), "quiet"] : ["Dismiss", () => respond(delivery, "dismiss"), "quiet"]);
+    if (!responded && delivery.recommended_default) actions.push(["Do it", () => respond(delivery, "accept", "recommended_default")]);
+    actions.push(responded ? ["Reopen", () => respond(delivery, "reopen"), "quiet"] : ["Dismiss", () => respond(delivery, "dismiss"), "quiet"]);
     return row({
-      key: "delivery-" + delivery.id, state: delivery.status === "new" ? "unread" : "read", closed,
+      key: "delivery-" + delivery.series, state: delivery.unread ? "unread" : "read", closed: settled(delivery),
       href: `${base}/deliveries/${delivery.id}`, title: delivery.title, flags: [outcome, delivery.category || delivery.origin.agent],
-      excerpt: !closed && delivery.recommended_default ? excerpt(delivery.recommended_default, "Recommended:") : excerpt(delivery.summary),
+      excerpt: !responded && delivery.recommended_default ? excerpt(delivery.recommended_default, "Recommended:") : excerpt(delivery.summary),
       at: delivery.received_at, actions});
   }
   function operationRow(operation) {
@@ -96,9 +102,9 @@
     const show = view(), query = element("review-search").value.trim().toLowerCase();
     const wanted = closed => show === "all" || closed === (show === "done");
     const asks = show === "done" ? [] : review.asks.asks.filter(ask => matches(query, ask.title, ask.detail, ask.context, ask.unblocks, ask.project_label, ask.thread_title));
-    const deliveries = review.deliveries.filter(delivery => wanted(Boolean(delivery.response)) &&
+    const deliveries = review.deliveries.filter(delivery => wanted(settled(delivery)) &&
       matches(query, delivery.title, delivery.summary, delivery.recommended_default, delivery.category, delivery.origin.agent, delivery.origin.workspace));
-    deliveries.sort((first, second) => (second.status === "new") - (first.status === "new"));
+    deliveries.sort((first, second) => second.unread - first.unread);
     const operations = review.operations.filter(operation => wanted(Boolean(operation.dismissed_at)) &&
       matches(query, operation.title, operation.subject, operation.summary, operation.origin.agent, operation.origin.workspace));
     const rank = operation => operation.dismissed_at ? 0 : (operation.ask_count ? 2 : 0) + (operation.unread ? 1 : 0);
@@ -110,7 +116,7 @@
     element("review-source").replaceChildren(...(review.asks.available ? [] : [make("strong", "Asks unavailable. "), review.asks.reason]));
     element("deliveries").hidden = !deliveries.length;
     element("operations").hidden = !operations.length;
-    const awaiting = review.deliveries.filter(delivery => !delivery.response).length;
+    const awaiting = review.deliveries.filter(delivery => !settled(delivery)).length;
     const updated = review.operations.filter(operation => operation.unread && !operation.dismissed_at).length;
     const blocking = review.asks.asks.filter(ask => ask.blocking).length;
     element("review-counts").textContent = [

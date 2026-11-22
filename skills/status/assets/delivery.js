@@ -1,26 +1,65 @@
 "use strict";
 (() => {
-  const {make, time, request, measure, localizeTimes} = window.StatusControls;
+  const {make, time, base, request, measure, localizeTimes} = window.StatusControls;
   const configuration = JSON.parse(document.getElementById("status-configuration").textContent);
   localizeTimes();
   for (const button of document.querySelectorAll(".copy-path")) button.onclick = async () => {
     try { await navigator.clipboard.writeText(button.dataset.path); button.textContent = "Copied"; }
     catch { button.textContent = "Select the path to copy"; }
   };
+  const history = document.querySelector(".version-history");
+  document.addEventListener("click", event => { if (history?.open && !history.contains(event.target)) history.open = false; });
+  document.addEventListener("keydown", event => { if (event.key === "Escape" && history?.open) { history.open = false; history.querySelector("summary").focus(); } });
   if (!configuration.delivery) return;
+  // `delivery` is the version this page shows. Responses belong to the whole delivery and name the version they were given on.
   let delivery = configuration.delivery, noteOpen = false, noteText = "", busy = false, failed = "";
+  let proposal = null, proposalReady = false, proposalTimer = null;
+  const CONFIRM_DELAY = 600;             // a proposal that has just appeared cannot be confirmed by a click already under way
   const panel = document.getElementById("delivery-response");
   const options = delivery.decision?.options || [];
 
-  async function respond(action, choice) {
+  async function respond(action, choice, proposedNote) {
     if (busy) return;
     busy = true; failed = ""; render();
     try {
-      const note = noteOpen && noteText.trim() && action !== "discuss" && action !== "reopen" ? noteText.trim() : undefined;
+      const typed = noteOpen && noteText.trim() ? noteText.trim() : undefined;
+      const note = action === "discuss" || action === "reopen" ? undefined : proposedNote || typed;
       delivery = await request("/api/delivery-response", {id: delivery.id, action, ...(choice ? {choice} : {}), ...(note ? {note} : {})});
-      if (action === "accept" || action === "dismiss") { noteOpen = false; noteText = ""; }
+      if (action === "accept" || action === "dismiss") { noteOpen = false; noteText = ""; proposal = null; }
     } catch (error) { failed = error.message + " Your note is still here."; }
     finally { busy = false; render(); }
+  }
+
+  // The embedded document may propose a response. It is shown here, in the page's own words, and recorded only by Confirm.
+  function propose({action, choice, note}) {
+    if (!delivery.latest) return false;
+    if (action === "accept") {
+      choice = choice === undefined ? "recommended_default" : choice;
+      if (choice === "recommended_default" ? !delivery.recommended_default : !options.includes(choice)) return false;
+    } else if (choice !== undefined) return false;
+    const next = {action, choice: action === "accept" ? choice : undefined, note: typeof note === "string" && note.trim() ? note.trim() : undefined};
+    if (proposal && JSON.stringify(proposal) === JSON.stringify(next)) return false;
+    proposal = next; proposalReady = false;
+    clearTimeout(proposalTimer);
+    proposalTimer = setTimeout(() => { proposalReady = true; render(); }, CONFIRM_DELAY);
+    render();
+    return true;
+  }
+  window.StatusDelivery = {propose};
+
+  function proposalBlock() {
+    const block = make("div", null, "response-proposal"), buttons = make("div", null, "response-buttons");
+    const what = proposal.action === "dismiss" ? "dismiss this delivery"
+      : proposal.choice === "recommended_default" ? "accept the recommended default" : `accept \u201c${proposal.choice}\u201d`;
+    block.append(make("p", `The document proposes: ${what}.`));
+    if (proposal.note) block.append(make("p", "With the note: " + proposal.note, "note text"));
+    const confirm = make("button", "Confirm"), ignore = make("button", "Ignore", "quiet");
+    confirm.type = ignore.type = "button"; confirm.disabled = busy || !proposalReady; ignore.disabled = busy;
+    confirm.onclick = () => respond(proposal.action, proposal.choice, proposal.note);
+    ignore.onclick = () => { proposal = null; render(); };
+    buttons.append(confirm, ignore);
+    block.append(buttons, make("p", "Nothing is recorded until you confirm.", "note"));
+    return block;
   }
 
   function render() {
@@ -31,11 +70,18 @@
       line.append(make("span", accepted ? "Accepted" : "Dismissed", accepted ? "outcome-accepted" : "outcome-dismissed"),
         ` ${time(response.at)}` + (accepted && response.choice !== "recommended_default" ? `: ${response.choice}` : accepted ? ": the recommended default" : ""));
       outcome.append(line);
-      const reopen = make("button", "Change response", "quiet"); reopen.type = "button"; reopen.disabled = busy; reopen.onclick = () => respond("reopen");
-      outcome.append(reopen); content.push(outcome);
+      if (delivery.latest) {
+        const reopen = make("button", "Change response", "quiet"); reopen.type = "button"; reopen.disabled = busy; reopen.onclick = () => respond("reopen");
+        outcome.append(reopen);
+      }
+      content.push(outcome);
+      if (response.version !== delivery.id) {
+        const given = delivery.response_version_number ? `version ${delivery.response_version_number}` : "an earlier version";
+        content.push(make("p", `You ${accepted ? "accepted" : "dismissed"} ${given}; this is version ${delivery.number}.`, "response-version"));
+      }
       if (response.note) content.push(make("p", "Your note: " + response.note, "note text"));
       content.push(make("p", accepted ? "The agent reads this response on its next wake." : "The agent sees the dismissal and your reason on its next wake.", "note"));
-    } else {
+    } else if (delivery.latest) {
       const buttons = make("div", null, "response-buttons");
       const add = (label, handler, className) => { const button = make("button", label, className || ""); button.type = "button"; button.disabled = busy; button.onclick = handler; buttons.append(button); };
       if (delivery.recommended_default) add("Do it", () => respond("accept", "recommended_default"), "primary");
@@ -51,11 +97,15 @@
         content.push(field);
       }
     }
-    if (delivery.thread) {
+    if (!delivery.latest) {
+      const later = make("p", "Responses are given on the latest version. ", "note"), link = make("a", "Open the latest version");
+      link.href = `${base}/deliveries/${delivery.version}`; later.append(link); content.push(later);
+    } else if (delivery.thread) {
       const discuss = make("a", "Discuss in Ribbon Field", "link-button"); discuss.href = delivery.thread;
       discuss.onclick = () => { request("/api/delivery-response", {id: delivery.id, action: "discuss"}).then(next => { delivery = next; }).catch(() => {}); };
       content[0].append(discuss);
     }
+    if (proposal && delivery.latest) content.push(proposalBlock());
     if (failed) { const alert = make("p", failed, "failure"); alert.setAttribute("role", "alert"); content.push(alert); }
     panel.replaceChildren(...content);
   }

@@ -7,8 +7,8 @@ import json
 import os
 from pathlib import Path
 
-from delivery_store import publish
-from register_status import inbox_directory
+from delivery_store import Deliveries, publish
+from register_status import add_interactive_arguments, inbox_directory, interactive_arguments
 
 
 def main():
@@ -23,17 +23,25 @@ def main():
     parser.add_argument("--thread-id", default=os.environ.get("AGENT_COORD_SESSION_ID") or os.environ.get("CODEX_THREAD_ID"),
                         help="Ribbon Field conversation for discussion; defaults to the current conversation")
     parser.add_argument("--inbox", type=Path, default=inbox_directory())
+    versions = parser.add_mutually_exclusive_group()
+    versions.add_argument("--key", help="Stable key of a living delivery (lowercase letters, digits, hyphens); every delivery published "
+                          "with it is a new version of the same delivery, and the user's responses stay with it")
+    versions.add_argument("--replaces", metavar="DELIVERY-ID", help="Publish a new version of an existing delivery that has no key")
+    add_interactive_arguments(parser)
     arguments = parser.parse_args()
     try:
         document = json.loads(arguments.delivery.read_text(encoding="utf-8"))
         body = arguments.document.read_text(encoding="utf-8") if arguments.document else None
         root = arguments.inbox.expanduser()
         identifier = publish(document, workspace=arguments.workspace, agent=arguments.agent, provider=arguments.provider,
-                             thread_id=arguments.thread_id, body=body, attachments=arguments.attach, root=root)
+                             thread_id=arguments.thread_id, body=body, attachments=arguments.attach, root=root,
+                             key=arguments.key, replaces=arguments.replaces, **interactive_arguments(arguments, root))
+        record = Deliveries(root).record(identifier)
     except (ValueError, KeyError, OSError) as error:
         parser.error(str(error))
     from status_server import DEFAULT_PORT, saved_public_url
-    result = {"delivery": identifier, "local_url": f"http://127.0.0.1:{DEFAULT_PORT}/deliveries/{identifier}"}
+    result = {"delivery": identifier, "series": record["series"], "version_number": record["number"],
+              "local_url": f"http://127.0.0.1:{DEFAULT_PORT}/deliveries/{identifier}"}
     public = saved_public_url(root)
     if public:
         result["url"] = f"{public}/deliveries/{identifier}"

@@ -112,6 +112,13 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
 .response-outcome .outcome-dismissed { font-weight: var(--weight-strong); }
 .response-panel .note { margin-top: var(--space-2); }
 .response-panel .failure { margin-top: var(--space-3); }
+.response-version { margin-top: var(--space-2); color: var(--attention); font-size: var(--meta); font-weight: var(--weight-medium); }
+.response-proposal { margin-top: var(--space-4); padding-top: var(--space-4); border-top: var(--stroke) solid var(--rule); overflow-wrap: anywhere; }
+/* Content an agent built, in a sandboxed frame across the whole column. Its document reports its height to the page. */
+.sheet section.embedded { margin-top: var(--space-5); }
+.sheet .assessment + section.embedded { margin-top: 0; }
+.embedded-document { display: block; width: 100%; height: var(--embedded-height); border: var(--stroke) solid var(--rule); border-radius: var(--radius); background: var(--surface); }
+.embedded-application .embedded-document { height: var(--embedded-application-height); }
 .link-button { display: inline-flex; align-items: center; min-height: var(--control-height); padding: 0 var(--space-3); border-radius: var(--radius-control); font-size: var(--meta); font-weight: var(--weight-medium); }
 .link-button:hover { background: var(--surface-quiet); text-decoration: none; }
 .link-list { margin: 0; padding: 0; list-style: none; }
