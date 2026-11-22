@@ -43,8 +43,10 @@ would warn the next agent about. Record it even if you worked around it.
   `friction - <<'EOF'` ... `EOF`.
 - The command captures directory, repository, branch, commit, provider,
   session, and host. It writes outside every repository: no write scope, no
-  Git change. Never read, edit, or summarize the store, and do not report
-  records to the user unless the friction changed the outcome.
+  Git change. Unless you are assigned friction triage, never list, resolve, or
+  summarize records, and do not report them to the user unless the friction
+  changed the outcome. Triage marks records handled with `friction --resolve`
+  (see `friction --help`) and never edits the store file.
 - Do not stop your task to fix friction outside your current scope. Blocking
   defects and requested work belong in Beads, not here.
 

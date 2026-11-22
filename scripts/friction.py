@@ -15,7 +15,11 @@ repository (default ~/.local/state/friction/records.jsonl, overridable with
 FRICTION_STORE), so recording never needs a repository write scope, never
 produces a Git change, and survives worktree deletion.
 
-Agents only record. The --list mode exists for people and triage jobs.
+Agents only record. The --list and --resolve modes exist for people and for
+agents assigned friction triage. Triage never edits existing lines: it appends a
+resolution entry that names the records it handles, its disposition and the
+evidence (a commit, Beads issue or URL). --list hides resolved records unless
+--all is given; a record's latest resolution wins.
 """
 
 from __future__ import annotations
@@ -35,6 +39,7 @@ from typing import Any
 SCHEMA_VERSION = 1
 MAXIMUM_TEXT_LENGTH = 1500
 SCOPES = ("repository", "environment", "harness", "external")
+DISPOSITIONS = ("fixed", "duplicate", "stale", "external", "declined")
 DEFAULT_STORE = Path.home() / ".local" / "state" / "friction" / "records.jsonl"
 
 # Ordered (provider, session variable) pairs. The first provider whose marker
@@ -113,11 +118,39 @@ def agent_context(environment: dict[str, str]) -> dict[str, Any]:
     return {"provider": provider or "unknown", "session_id": session_id}
 
 
+def _now() -> str:
+    return dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds")
+
+
+def build_resolution(
+    record_ids: list[str],
+    disposition: str,
+    reference: str,
+    note: str | None,
+    cwd: Path,
+    environment: dict[str, str],
+) -> dict[str, Any]:
+    return {
+        "schema": SCHEMA_VERSION,
+        "kind": "resolution",
+        "id": "frr_" + uuid.uuid4().hex[:12],
+        "recorded_at": _now(),
+        "resolves": record_ids,
+        "disposition": disposition,
+        "reference": reference,
+        "note": note,
+        "cwd": str(cwd),
+        **agent_context(environment),
+        "host": socket.gethostname().split(".")[0],
+    }
+
+
 def build_record(text: str, scope: str | None, cwd: Path, environment: dict[str, str]) -> dict[str, Any]:
     return {
         "schema": SCHEMA_VERSION,
+        "kind": "report",
         "id": "frc_" + uuid.uuid4().hex[:12],
-        "recorded_at": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
+        "recorded_at": _now(),
         "text": text,
         "scope": scope,
         **repository_context(cwd),
@@ -158,14 +191,70 @@ def read_records(path: Path) -> list[dict[str, Any]]:
     return records
 
 
-def list_records(path: Path, project: str | None, since: str | None, output_format: str) -> str:
-    records = read_records(path)
+def partition(entries: list[dict[str, Any]]) -> tuple[list[dict[str, Any]], dict[str, dict[str, Any]]]:
+    """Split store entries into reports and the latest resolution for each report ID.
+
+    Entries without a kind predate resolutions and are reports.
+    """
+    reports: list[dict[str, Any]] = []
+    resolutions: dict[str, dict[str, Any]] = {}
+    for entry in entries:
+        if entry.get("kind", "report") == "resolution":
+            for record_id in entry.get("resolves") or []:
+                resolutions[str(record_id)] = entry
+        else:
+            reports.append(entry)
+    return reports, resolutions
+
+
+def resolve_records(
+    path: Path,
+    record_ids: list[str],
+    disposition: str,
+    reference: str,
+    note: str | None,
+    cwd: Path,
+    environment: dict[str, str],
+) -> dict[str, Any]:
+    """Append one resolution entry; raise ValueError if any ID is not a recorded report."""
+    unique_ids = list(dict.fromkeys(record_ids))
+    if not unique_ids:
+        raise ValueError("no record IDs given")
+    reports, _ = partition(read_records(path))
+    known = {str(report.get("id")) for report in reports}
+    unknown = [record_id for record_id in unique_ids if record_id not in known]
+    if unknown:
+        raise ValueError("unknown record IDs: " + " ".join(unknown))
+    resolution = build_resolution(unique_ids, disposition, reference, note, cwd, environment)
+    append_record(resolution, path)
+    return resolution
+
+
+def list_records(
+    path: Path,
+    project: str | None,
+    since: str | None,
+    output_format: str,
+    scope: str | None = None,
+    include_resolved: bool = False,
+) -> str:
+    records, resolutions = partition(read_records(path))
+    if not include_resolved:
+        records = [record for record in records if str(record.get("id")) not in resolutions]
+    if scope:
+        records = [record for record in records if record.get("scope") == scope]
     if project:
         records = [record for record in records if record.get("project") == project]
     if since:
         records = [record for record in records if str(record.get("recorded_at", "")) >= since]
     if output_format == "jsonl":
-        return "".join(json.dumps(record, ensure_ascii=False) + "\n" for record in records)
+        lines = []
+        for record in records:
+            resolution = resolutions.get(str(record.get("id")))
+            if resolution is not None:
+                record = {**record, "resolution": _resolution_summary(resolution)}
+            lines.append(json.dumps(record, ensure_ascii=False) + "\n")
+        return "".join(lines)
     grouped: dict[str, list[dict[str, Any]]] = {}
     for record in records:
         grouped.setdefault(str(record.get("project") or "unknown"), []).append(record)
@@ -175,25 +264,52 @@ def list_records(path: Path, project: str | None, since: str | None, output_form
         for record in sorted(grouped[name], key=lambda item: str(item.get("recorded_at", "")), reverse=True):
             date = str(record.get("recorded_at", ""))[:10] or "undated"
             scope = record.get("scope") or "unclassified"
-            lines.append(f"- {date} [{scope}, {record.get('provider', 'unknown')}] {record.get('text', '')}")
+            resolution = resolutions.get(str(record.get("id")))
+            status = ""
+            if resolution is not None:
+                status = f" (resolved {resolution.get('disposition')}: {resolution.get('reference')})"
+            lines.append(
+                f"- {date} {record.get('id', 'no-id')} [{scope}, {record.get('provider', 'unknown')}]{status} "
+                f"{record.get('text', '')}"
+            )
         sections.append("\n".join(lines))
     return "\n\n".join(sections) + ("\n" if sections else "No friction records.\n")
+
+
+def _resolution_summary(resolution: dict[str, Any]) -> dict[str, Any]:
+    return {
+        key: resolution.get(key)
+        for key in ("id", "recorded_at", "disposition", "reference", "note", "session_id")
+    }
 
 
 def parse_arguments(argv: list[str]) -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         prog="friction",
-        description="Record avoidable friction encountered while working. Agents only record.",
+        description=(
+            "Record avoidable friction encountered while working. Agents only record; "
+            "--list and --resolve are for people and assigned friction triage."
+        ),
     )
     parser.add_argument(
         "text",
         nargs="?",
         help="One or two sentences: 'While <task>, <obstacle>; <cause or remedy>.' Use - to read standard input.",
     )
-    parser.add_argument("--scope", choices=SCOPES, help="Owner of the remedy.")
-    parser.add_argument("--list", action="store_true", help="Print recorded friction (for people and triage).")
+    parser.add_argument("--scope", choices=SCOPES, help="Owner of the remedy. With --list, restrict to one scope.")
+    parser.add_argument("--list", action="store_true", help="Print unresolved friction (for people and triage).")
+    parser.add_argument("--all", action="store_true", dest="include_resolved", help="With --list, include resolved records.")
     parser.add_argument("--project", help="With --list, restrict to one project.")
     parser.add_argument("--since", help="With --list, restrict to records on or after this ISO date.")
+    parser.add_argument(
+        "--resolve",
+        nargs="+",
+        metavar="RECORD_ID",
+        help="Mark records handled (triage only). Use - to read whitespace-separated IDs from standard input.",
+    )
+    parser.add_argument("--disposition", choices=DISPOSITIONS, help="With --resolve, how the records were handled.")
+    parser.add_argument("--reference", help="With --resolve, the evidence: commit, Beads issue, record ID or URL.")
+    parser.add_argument("--note", help="With --resolve, an optional one-sentence explanation.")
     parser.add_argument("--format", choices=("markdown", "jsonl"), default="markdown", dest="output_format")
     return parser.parse_args(argv)
 
@@ -201,8 +317,19 @@ def parse_arguments(argv: list[str]) -> argparse.Namespace:
 def main(argv: list[str] | None = None) -> int:
     arguments = parse_arguments(sys.argv[1:] if argv is None else argv)
     path = store_path()
+    if arguments.resolve:
+        return _resolve_command(arguments, path)
     if arguments.list:
-        sys.stdout.write(list_records(path, arguments.project, arguments.since, arguments.output_format))
+        sys.stdout.write(
+            list_records(
+                path,
+                arguments.project,
+                arguments.since,
+                arguments.output_format,
+                arguments.scope,
+                arguments.include_resolved,
+            )
+        )
         return 0
     raw = arguments.text
     if raw is None or raw == "-":
@@ -221,6 +348,37 @@ def main(argv: list[str] | None = None) -> int:
         print(f"friction: could not record ({error.strerror}); continue your task.", file=sys.stderr)
         return 1
     print(f"Recorded {record['id']}.")
+    return 0
+
+
+def _resolve_command(arguments: argparse.Namespace, path: Path) -> int:
+    if not arguments.disposition or not arguments.reference or not arguments.reference.strip():
+        print("friction: --resolve requires --disposition and --reference.", file=sys.stderr)
+        return 2
+    record_ids: list[str] = []
+    for value in arguments.resolve:
+        if value == "-":
+            record_ids.extend(sys.stdin.read().split())
+        else:
+            record_ids.append(value)
+    note = normalize_text(arguments.note) if arguments.note else None
+    try:
+        resolution = resolve_records(
+            path,
+            record_ids,
+            arguments.disposition,
+            arguments.reference.strip(),
+            note or None,
+            Path.cwd(),
+            dict(os.environ),
+        )
+    except ValueError as error:
+        print(f"friction: {error}", file=sys.stderr)
+        return 2
+    except OSError as error:
+        print(f"friction: could not record the resolution ({error.strerror}).", file=sys.stderr)
+        return 1
+    print(f"Resolved {len(resolution['resolves'])} records as {resolution['disposition']} ({resolution['id']}).")
     return 0
 
 

@@ -135,3 +135,106 @@ def test_list_groups_by_project_and_filters(tmp_path):
     assert full.index("] b") < full.index("] a")
     assert "] c" not in friction.list_records(store, "rig", None, "markdown")
     assert "] a" not in friction.list_records(store, None, "2026-11-02", "markdown")
+
+
+def resolution_arguments(*record_ids, disposition="fixed", reference="abc1234"):
+    return ["--resolve", *record_ids, "--disposition", disposition, "--reference", reference]
+
+
+def test_new_records_declare_report_kind(tmp_path):
+    store = tmp_path / "records.jsonl"
+
+    assert run_command(["The fixture path was stale."], store, tmp_path).returncode == 0
+
+    assert json.loads(store.read_text())["kind"] == "report"
+
+
+def test_resolution_hides_records_from_default_listing(tmp_path):
+    store = tmp_path / "records.jsonl"
+    friction.append_record({"id": "frc_a", "project": "stoic", "text": "first"}, store)
+    friction.append_record({"id": "frc_b", "project": "stoic", "text": "second"}, store)
+
+    completed = run_command(
+        [*resolution_arguments("frc_a", reference="stoic-12"), "--note", "Fixed  at the cause."],
+        store,
+        tmp_path,
+        {"AGENT_COORD_SESSION_ID": "triage-1"},
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert "Resolved 1 records as fixed" in completed.stdout
+    resolution = json.loads(store.read_text().splitlines()[-1])
+    assert resolution["kind"] == "resolution"
+    assert resolution["resolves"] == ["frc_a"]
+    assert resolution["reference"] == "stoic-12"
+    assert resolution["note"] == "Fixed at the cause."
+    assert resolution["session_id"] == "triage-1"
+    default = friction.list_records(store, None, None, "markdown")
+    assert "frc_b" in default and "frc_a" not in default
+    assert "## stoic (1)" in default
+    complete = friction.list_records(store, None, None, "markdown", include_resolved=True)
+    assert "frc_a [unclassified, unknown] (resolved fixed: stoic-12) first" in complete
+
+
+def test_listing_ignores_resolution_entries_and_reports_latest_resolution(tmp_path):
+    store = tmp_path / "records.jsonl"
+    friction.append_record({"id": "frc_a", "text": "legacy record without kind"}, store)
+    assert run_command(resolution_arguments("frc_a", disposition="stale", reference="r1"), store, tmp_path).returncode == 0
+    assert run_command(resolution_arguments("frc_a", disposition="fixed", reference="r2"), store, tmp_path).returncode == 0
+
+    lines = friction.list_records(store, None, None, "jsonl", include_resolved=True).splitlines()
+
+    assert len(lines) == 1
+    record = json.loads(lines[0])
+    assert record["id"] == "frc_a"
+    assert record["resolution"]["disposition"] == "fixed"
+    assert record["resolution"]["reference"] == "r2"
+    assert friction.list_records(store, None, None, "jsonl") == ""
+
+
+def test_resolution_reads_identifiers_from_standard_input(tmp_path):
+    store = tmp_path / "records.jsonl"
+    for record_id in ("frc_a", "frc_b", "frc_c"):
+        friction.append_record({"id": record_id, "text": record_id}, store)
+
+    completed = run_command(
+        resolution_arguments("-", disposition="duplicate", reference="frc_c"),
+        store,
+        tmp_path,
+        stdin="frc_a\nfrc_b frc_a\n",
+    )
+
+    assert completed.returncode == 0, completed.stderr
+    assert json.loads(store.read_text().splitlines()[-1])["resolves"] == ["frc_a", "frc_b"]
+
+
+def test_resolution_rejects_unknown_identifiers_and_missing_evidence(tmp_path):
+    store = tmp_path / "records.jsonl"
+    friction.append_record({"id": "frc_a", "text": "a"}, store)
+    before = store.read_text()
+
+    unknown = run_command(resolution_arguments("frc_a", "frc_missing"), store, tmp_path)
+    missing_reference = run_command(["--resolve", "frc_a", "--disposition", "fixed"], store, tmp_path)
+    blank_reference = run_command(resolution_arguments("frc_a", reference="  "), store, tmp_path)
+    resolution_identifier = run_command(resolution_arguments("frc_a"), store, tmp_path)
+    resolution_id = json.loads(store.read_text().splitlines()[-1])["id"]
+    after_valid = store.read_text()
+    resolves_resolution = run_command(resolution_arguments(resolution_id), store, tmp_path)
+
+    assert unknown.returncode == 2 and "frc_missing" in unknown.stderr
+    assert missing_reference.returncode == 2
+    assert blank_reference.returncode == 2
+    assert resolution_identifier.returncode == 0
+    assert after_valid.startswith(before) and len(after_valid.splitlines()) == 2
+    assert resolves_resolution.returncode == 2
+    assert store.read_text() == after_valid
+
+
+def test_list_filters_by_scope(tmp_path):
+    store = tmp_path / "records.jsonl"
+    friction.append_record({"id": "frc_a", "scope": "harness", "text": "a"}, store)
+    friction.append_record({"id": "frc_b", "scope": "repository", "text": "b"}, store)
+
+    listing = friction.list_records(store, None, None, "markdown", scope="repository")
+
+    assert "frc_b" in listing and "frc_a" not in listing
