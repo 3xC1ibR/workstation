@@ -54,6 +54,7 @@ a { color: var(--ink); text-underline-offset: var(--space-1); overflow-wrap: any
 a:hover, summary:hover { text-decoration: underline; }
 :is(a, summary, .table-region):focus-visible { outline: var(--focus) solid var(--ink); outline-offset: var(--space-1); }
 .source { margin-bottom: var(--space-3); }
+.response-questions dt { margin-top: var(--space-4); }
 code { font: inherit; overflow-wrap: anywhere; }
 footer { display: flex; justify-content: space-between; gap: var(--space-4); margin-top: var(--space-7); padding-top: var(--space-3); border-top: var(--stroke) solid var(--ink); }
 @media (max-width: 600px) {

@@ -16,7 +16,7 @@ import urllib.request
 from urllib.parse import urlsplit
 
 from register_status import inbox_directory
-from status_store import REPORT_CSP, StatusError, StatusReports
+from status_store import REPORT_CSP, ResponseConflict, StatusError, StatusReports
 
 ASSETS = Path(__file__).resolve().parents[1] / "assets"
 SERVICE = "workstation-status"
@@ -65,17 +65,20 @@ def make_server(root, port=DEFAULT_PORT):
                 return
             path = urlsplit(self.path).path
             assets = {"/": ("inbox.html", "text/html"), "/style.css": ("style.css", "text/css"),
-                      "/inbox.css": ("inbox.css", "text/css"), "/inbox.js": ("inbox.js", "text/javascript")}
+                      "/inbox.css": ("inbox.css", "text/css"), "/inbox.js": ("inbox.js", "text/javascript"),
+                      "/responses.js": ("responses.js", "text/javascript")}
             try:
                 if path in assets:
                     name, content_type = assets[path]
                     self.send(200, (ASSETS / name).read_bytes(), content_type)
                 elif path == "/health":
-                    self.send(200, {"service": SERVICE, "version": 1, "inbox": str(reports.root)})
+                    self.send(200, {"service": SERVICE, "version": 2, "inbox": str(reports.root)})
                 elif path == "/api/config":
                     self.send(200, {"token": token})
                 elif path == "/api/reports":
                     self.send(200, reports.list())
+                elif path.startswith("/api/responses/"):
+                    self.send(200, reports.responses(path.removeprefix("/api/responses/")))
                 elif path.startswith("/reports/"):
                     self.send(200, reports.content(path.removeprefix("/reports/")).encode("utf-8"), "text/html", policy=REPORT_CSP)
                 else:
@@ -91,17 +94,25 @@ def make_server(root, port=DEFAULT_PORT):
                     not secrets.compare_digest(self.headers.get("X-Status-Token", ""), token)):
                 self.send(403, {"error": "Refresh the Status page before changing a report."})
                 return
-            if urlsplit(self.path).path != "/api/dismiss":
+            path = urlsplit(self.path).path
+            if path not in {"/api/dismiss", "/api/responses"}:
                 self.send(404, {"error": "This action does not exist."})
                 return
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                if not 0 < length <= 4096 or self.headers.get("Content-Type", "").split(";")[0] != "application/json":
-                    raise ValueError("Expected a small JSON request.")
+                maximum = 4 * 1024 * 1024 if path == "/api/responses" else 4096
+                if not 0 < length <= maximum or self.headers.get("Content-Type", "").split(";")[0] != "application/json":
+                    raise ValueError("Expected a JSON request within the size limit.")
                 body = json.loads(self.rfile.read(length))
-                if not isinstance(body, dict) or set(body) != {"id", "dismissed"}:
-                    raise ValueError("Choose a report and its dismissed state.")
-                self.send(200, reports.dismiss(body["id"], body["dismissed"]))
+                expected = {"id", "revision", "values"} if path == "/api/responses" else {"id", "dismissed"}
+                if not isinstance(body, dict) or set(body) != expected:
+                    raise ValueError("Choose a report and provide the expected action fields.")
+                if path == "/api/responses":
+                    self.send(200, reports.save_responses(body["id"], body["values"], body["revision"]))
+                else:
+                    self.send(200, reports.dismiss(body["id"], body["dismissed"]))
+            except ResponseConflict as error:
+                self.send(409, {"error": str(error)})
             except (ValueError, UnicodeError) as error:
                 self.send(400, {"error": str(error)})
             except OSError:
@@ -122,6 +133,8 @@ def inspect_service(root, port):
         raise ValueError(f"Port {port} does not contain a Status service.") from error
     if value.get("service") != SERVICE or value.get("inbox") != str(root):
         raise ValueError(f"Port {port} belongs to another service or inbox; select a different --port.")
+    if value.get("version", 1) < 2:
+        raise ValueError("The running Status viewer needs a restart for response fields. Run install for its login service, or restart its serve process.")
     return True
 
 

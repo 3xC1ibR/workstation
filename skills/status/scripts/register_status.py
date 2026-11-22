@@ -35,7 +35,8 @@ def register(document, html, *, workspace, agent=None, provider=None, thread_id=
         return identifier
     manifest = {"version": 1, "id": identifier, "title": document["title"], "subject": document["subject"],
                 "summary": document["summary"], "generated_at": document["generated_at"],
-                "received_at": datetime.now(timezone.utc).isoformat(), "origin": origin}
+                "received_at": datetime.now(timezone.utc).isoformat(), "origin": origin,
+                "response_field_count": len(document.get("response_fields", []))}
     if len(json.dumps(manifest, ensure_ascii=False).encode()) > 256 * 1024:
         raise ValueError("The report's title, summary, and origin metadata exceed the inbox record limit")
     staging = Path(tempfile.mkdtemp(prefix=".pending-", dir=reports))

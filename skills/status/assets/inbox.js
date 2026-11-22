@@ -9,6 +9,7 @@
   };
   let reports = [], token, revision = 0, signature = "", undo = null;
   const pickers = new Map();
+  const rows = new Map();
   const pending = new Set();
   const feedback = text => { element("report-feedback").textContent = text; };
   const error = text => { element("report-error").textContent = text; element("report-error").hidden = !text; };
@@ -23,6 +24,9 @@
     button.setAttribute("role", "combobox"); button.setAttribute("aria-haspopup", "listbox");
     button.setAttribute("aria-expanded", "false"); button.setAttribute("aria-controls", options.id);
     button.setAttribute("aria-labelledby", select.id + "-label " + value.id);
+    for (const attribute of ["aria-required", "aria-describedby"]) {
+      if (select.hasAttribute(attribute)) button.setAttribute(attribute, select.getAttribute(attribute));
+    }
     options.setAttribute("role", "listbox"); options.setAttribute("aria-labelledby", select.id + "-label");
     element(select.id + "-label").htmlFor = button.id;
     select.before(wrapper); wrapper.append(select, button, options); button.append(value);
@@ -104,21 +108,31 @@
     const view = element("report-view").value, project = element("report-project").value, query = element("report-search").value.trim().toLowerCase();
     const visible = reports.filter(report => (view === "all" || Boolean(report.dismissed_at) === (view === "dismissed")) &&
       (!project || report.origin.workspace === project) && (!query || [report.title, report.subject, report.summary, origin(report)].join(" ").toLowerCase().includes(query)));
-    const list = element("report-list"); list.replaceChildren();
-    for (const report of visible) {
-      const row = make("li", null, "collection-row"); row.dataset.reportId = report.id;
-      const record = make("div", null, "collection-record"), heading = make("h2");
-      const title = make("a", report.title, "collection-title");
-      title.href = "/reports/" + report.id; title.target = "_blank"; title.rel = "noopener";
-      title.setAttribute("aria-label", report.title + " (opens in a new tab)"); heading.append(title);
-      record.append(heading, make("p", report.summary, "collection-summary"), make("p", origin(report) || report.subject, "collection-note"),
-        make("p", "Generated " + time(report.generated_at) + (report.dismissed_at ? " · Dismissed " + time(report.dismissed_at) : ""), "collection-note"));
-      const action = make("button", report.dismissed_at ? "Restore" : "Dismiss", "collection-action"); action.type = "button";
+    const list = element("report-list");
+    for (const [index, report] of visible.entries()) {
+      let row = rows.get(report.id);
+      if (!row) {
+        row = make("li", null, "collection-row"); row.dataset.reportId = report.id;
+        const record = make("div", null, "collection-record"), heading = make("h2");
+        const title = make("a", report.title, "collection-title");
+        title.href = "/reports/" + report.id; title.target = "_blank"; title.rel = "noopener";
+        title.setAttribute("aria-label", report.title + " (opens in a new tab)"); heading.append(title);
+        record.append(heading, make("p", report.summary, "collection-summary"), make("p", origin(report) || report.subject, "collection-note"),
+          make("p", "", "collection-note"));
+        if (report.response_field_count) record.append(window.createStatusResponses(report, {make, request, createPicker, pickers, time}));
+        const action = make("button", "", "collection-action"); action.type = "button";
+        row.append(record, action); rows.set(report.id, row);
+      }
+      const action = row.querySelector(".collection-action");
+      action.textContent = report.dismissed_at ? "Restore" : "Dismiss";
       action.setAttribute("aria-label", `${report.dismissed_at ? "Restore" : "Dismiss"} ${report.title}`);
       action.disabled = pending.has(report.id) || !token;
       action.onclick = () => changeDismissal(report.id, !report.dismissed_at);
-      row.append(record, action); list.append(row);
+      row.querySelector(".collection-record > .collection-note:last-of-type").textContent = "Generated " + time(report.generated_at) + (report.dismissed_at ? " · Dismissed " + time(report.dismissed_at) : "");
+      if (list.children[index] !== row) list.insertBefore(row, list.children[index] || null);
     }
+    const visibleIds = new Set(visible.map(report => report.id));
+    for (const row of [...list.children]) if (!visibleIds.has(row.dataset.reportId)) row.remove();
     element("report-empty").hidden = visible.length > 0;
     element("report-empty").textContent = reports.length ? "No reports match this view." : "No reports yet. Ask an agent to use the status skill; its HTML report will appear here.";
     element("report-counts").textContent = `${reports.filter(report => !report.dismissed_at).length} in inbox · ${reports.filter(report => report.dismissed_at).length} dismissed`;
@@ -170,5 +184,10 @@
   document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
   const timer = setInterval(() => { if (!document.hidden && !pending.size) load(); }, 10000);
   addEventListener("pagehide", () => clearInterval(timer));
+  addEventListener("beforeunload", event => {
+    if ([...rows.values()].some(row => row.querySelector('[data-dirty="true"]'))) {
+      event.preventDefault(); event.returnValue = "";
+    }
+  });
   load();
 })();

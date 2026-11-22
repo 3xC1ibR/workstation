@@ -7,6 +7,7 @@ and any application. Only user review changes dismissal records.
 from __future__ import annotations
 
 from datetime import datetime, timezone
+import fcntl
 import json
 import os
 from pathlib import Path
@@ -14,8 +15,14 @@ import re
 import stat
 import tempfile
 
+from status_fields import validate_fields, validate_values
+
 class StatusError(ValueError):
     """An unreadable or unsupported status inbox record."""
+
+
+class ResponseConflict(StatusError):
+    """A response changed after the editor loaded its previous revision."""
 
 IDENTIFIER = re.compile(r"[a-f0-9]{64}\Z")
 REPORT_CSP = ("default-src 'none'; style-src 'unsafe-inline'; img-src data:; "
@@ -94,6 +101,62 @@ class StatusReports:
     def content(self, identifier):
         self._manifest(identifier)
         return self._read(self._directory(identifier) / "report.html", 8 * 1024 * 1024)
+
+    def response_fields(self, identifier):
+        self._manifest(identifier)
+        try:
+            document = json.loads(self._read(self._directory(identifier) / "report.json", 8 * 1024 * 1024))
+            fields = document.get("response_fields", [])
+            validate_fields(fields)
+            return fields
+        except (ValueError, AttributeError) as error:
+            raise StatusError("The report's response fields cannot be read.") from error
+
+    def responses(self, identifier):
+        manifest = self._manifest(identifier)
+        fields = self.response_fields(identifier)
+        path = self.root / "responses" / (identifier + ".json")
+        state = {"revision": 0, "updated_at": None, "values": {}}
+        if path.exists() or path.is_symlink():
+            try:
+                state = json.loads(self._read(path, 2 * 1024 * 1024))
+                if (not isinstance(state, dict) or set(state) != {"revision", "updated_at", "values"}
+                        or type(state["revision"]) is not int or state["revision"] < 1
+                        or datetime.fromisoformat(state["updated_at"].replace("Z", "+00:00")).utcoffset() is None):
+                    raise ValueError("Invalid response record")
+                state["values"] = validate_values(fields, state["values"])
+            except (ValueError, KeyError, TypeError, AttributeError) as error:
+                raise StatusError("The report's saved responses cannot be read.") from error
+        return {"id": identifier, "title": manifest["title"], "origin": manifest["origin"],
+                "fields": fields, **state}
+
+    def save_responses(self, identifier, values, revision):
+        fields = self.response_fields(identifier)
+        if not fields:
+            raise StatusError("This report has no response fields.")
+        if type(revision) is not int or revision < 0:
+            raise StatusError("A nonnegative response revision is required.")
+        values = validate_values(fields, values)
+        directory = self.root / "responses"
+        directory.mkdir(parents=True, exist_ok=True)
+        # Separate processes and server threads share the same per-report lock.
+        descriptor = os.open(directory / (identifier + ".lock"), os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW, 0o600)
+        with os.fdopen(descriptor, "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            if self.responses(identifier)["revision"] != revision:
+                raise ResponseConflict("Responses changed in another page. Load saved responses before saving again; your input is still here.")
+            state = {"revision": revision + 1, "updated_at": datetime.now(timezone.utc).isoformat(), "values": values}
+            descriptor, temporary = tempfile.mkstemp(prefix=".pending-", dir=directory)
+            try:
+                with os.fdopen(descriptor, "w", encoding="utf-8") as target:
+                    json.dump(state, target, ensure_ascii=False, allow_nan=False)
+                    target.flush()
+                    os.fsync(target.fileno())
+                os.replace(temporary, directory / (identifier + ".json"))
+            finally:
+                if os.path.exists(temporary):
+                    os.unlink(temporary)
+        return {"id": identifier, "fields": fields, **state}
 
     def dismiss(self, identifier, dismissed):
         if type(dismissed) is not bool:

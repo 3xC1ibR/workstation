@@ -2,12 +2,13 @@
 .collection-filter { display: grid; gap: var(--space-2); min-width: 0; }
 .collection-controls label { display: grid; gap: var(--space-2); font-size: var(--small); text-transform: uppercase; letter-spacing: var(--tracking); min-width: 0; }
 .collection-search { flex: 1; }
-input, select, button { font: inherit; color: var(--ink); background: var(--paper); border: var(--stroke) solid var(--rule); border-radius: var(--radius); min-height: var(--control-height); padding: var(--space-2) var(--space-3); max-width: 100%; }
-input, select { width: 100%; font-size: var(--body); text-transform: none; letter-spacing: normal; }
+input, select, textarea, button { font: inherit; color: var(--ink); background: var(--paper); border: var(--stroke) solid var(--rule); border-radius: var(--radius); min-height: var(--control-height); padding: var(--space-2) var(--space-3); max-width: 100%; }
+input, select, textarea { width: 100%; font-size: var(--body); text-transform: none; letter-spacing: normal; }
+textarea { resize: vertical; }
 button { cursor: pointer; }
 button:hover { border-color: var(--ink); }
 button:disabled { color: var(--secondary); cursor: wait; }
-:is(input, select, button):focus-visible { outline: var(--focus) solid var(--ink); outline-offset: var(--space-1); }
+:is(input, select, textarea, button):focus-visible { outline: var(--focus) solid var(--ink); outline-offset: var(--space-1); }
 .collection-picker { display: grid; position: relative; min-width: 0; }
 .collection-native-select { grid-area: 1 / 1; visibility: hidden; pointer-events: none; }
 .collection-picker-trigger { grid-area: 1 / 1; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-width: 0; width: 100%; text-align: left; }
@@ -29,6 +30,12 @@ button:disabled { color: var(--secondary); cursor: wait; }
 .collection-title { font-size: var(--body); font-weight: 600; text-transform: none; letter-spacing: normal; }
 .collection-summary { margin: var(--space-3) 0; overflow-wrap: anywhere; white-space: pre-line; }
 .collection-action { align-self: start; }
+.response-editor { margin-top: var(--space-4); }
+.response-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
+.response-field { display: grid; gap: var(--space-2); margin-top: var(--space-4); min-width: 0; }
+.response-field label { font-weight: 600; overflow-wrap: anywhere; }
+.response-field .collection-picker-trigger span { white-space: normal; overflow-wrap: anywhere; }
+.response-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-4); }
 @media (max-width: 600px) {
   .collection-filter { flex: 1 1 40%; }
   #report-project-options { left: auto; width: calc(100vw - 2 * var(--space-4)); max-width: var(--text-column-width); }

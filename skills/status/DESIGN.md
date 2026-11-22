@@ -16,9 +16,13 @@ changes questions, scope, and ordering; it does not invent another theme.
 
 ## Objects and hierarchy
 
-Objects: report, subject, observation, source, notice, action, section.
+Objects: report, subject, observation, source, notice, action, section, response
+field, saved response.
 Actions: read, expand supporting evidence, follow a source, print. The shared
 collection adds filter, dismiss, and restore; dismissal applies to one report.
+Agents may attach response fields to a report. The collection adds an inline
+Responses disclosure with labeled controls and Save responses. Saving records
+user input separately from observations; it does not execute the next action.
 
 Opening hierarchy: subject and observation context; urgent notices; assessment;
 requested observations; next actions; supporting sections and sources. Arbitrary
@@ -67,6 +71,10 @@ Tab traversal, and outside-click dismissal. Options wrap on narrow screens.
 
 ## Decision record
 
+- 2026-11-21: Add report-specific response fields and durable user answers in the
+  existing collection rows. Reuse the sheet's controls and filter pickers; keep
+  portable snapshots inert, make save state explicit, and preserve unsaved input
+  during collection refreshes. Detect competing edits before replacing answers.
 - 2026-10-29: Reuse system-drawings visual language. Markdown profiles customize
   expected coverage; agents must add material findings beyond configured fields.
   Generated artifacts are offline snapshots with source observation times.

@@ -1,4 +1,4 @@
 interface:
   display_name: "Status"
-  short_description: "Agent status sheets with configurable questions"
+  short_description: "Status sheets with editable user responses"
   default_prompt: "Use $status to show current progress, next steps, and anything else I should know."

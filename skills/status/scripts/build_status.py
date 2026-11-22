@@ -11,6 +11,8 @@ from pathlib import Path
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
+from status_fields import validate_fields
+
 
 FIELDS = {
     "notices": ({"title", "text"}, set()),
@@ -40,7 +42,8 @@ def check_fields(record, required, optional, location):
 
 def validate(document):
     required = {"title", "subject", "generated_at", "summary"}
-    check_fields(document, required, set(FIELDS) | {"timezone"}, "report")
+    check_fields(document, required, set(FIELDS) | {"timezone", "response_fields"}, "report")
+    validate_fields(document.get("response_fields", []))
     for key in required | ({"timezone"} & document.keys()):
         if not isinstance(document[key], str) or not document[key].strip():
             raise ValueError(f"{key} must be nonempty text")
@@ -154,6 +157,17 @@ def render(document):
                           f'<dd class="detail text">{escape(metric.get("detail", ""))}</dd><dd>{provenance(metric)}</dd></div>')
         output.append('</dl>')
     number = 0
+    if document.get("response_fields"):
+        number += 1
+        output.append(f'<section><h2 class="section-heading"><span class="reference">{number:02d}</span>Responses</h2>'
+                      '<p class="text">Open this report’s Responses in the Status collection to save answers for the agent. '
+                      'This portable snapshot does not save input.</p><dl class="response-questions">')
+        for field in document["response_fields"]:
+            output.append(f'<dt>{escape(field["label"])}{" · Required" if field.get("required") else ""}</dt>'
+                          f'<dd class="text">{escape(field.get("help", ""))}</dd>')
+            if field["type"] == "choice":
+                output.append(f'<dd class="text">Choices: {escape(" / ".join(field["options"]))}</dd>')
+        output.append('</dl></section>')
     if document.get("actions"):
         number += 1
         output.append(f'<section><h2 class="section-heading"><span class="reference">{number:02d}</span>Next actions</h2><ol class="actions">')

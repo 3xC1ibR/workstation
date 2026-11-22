@@ -13,6 +13,7 @@ Optional `timezone` defaults to `UTC` and accepts an IANA name. Collections:
 | `actions` | `{action, owner, reason?, status?, source?}`. Distinguish planned, recommended, blocked, etc. in `status`. |
 | `sections` | `{title, text?, columns?, rows?, source?, observed_at?, freshness_minutes?, collapsed?}`. Arbitrary narrative and optional tables; rows are lists of text cells matching columns. |
 | `sources` | `{label, location, observed_at?}`. HTTP(S) links are clickable; local paths remain readable text. |
+| `response_fields` | Agent-defined user questions: `{id, label, type, help?, required?, options?}`. See [responses.md](responses.md) for field types, saving, and agent retrieval. |
 
 Content is escaped plain text; use `\n` for paragraph breaks. Unknown fields
 produce an error, not silent loss. Put additional subject matter in a section,
