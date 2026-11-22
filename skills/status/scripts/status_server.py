@@ -19,7 +19,7 @@ from delivery_store import Deliveries
 from register_status import inbox_directory
 from response_access import response_key
 import review_pages
-from ribbon_field_asks import AskReader, for_operation, resolve_ask
+from ribbon_field_asks import AskReader, for_operation, resolve_ask, shared_workspaces
 from status_store import REPORT_CSP, ResponseConflict, StatusError, StatusReports
 from usage_events import UsageEvents
 
@@ -127,8 +127,9 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
 
         def review(self):
             operations, delivered, listing = reports.operations(), deliveries.list(), asks.current()
+            shared = shared_workspaces(operations["operations"])
             for operation in operations["operations"]:
-                operation["ask_count"] = len(for_operation(listing["asks"], operation)) if listing["available"] else None
+                operation["ask_count"] = len(for_operation(listing["asks"], operation, shared)) if listing["available"] else None
                 operation["version_count"] = len(operation.pop("versions"))
             return {"operations": operations["operations"], "deliveries": delivered["deliveries"], "asks": listing,
                     "unreadable": operations["unreadable"] + delivered["unreadable"],
@@ -196,7 +197,8 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
                     if "fresh=asks" in urlsplit(self.path).query:
                         asks.invalidate()
                     operation, listing = reports.operation(path.removeprefix("/api/operations/")), asks.current()
-                    self.send(200, {"operation": operation, "asks": {**listing, "asks": for_operation(listing["asks"], operation)},
+                    shared = shared_workspaces(reports.operations()["operations"])
+                    self.send(200, {"operation": operation, "asks": {**listing, "asks": for_operation(listing["asks"], operation, shared)},
                                     "public_url": public[0] + public[2] if public else None})
                 elif path.startswith("/api/responses/"):
                     self.send(200, reports.responses(path.removeprefix("/api/responses/")))

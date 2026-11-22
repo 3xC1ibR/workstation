@@ -100,10 +100,25 @@ class AskReader:
             self.value = None
 
 
-def for_operation(asks, operation):
-    """Asks filed from the operation's conversations or from its workspace."""
+def shared_workspaces(operations):
+    """Workspaces that hold more than one operation, such as a shared projects root."""
+    seen, shared = set(), set()
+    for operation in operations:
+        workspace = operation.get("origin", {}).get("workspace")
+        if workspace:
+            (shared if workspace in seen else seen).add(workspace)
+    return shared
+
+
+def for_operation(asks, operation, shared=frozenset()):
+    """Asks filed from the operation's conversations, or from its workspace when no other operation shares it.
+
+    A workspace shared by several operations (for example a common projects root) says nothing about
+    which operation an ask belongs to, so only the conversation match applies there.
+    """
     threads, workspace = set(operation["threads"]), operation["origin"].get("workspace")
-    return [ask for ask in asks if ask["session_id"] in threads or (workspace and ask.get("cwd") == workspace)]
+    by_workspace = bool(workspace) and workspace not in shared
+    return [ask for ask in asks if ask["session_id"] in threads or (by_workspace and ask.get("cwd") == workspace)]
 
 RESOLUTION_FIELDS = {"resolution", "option", "answer", "note"}
 
