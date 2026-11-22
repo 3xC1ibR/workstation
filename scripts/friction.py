@@ -320,16 +320,20 @@ def main(argv: list[str] | None = None) -> int:
     if arguments.resolve:
         return _resolve_command(arguments, path)
     if arguments.list:
-        sys.stdout.write(
-            list_records(
-                path,
-                arguments.project,
-                arguments.since,
-                arguments.output_format,
-                arguments.scope,
-                arguments.include_resolved,
-            )
+        listing = list_records(
+            path,
+            arguments.project,
+            arguments.since,
+            arguments.output_format,
+            arguments.scope,
+            arguments.include_resolved,
         )
+        try:
+            sys.stdout.write(listing)
+            sys.stdout.flush()
+        except BrokenPipeError:
+            # A reader such as head closed the pipe early; that is not an error.
+            os.dup2(os.open(os.devnull, os.O_WRONLY), sys.stdout.fileno())
         return 0
     raw = arguments.text
     if raw is None or raw == "-":

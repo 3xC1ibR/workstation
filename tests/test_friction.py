@@ -238,3 +238,22 @@ def test_list_filters_by_scope(tmp_path):
     listing = friction.list_records(store, None, None, "markdown", scope="repository")
 
     assert "frc_b" in listing and "frc_a" not in listing
+
+
+def test_listing_into_a_closed_pipe_exits_cleanly(tmp_path):
+    store = tmp_path / "records.jsonl"
+    for index in range(3000):
+        friction.append_record({"id": f"frc_{index}", "text": "z" * 200}, store)
+    env = {"PATH": os.environ["PATH"], "HOME": os.environ["HOME"], "FRICTION_STORE": str(store)}
+
+    completed = subprocess.run(
+        f"'{sys.executable}' '{SCRIPT}' --list | head -1",
+        shell=True,
+        env=env,
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+
+    assert completed.stdout.startswith("## unknown")
+    assert "Traceback" not in completed.stderr
