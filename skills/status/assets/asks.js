@@ -9,11 +9,14 @@
                     accepted: "Accepted", changes_requested: "Changes requested", granted: "Granted", dismissed: "Dismissed", snoozed: "Snoozed"};
   const drafts = new Map();          // ask id -> {open, text, error, busy}; survives list refreshes
   const draft = id => drafts.get(id) || drafts.set(id, {open: false, text: "", error: "", busy: false}).get(id);
-  let connection = null;             // {state: "ready", token} | {state: "unpaired"} | {state: "elsewhere"}
+  let connection = null;             // {state: "local"} | {state: "ready", token} | {state: "unpaired"} | {state: "elsewhere"}
+  const LOCAL = ["127.0.0.1", "localhost", "[::1]"].includes(location.hostname);
 
   // Ribbon Field answers at the root of the tailnet address this page shares. Anywhere else there is nothing to ask.
   async function connect(renew = false) {
     if (connection && !renew) return connection;
+    // On this Mac the Status service forwards answers to Ribbon Field's loopback interface; no pairing is needed.
+    if (LOCAL) return (connection = {state: "local"});
     try {
       const response = await fetch("/api/browser/config", {cache: "no-store", credentials: "same-origin"});
       const body = await response.json().catch(() => null);
@@ -85,7 +88,11 @@
       if (state.busy) return;
       state.busy = true; state.error = ""; draw();
       try {
-        await send(payload.until === undefined ? `/api/browser/asks/${ask.id}` : `/api/browser/asks/${ask.id}/snooze`, payload);
+        if (connection && connection.state === "local") {
+          await request("/api/ask-resolution", {id: ask.id, body: payload, snooze: payload.until !== undefined});
+        } else {
+          await send(payload.until === undefined ? `/api/browser/asks/${ask.id}` : `/api/browser/asks/${ask.id}/snooze`, payload);
+        }
         drafts.delete(ask.id);
         measure({type: "ask_resolution", view: "review", item_kind: "ask", item: String(ask.id), action});
         changed(`${OUTCOMES[action] || "Resolved"}. Ribbon Field ${action === "snoozed" ? "will show it again later" : "has told the agent"}.`, ask.id);
@@ -138,7 +145,9 @@
       const note = make("p", null, "ask-unavailable");
       if (connection.state === "unpaired") {
         const pair = make("a", "Open Ribbon Field"); pair.href = "/";
-        note.append("This browser is not paired with Ribbon Field, so an answer cannot be sent from here. Create a pairing link in Ribbon Field on your Mac, or answer there. ", pair);
+        const local = make("a", "http://127.0.0.1:8766/"); local.href = "http://127.0.0.1:8766/";
+        note.append("This browser is not paired with Ribbon Field, so an answer cannot be sent from this address. On the Mac itself, answer at ", local,
+                    " with no pairing. On another device, create a pairing link in Ribbon Field on your Mac, or answer there. ", pair);
       } else if (publicUrl && !location.href.startsWith(publicUrl)) {
         const address = make("a", publicUrl + "/"); address.href = publicUrl + "/";
         note.append("Answers are sent through Ribbon Field's tailnet address. Open this page at ", address, " to answer here, or answer in Ribbon Field.");
@@ -154,7 +163,7 @@
       if (ask.detail) content.push(prose(ask.detail, "ask-text"));
       if (ask.unblocks) content.push(prose("Unblocks: " + ask.unblocks, "ask-text"));
       if (ask.context) content.push(prose(ask.context, "ask-text ask-context"));
-      content.push(!connection ? make("p", "Checking Ribbon Field…", "note") : connection.state === "ready" ? controls() : unavailable());
+      content.push(!connection ? make("p", "Checking Ribbon Field…", "note") : ["ready", "local"].includes(connection.state) ? controls() : unavailable());
       if (state.error) { const alert = make("p", state.error, "failure"); alert.setAttribute("role", "alert"); content.push(alert); }
       content.push(links());
       const focused = body.contains(document.activeElement) && document.activeElement.className;

@@ -19,7 +19,7 @@ from delivery_store import Deliveries
 from register_status import inbox_directory
 from response_access import response_key
 import review_pages
-from ribbon_field_asks import AskReader, for_operation
+from ribbon_field_asks import AskReader, for_operation, resolve_ask
 from status_store import REPORT_CSP, ResponseConflict, StatusError, StatusReports
 from usage_events import UsageEvents
 
@@ -36,7 +36,8 @@ FILES = {"/tokens.css": "text/css", "/style.css": "text/css", "/review.css": "te
 POSTS = {"/api/dismiss": ({"id", "dismissed"}, set(), 4096),
          "/api/responses": ({"id", "revision", "values"}, set(), 4 * 1024 * 1024),
          "/api/delivery-response": ({"id", "action"}, {"choice", "note"}, 16 * 1024),
-         "/api/events": ({"type"}, {"view", "item_kind", "item", "action", "narrow"}, 4096)}
+         "/api/events": ({"type"}, {"view", "item_kind", "item", "action", "narrow"}, 4096),
+         "/api/ask-resolution": ({"id", "body"}, {"snooze"}, 16 * 1024)}
 
 
 def public_address(value):
@@ -252,6 +253,12 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
                     self.send(200, reports.save_responses(identifier if cors else body["id"], body["values"], body["revision"]), cors=cors)
                 elif path == "/api/dismiss":
                     self.send(200, reports.dismiss(body["id"], body["dismissed"]))
+                elif path == "/api/ask-resolution":
+                    if self.remote():
+                        raise PermissionError("On the tailnet address, answers go through Ribbon Field's paired-device sign-in.")
+                    result = resolve_ask(body["id"], body["body"], snooze=body.get("snooze") is True)
+                    asks.invalidate()
+                    self.send(200, result)
                 elif path == "/api/delivery-response":
                     record = deliveries.respond(body["id"], body["action"], choice=body.get("choice"), note=body.get("note"))
                     if body["action"] != "read":
@@ -268,6 +275,8 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
                     self.send(200, {"recorded": True, "opened": opened})
             except ResponseConflict as error:
                 self.send(409, {"error": str(error)}, cors=cors)
+            except PermissionError as error:
+                self.send(403, {"error": str(error)}, cors=cors)
             except (ValueError, UnicodeError) as error:
                 self.send(400, {"error": str(error)}, cors=cors)
             except OSError:
