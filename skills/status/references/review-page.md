@@ -122,7 +122,10 @@ operation unless it passes the same explicit key.
 Ribbon Field owns asks. This page never stores an ask or an answer.
 
 **Reading.** The service runs `agent-coord ask --list --all-sessions --status open`
-when the page asks and keeps the answer in memory for about 20 seconds. It finds
+and keeps the listing in memory. A page refresh never waits for that command:
+it receives the last listing at once, and a listing older than about 20 seconds
+is renewed by one background read. Only the service's first read and the read
+after an answer given on the page wait for Ribbon Field. It finds
 the command at `AGENT_COORD_CLI`, then `~/.local/bin/agent-coord`, then `PATH`.
 An operation shows the asks filed from its conversations or from its workspace
 directory. A row leads with one line (the question's first line, or its first

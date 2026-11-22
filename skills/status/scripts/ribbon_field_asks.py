@@ -1,8 +1,9 @@
 """Read open asks from Ribbon Field without copying them into the Status store.
 
-Ribbon Field owns asks. This reader runs its command-line listing on demand and
-keeps the result in memory briefly. When the listing is unavailable the reason
-is reported, never an empty list presented as "no asks".
+Ribbon Field owns asks. This reader runs its command-line listing and keeps the
+result in memory; page refreshes read that copy while one background thread
+renews it. When the listing is unavailable the reason is reported, never an
+empty list presented as "no asks".
 """
 from __future__ import annotations
 
@@ -82,22 +83,52 @@ def read_asks(command=None, timeout=8):
 
 
 class AskReader:
-    """Share one recent listing among page refreshes."""
+    """Share one listing among page refreshes without making them wait for Ribbon Field.
+
+    The first read, and the first read after invalidate(), wait for the command.
+    Every other read returns the last listing at once; a listing older than its
+    lifetime starts one background refresh, and later reads see its result.
+    """
 
     def __init__(self, reader=read_asks, lifetime=20):
         self.reader, self.lifetime = reader, lifetime
-        self.lock, self.value, self.read_at = threading.Lock(), None, 0.0
+        self.lock = threading.Lock()                # guards the fields below; never held while the command runs
+        self.waiting = threading.Lock()             # readers with no listing share one command
+        self.value, self.read_at, self.refreshing, self.generation = None, 0.0, False, 0
 
     def current(self):
         with self.lock:
-            if self.value is None or time.monotonic() - self.read_at > self.lifetime:
-                self.value, self.read_at = self.reader(), time.monotonic()
-            return self.value
+            if self.value is not None:
+                if time.monotonic() - self.read_at > self.lifetime and not self.refreshing:
+                    self.refreshing = True
+                    threading.Thread(target=self._refresh, args=(self.generation,), name="ask-listing-refresh", daemon=True).start()
+                return self.value
+        with self.waiting:
+            with self.lock:
+                if self.value is not None:          # another waiting reader has just read it
+                    return self.value
+                generation = self.generation
+            value = self.reader()
+            self._keep(value, generation)
+            return value
+
+    def _keep(self, value, generation):
+        """Retain a listing unless invalidate() was called after its command started."""
+        with self.lock:
+            if generation == self.generation:
+                self.value, self.read_at = value, time.monotonic()
+
+    def _refresh(self, generation):
+        try:
+            self._keep(self.reader(), generation)
+        finally:
+            with self.lock:
+                self.refreshing = False
 
     def invalidate(self):
         """Read Ribbon Field again on the next request, after the user resolved an ask there."""
         with self.lock:
-            self.value = None
+            self.value, self.generation = None, self.generation + 1
 
 
 def for_operation(asks, operation):

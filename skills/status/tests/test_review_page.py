@@ -9,6 +9,7 @@ import subprocess
 import sys
 import tempfile
 import threading
+import time
 import unittest
 from zoneinfo import ZoneInfo
 
@@ -408,6 +409,56 @@ class AskTests(Workspace):
         self.assertEqual(json.loads(self.request("/api/review?fresh=asks")[2])["public_url"], PUBLIC)
         self.assertEqual(len(calls), 2)                              # after a resolution the page reads Ribbon Field again
         self.assertFalse((self.root / "asks").exists())
+
+    def test_an_expired_listing_is_served_at_once_while_one_background_read_renews_it(self):
+        release, started, calls = threading.Event(), threading.Event(), []
+        def reader():
+            calls.append(len(calls) + 1)
+            if len(calls) == 2:                                      # the renewal is slow, as Ribbon Field sometimes is
+                started.set()
+                self.assertTrue(release.wait(5))
+            return {"available": True, "reason": None, "asks": [{"id": len(calls)}]}
+        asks = AskReader(reader, lifetime=0)
+        self.addCleanup(release.set)
+        self.assertEqual(asks.current()["asks"], [{"id": 1}])        # the first read waits for the command
+        began = time.monotonic()
+        for _ in range(5):                                           # expired: every read returns the last listing without waiting
+            self.assertEqual(asks.current()["asks"], [{"id": 1}])
+        self.assertLess(time.monotonic() - began, 1)
+        self.assertTrue(started.wait(5))
+        self.assertEqual(calls, [1, 2])                              # one renewal, not one per read
+        release.set()
+        for _ in range(200):
+            if asks.current()["asks"] == [{"id": 2}]:
+                break
+            time.sleep(.01)
+        else:
+            self.fail("The renewed listing was never served.")
+        fresh = AskReader(reader, lifetime=60)
+        fresh.current()
+        count = len(calls)
+        fresh.invalidate()
+        self.assertEqual(fresh.current()["asks"], [{"id": count + 1}])     # after invalidate() the next read waits for a new listing
+
+    def test_a_renewal_started_before_a_resolution_never_replaces_the_listing_read_after_it(self):
+        release, started, calls = threading.Event(), threading.Event(), []
+        def reader():
+            calls.append(len(calls) + 1)
+            number = len(calls)
+            if number == 2:
+                started.set()
+                self.assertTrue(release.wait(5))
+            return {"available": True, "reason": None, "asks": [{"id": number}]}
+        asks = AskReader(reader, lifetime=0)
+        self.addCleanup(release.set)
+        asks.current()
+        asks.current()                                               # starts the slow renewal (read 2)
+        self.assertTrue(started.wait(5))
+        asks.invalidate()                                            # the user resolved an ask while it ran
+        self.assertEqual(asks.current()["asks"], [{"id": 3}])
+        release.set()
+        time.sleep(.05)
+        self.assertNotEqual(asks.current()["asks"], [{"id": 2}])     # the earlier read's result was discarded
 
     def test_resolutions_made_on_the_page_are_measured_without_content(self):
         self.serve(ask_reader=AskReader(lambda: {"available": True, "reason": None, "asks": []}))
