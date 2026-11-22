@@ -46,7 +46,8 @@ says so: confirm with `lsof -nP -iTCP:8766 -sTCP:LISTEN` that it is
 service starts by itself. Do not stop unrelated processes.
 
 For development, run `serve --inbox /temporary/inbox --port 0` in a terminal. It
-prints its address and stops with Control-C. Production and test data must use
+prints its address and stops with Control-C. Only `install` records the public
+address used in printed links; a development `serve` never changes it. Production and test data must use
 separate inbox directories.
 
 ## Another device on the tailnet

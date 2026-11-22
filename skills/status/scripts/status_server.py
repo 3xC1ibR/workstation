@@ -417,12 +417,13 @@ def main():
         public_address(public_url)
         if arguments.command == "serve":
             with make_server(root, arguments.port, public_url=public_url) as server:
-                save_public_url(root, public_url)
                 print(f"http://127.0.0.1:{server.server_port}/", flush=True)
                 server.serve_forever()
         else:
             public_url = public_url or (saved_public_url(root) if arguments.command == "install" else None)
             (install if arguments.command == "install" else start)(root, arguments.port, public_url)
+            if arguments.command == "install":
+                save_public_url(root, public_url)        # only the login service records the address; a development serve never does
             print(f"http://127.0.0.1:{arguments.port}/")
             if public_url:
                 print(public_url + "/")

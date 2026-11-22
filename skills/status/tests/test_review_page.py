@@ -308,6 +308,15 @@ class PublicAddressTests(Workspace):
         self.assertTrue(UsageEvents(self.root).read()[0]["remote"])
         self.assertEqual(json.loads(self.request("/health")[2])["public_url"], PUBLIC)
 
+    def test_only_installation_records_the_public_address(self):
+        import status_server
+        self.assertIsNone(status_server.saved_public_url(self.root))
+        status_server.save_public_url(self.root, PUBLIC)
+        self.assertEqual(status_server.saved_public_url(self.root), PUBLIC)
+        source = (SCRIPTS / "status_server.py").read_text()
+        serve = source[source.index('if arguments.command == "serve":'):source.index("else:", source.index('if arguments.command == "serve":'))]
+        self.assertNotIn("save_public_url", serve)                 # a development serve must not redirect the installed page's links
+
     def test_without_a_public_address_only_local_hosts_are_served(self):
         self.serve()
         self.assertEqual(self.request("/", headers={"Host": "machine.example.ts.net"})[0], 403)
