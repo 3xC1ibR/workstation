@@ -40,8 +40,10 @@ This installs `~/Library/LaunchAgents/com.workstation.status.plist`. The log is
 reloads the service and preserves reports, deliveries, responses, and the
 recorded public address. To stop login startup, use
 `launchctl bootout gui/$(id -u)/com.workstation.status`, then remove that plist.
-If a manually started service occupies the port, stop that specific process
-before installing login startup. Do not stop unrelated processes.
+If an earlier or manually started Status process occupies the port, `install`
+says so: confirm with `lsof -nP -iTCP:8766 -sTCP:LISTEN` that it is
+`status_server.py` for this inbox, stop that specific process, and the login
+service starts by itself. Do not stop unrelated processes.
 
 For development, run `serve --inbox /temporary/inbox --port 0` in a terminal. It
 prints its address and stops with Control-C. Production and test data must use

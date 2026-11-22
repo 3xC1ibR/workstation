@@ -36,10 +36,10 @@
 .row:first-child { border-radius: var(--radius) var(--radius) 0 0; }
 .row:last-child { border-radius: 0 0 var(--radius) var(--radius); }
 .row:only-child { border-radius: var(--radius); }
-.row-summary { color: var(--ink-secondary); margin-top: var(--space-1); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }
+.row-summary { color: var(--ink-secondary); margin-top: var(--space-1); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: break-word; }
 .row[data-kind="operation"] .row-summary { -webkit-line-clamp: 1; }
 .row[data-kind="ask"] .row-summary { -webkit-line-clamp: 3; }
-.row-recommendation { margin-top: var(--space-2); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.row-recommendation { margin-top: var(--space-2); overflow-wrap: break-word; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
 .row-meta { color: var(--ink-tertiary); font-size: var(--meta); margin-top: var(--space-2); overflow-wrap: anywhere; }
 .row-meta .outcome-accepted { color: var(--positive); font-weight: var(--weight-medium); }
 .row-meta .flag-blocking { color: var(--critical); font-weight: var(--weight-strong); }
@@ -90,7 +90,7 @@
 .response-buttons { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); align-items: center; }
 .response-buttons .spacer { flex: 1; }
 .response-note { margin-top: var(--space-3); }
-.response-outcome { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-3); }
+.response-outcome { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); margin-top: var(--space-3); }
 .response-outcome p { flex: 1 1 24ch; }
 .response-outcome .outcome-accepted { color: var(--positive); font-weight: var(--weight-strong); }
 .response-outcome .outcome-dismissed { font-weight: var(--weight-strong); }

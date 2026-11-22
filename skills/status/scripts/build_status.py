@@ -195,8 +195,7 @@ def render(document, connection=None, *, page=None):
         for metric in document["metrics"]:
             detail = f'<dd class="detail text">{escape(metric["detail"])}</dd>' if metric.get("detail") else ""
             source = f'<dd>{provenance(metric)}</dd>' if provenance(metric) else ""
-            size = " value-long" if metric["value"] and len(metric["value"]) > 16 else ""
-            output.append(f'<div class="metric"><dt>{escape(metric["label"])}</dt><dd class="value{size}">{escape(metric["value"])}</dd>{detail}{source}</div>')
+            output.append(f'<div class="metric"><dt>{escape(metric["label"])}</dt><dd class="value">{escape(metric["value"])}</dd>{detail}{source}</div>')
         output.append('</dl>')
     if document.get("response_fields"):
         output.append('<section id="status-response-fields"><h2 class="section-heading">Your responses</h2>'

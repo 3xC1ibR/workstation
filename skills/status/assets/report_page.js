@@ -37,7 +37,7 @@
       main.append(meta); item.append(marker, main, aside); list.append(item);
     }
     section.replaceChildren(make("h2", asks.asks.length === 1 ? "This operation needs you" : `This operation needs you (${asks.asks.length})`),
-      make("p", "Answered in Ribbon Field", "section-note"), list);
+      make("p", "Answer in Ribbon Field", "section-note"), list);
     section.hidden = false;
   }).catch(() => {});
 })();

@@ -384,7 +384,15 @@ def wait_for_restart(root, port):
         except ValueError:
             pass
         time.sleep(.1)
-    wait_for_service(root, port)
+    try:
+        if inspect_service(root, port):
+            return
+    except ValueError:
+        pass
+    raise ValueError(f"The login service was loaded, but port {port} does not answer as the current Status service. "
+                     f"An earlier Status process may still hold the port: find it with "
+                     f"'lsof -nP -iTCP:{port} -sTCP:LISTEN', confirm it is status_server.py for this inbox, and stop that "
+                     f"process; the login service then starts by itself. Log: {root / 'viewer/service.log'}.")
 
 
 def main():

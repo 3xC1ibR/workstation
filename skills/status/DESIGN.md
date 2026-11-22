@@ -86,10 +86,12 @@ headings, and no reference numerals on sections.
 
 A single centred column of 800 px on every page, so edges do not move between
 the list, a delivery, and a report. Spacing uses the 4 px scale. A row is a
-marker column, the content, and its age at the right. Row metadata holds at
-most three items: a state word, a kind or category, and an origin. Row actions
-appear over the age on hover or keyboard focus; a touch user responds on the
-item's own page, where controls reach 44 px. Reading text is limited to about 70
+marker column, the content, and its age at the right; at phone width the age
+ends the metadata line instead. Row metadata holds at most three items: a
+state word, a kind or category, and an origin. Delivery summaries clamp to two
+lines, operation summaries to one, ask reasons to three. Row actions appear
+over the age on hover or keyboard focus; a touch user responds on the item's
+own page, where controls reach 44 px. Reading text is limited to about 70
 characters. Wide tables scroll inside a labelled, focusable region, keep their
 first column while scrolling at phone width, and announce that they scroll.
 
@@ -195,6 +197,17 @@ Only a 120 ms colour transition on controls. Nothing moves on load.
   shown on hover or focus only, one 800 px column, "asks open" in ink instead
   of the attention colour, the assessment ahead of notices, finished actions
   quieted, and one date format.
+- 2026-11-22: Second scoring round. Changes: at phone width the age moves into
+  the metadata line so titles span the row; operation summaries clamp to one
+  line and ask reasons to three; report provenance is source and time only,
+  with the year and timezone stated once in the header and "Stale" as a single
+  word; links and attachments form one list after a delivery's write-up.
+  A third round was not run: the second gain (+0.15) was at the critics' noise
+  level. Open for the owner: a "Mark all read" control for operations at phone
+  width, and whether metric provenance belongs in the tile or under Sources.
+  Declined: clamping a metric's detail text, grouping next actions by owner
+  (owners are free text), and hiding a delivery document's opening paragraph,
+  because each would hide or reinterpret content the agent wrote.
 - 2026-11-22: Reports become versions of living operations. Identity is an
   explicit operation key, else workspace with agent name, else workspace with
   conversation, else workspace with title, so the 34 earlier snapshots group
