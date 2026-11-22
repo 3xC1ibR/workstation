@@ -12,13 +12,15 @@ import fcntl
 import json
 import os
 from pathlib import Path
+import re
 import statistics
 
 from status_store import IDENTIFIER, StatusError, moment
 
-EVENT_TYPES = {"page_open", "item_open", "response"}
+EVENT_TYPES = {"page_open", "item_open", "response", "ask_resolution"}
 VIEWS = {"review", "operation", "delivery"}
-KINDS = {"operation", "delivery"}
+KINDS = {"operation", "delivery", "ask"}
+ASK_IDENTIFIER = re.compile(r"[1-9][0-9]{0,17}\Z")         # Ribbon Field's own ask number; nothing about its content
 IGNORED_AFTER = timedelta(hours=24)
 
 
@@ -30,8 +32,11 @@ class UsageEvents:
         """Append one event. Invalid events are rejected rather than stored."""
         if kind not in EVENT_TYPES or (view is not None and view not in VIEWS):
             raise StatusError("Unsupported usage event.")
-        if (item_kind is None) != (item is None) or (item_kind is not None and (item_kind not in KINDS or not IDENTIFIER.fullmatch(str(item)))):
+        pattern = ASK_IDENTIFIER if item_kind == "ask" else IDENTIFIER
+        if (item_kind is None) != (item is None) or (item_kind is not None and (item_kind not in KINDS or not pattern.fullmatch(str(item)))):
             raise StatusError("A usage event item requires a kind and an identifier.")
+        if (kind == "ask_resolution") != (item_kind == "ask") or (kind == "ask_resolution" and not action):
+            raise StatusError("An ask resolution names the ask and the resolution.")
         if action is not None and (not isinstance(action, str) or not action.isidentifier() or len(action) > 32):
             raise StatusError("Unsupported usage event action.")
         now = moment_ or datetime.now(timezone.utc)
@@ -93,6 +98,10 @@ def summarize(reports, deliveries, events, *, since, until, zone):
         else:
             outcome["ignored" if until - received >= IGNORED_AFTER else "pending"] += 1
     total = len(delivered)
+    resolutions = [event for event in events if event["type"] == "ask_resolution"]
+    by_resolution = {}
+    for event in resolutions:
+        by_resolution[event["action"]] = by_resolution.get(event["action"], 0) + 1
     share = lambda count: round(count / total, 3) if total else None
     days = max(1, (until - since).days)
     return {
@@ -108,6 +117,9 @@ def summarize(reports, deliveries, events, *, since, until, zone):
             "counts": outcome, "share_acted_on": share(outcome["accepted"] + outcome["discussed_only"]),
             "share_accepted": share(outcome["accepted"]), "share_dismissed": share(outcome["dismissed"]),
             "share_ignored": share(outcome["ignored"]), "share_pending": share(outcome["pending"])},
+        "asks_resolved_on_page": {
+            "total": len(resolutions), "by_resolution": by_resolution,
+            "narrow_viewport": sum(1 for event in resolutions if event.get("narrow"))},
         "operation_report_opens": sorted(
             ({"operation": identifier, "title": operations[identifier]["title"] if identifier in operations else None,
               "workspace": operations[identifier]["origin"].get("workspace") if identifier in operations else None,
@@ -116,5 +128,7 @@ def summarize(reports, deliveries, events, *, since, until, zone):
             "acted_on": "accepted, or discussed in the linked thread without another response",
             "ignored": "no acceptance, dismissal or discussion 24 hours or more after delivery, measured at the period end",
             "pending": "no response yet and delivered less than 24 hours before the period end",
-            "response": "the first acceptance, dismissal or discussion; opening alone is counted under first open"},
+            "response": "the first acceptance, dismissal or discussion; opening alone is counted under first open",
+            "asks_resolved_on_page": "asks resolved or snoozed from this page through Ribbon Field; compare with "
+                                     "'agent-coord ask --metrics', which counts every resolution wherever it was made"},
     }

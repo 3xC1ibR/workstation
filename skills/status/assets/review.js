@@ -48,15 +48,12 @@
   const stamp = value => { const node = make("time", elapsed(value)); node.dateTime = value; node.title = time(value); return node; };
   const flag = (text, className) => make("span", text, className);
 
-  function askRow(ask) {
-    const kind = ask.kind ? ask.kind[0].toUpperCase() + ask.kind.slice(1) : "Ask";
-    return row({
-      key: "ask-" + ask.id, state: ask.blocking ? "blocking" : "waiting", href: ask.thread_link, external: true, title: ask.title,
-      summary: ask.unblocks ? "Unblocks: " + ask.unblocks : ask.detail || ask.context,
-      meta: [ask.blocking && flag("Blocking", "flag-blocking"), kind + (ask.effort_minutes ? `, ${ask.effort_minutes} min` : ""),
-             ask.thread_title || ask.project_label || folder(ask.cwd), ask.overdue && flag("Overdue", "flag-attention"),
-             ask.stale && flag(ask.thread_closed ? "Thread closed" : "Agent inactive", "flag-attention")], at: ask.created_at});
+  // Ribbon Field accepted a resolution: drop the ask at once, then read Ribbon Field's list again.
+  function askChanged(message, id) {
+    review.asks.asks = review.asks.asks.filter(ask => ask.id !== id);
+    signature = ""; render(); notice(message); load(true);
   }
+  const askRow = ask => window.StatusAsks.createAskRow(ask, {changed: askChanged, publicUrl: review.public_url});
   function deliveryRow(delivery) {
     const response = delivery.response, closed = Boolean(response);
     const outcome = !response ? null : response.type === "accepted" ? flag("Accepted", "outcome-accepted") : "Dismissed";
@@ -83,10 +80,10 @@
   function fill(section, items, build, count) {
     const node = element(section), list = node.querySelector(".rows");
     const focused = document.activeElement?.closest?.(".row"), focusKey = focused?.dataset.key;
-    const focusIndex = focused ? [...focused.querySelectorAll("a, button")].indexOf(document.activeElement) : -1;
+    const focusIndex = focused ? [...focused.querySelectorAll("a, button, textarea")].indexOf(document.activeElement) : -1;
     list.replaceChildren(...items.map(build));
     node.querySelector(".count").textContent = count == null ? "" : String(count);
-    if (focusKey) [...(list.querySelector(`[data-key="${focusKey}"]`)?.querySelectorAll("a, button") || [])][focusIndex]?.focus({preventScroll: true});
+    if (focusKey) [...(list.querySelector(`[data-key="${focusKey}"]`)?.querySelectorAll("a, button, textarea") || [])][focusIndex]?.focus({preventScroll: true});
     return items.length;
   }
 
@@ -131,10 +128,10 @@
     document.title = (awaiting + updated + review.asks.asks.length ? `(${awaiting + updated + review.asks.asks.length}) ` : "") + "Review";
   }
 
-  async function load() {
+  async function load(freshAsks = false) {
     const current = ++revision;
     try {
-      const result = await request("/api/review");
+      const result = await request("/api/review" + (freshAsks ? "?fresh=asks" : ""));
       if (current !== revision) return;
       failure("");
       element("review-coverage").hidden = !result.unreadable;
@@ -169,8 +166,8 @@
   });
   element("review-search").addEventListener("input", render);
   element("review-undo").onclick = () => { const reverse = undo; element("review-notice").hidden = true; undo = null; if (reverse) reverse(); };
-  document.addEventListener("visibilitychange", () => { if (!document.hidden) load(); });
-  const timer = setInterval(() => { if (!document.hidden && !pending.size) load(); }, 20000);
+  document.addEventListener("visibilitychange", () => { if (!document.hidden && !window.StatusAsks.editing()) load(); });
+  const timer = setInterval(() => { if (!document.hidden && !pending.size && !window.StatusAsks.editing()) load(); }, 20000);
   addEventListener("pagehide", () => clearInterval(timer));
   addEventListener("pageshow", event => { if (event.persisted) load(); });
   load();

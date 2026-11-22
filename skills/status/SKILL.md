@@ -23,7 +23,7 @@ Publish only what the review page is for. Most work publishes nothing.
 | An operation: a long-running effort you own, or one with a `.status/` profile | One living operation report; each build is a new version | `build_status.py --operation <key>` |
 | The user asks for status or a report | A report for that subject | `build_status.py` |
 | Finished work nobody requested (a proactive agent's result) | One delivery in the proactive feed | `publish_delivery.py` |
-| Something only the user can decide, do, approve, or provide | An ask in Ribbon Field, not a report | `agent-coord ask` |
+| Something only the user can decide, do, approve, or provide | An ask in Ribbon Field, not a report; he can answer it from the review page | `agent-coord ask` |
 
 Do not write a report to mark a task done, to summarize a conversation, or
 because this skill is installed. Do not publish a delivery for requested work:

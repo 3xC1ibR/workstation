@@ -19,7 +19,7 @@ import delivery_store
 from delivery_store import Deliveries
 import markdown_text
 from register_status import register
-from ribbon_field_asks import AskReader, for_operation, read_asks
+from ribbon_field_asks import AskReader, for_operation, read_asks, title_and_detail
 from status_server import make_server, public_address
 from status_store import StatusError, StatusReports
 from usage_events import UsageEvents, summarize
@@ -368,6 +368,54 @@ class AskTests(Workspace):
         operation = json.loads(self.request("/api/operations/" + review["operations"][0]["id"])[2])
         self.assertEqual(len(operation["asks"]["asks"]), 1)
         self.assertEqual(len(calls), 1)                              # one recent listing serves both requests
+
+    def test_title_is_one_line_and_the_whole_question_is_kept(self):
+        self.assertEqual(title_and_detail("Short question?"), ("Short question?", None))
+        self.assertEqual(title_and_detail("First line\n\n1. Step one\n2. Step two"), ("First line", "1. Step one\n2. Step two"))
+        long = "One step is left that only you can do. " + "It blocks pricing and takes ten minutes to finish in the console. " * 3
+        title, detail = title_and_detail(long + "\nReply done.")
+        self.assertEqual(title, "One step is left that only you can do.")
+        self.assertTrue(detail.startswith("It blocks pricing") and detail.endswith("Reply done."))
+        self.assertEqual((title + " " + detail).split(), (long + " Reply done.").split())          # no word is dropped
+        unbroken = "A" * 300
+        self.assertEqual(title_and_detail(unbroken), (unbroken, None))                             # never cut mid-sentence
+
+    def test_listing_carries_choices_and_resolutions_and_refreshes_on_request(self):
+        record = {"id": 7, "session_id": "thread-a", "kind": "action", "question": "Verify the payout", "blocking": False, "status": "open",
+                  "created_at": "2026-11-22T09:00:00+00:00", "snoozed": False, "cwd": "/work", "options": [],
+                  "resolutions": ["done", "not_done", "dismissed"]}
+        listing = self.root / "asks.json"
+        listing.write_text(json.dumps([record]))
+        result = read_asks(self.command(f'cat "{listing}"\n'))
+        self.assertEqual((result["asks"][0]["options"], result["asks"][0]["resolutions"]), ([], ["done", "not_done", "dismissed"]))
+        calls = []
+        def reader():
+            calls.append(1)
+            return {"available": True, "reason": None, "asks": []}
+        self.serve(ask_reader=AskReader(reader, lifetime=60), public_url=PUBLIC)
+        self.request("/api/review")
+        self.request("/api/review")
+        self.assertEqual(len(calls), 1)
+        self.assertEqual(json.loads(self.request("/api/review?fresh=asks")[2])["public_url"], PUBLIC)
+        self.assertEqual(len(calls), 2)                              # after a resolution the page reads Ribbon Field again
+        self.assertFalse((self.root / "asks").exists())
+
+    def test_resolutions_made_on_the_page_are_measured_without_content(self):
+        self.serve(ask_reader=AskReader(lambda: {"available": True, "reason": None, "asks": []}))
+        event = {"type": "ask_resolution", "view": "review", "item_kind": "ask", "item": "24", "action": "answered", "narrow": True}
+        self.assertEqual(self.request("/api/events", event)[0], 200)
+        self.assertEqual(self.request("/api/events", {**event, "action": "snoozed"})[0], 200)
+        for invalid in ({**event, "item": "abc"}, {**event, "item": "0"}, {**event, "item_kind": "delivery"},
+                        {key: value for key, value in event.items() if key != "action"}, {**event, "action": "an answer with words"},
+                        {"type": "page_open", "item_kind": "ask", "item": "24"}):
+            with self.subTest(invalid=invalid):
+                self.assertEqual(self.request("/api/events", invalid)[0], 400)
+        events = UsageEvents(self.root).read()
+        self.assertEqual([(entry["type"], entry["item"], entry["action"]) for entry in events],
+                         [("ask_resolution", "24", "answered"), ("ask_resolution", "24", "snoozed")])
+        now = datetime.now(timezone.utc) + timedelta(minutes=1)
+        summary = summarize(self.reports, self.deliveries, events, since=now - timedelta(days=1), until=now, zone=ZoneInfo("UTC"))
+        self.assertEqual(summary["asks_resolved_on_page"], {"total": 2, "by_resolution": {"answered": 1, "snoozed": 1}, "narrow_viewport": 2})
 
     def test_unavailable_asks_do_not_break_the_page(self):
         self.register(report("Operation"), agent="operator")

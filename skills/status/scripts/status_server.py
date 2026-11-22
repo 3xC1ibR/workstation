@@ -32,11 +32,11 @@ PAGE_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; connect-sr
             "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 FILES = {"/tokens.css": "text/css", "/style.css": "text/css", "/review.css": "text/css", "/controls.js": "text/javascript",
          "/responses.js": "text/javascript", "/report.js": "text/javascript", "/review.js": "text/javascript",
-         "/report_page.js": "text/javascript", "/delivery.js": "text/javascript"}
+         "/report_page.js": "text/javascript", "/delivery.js": "text/javascript", "/asks.js": "text/javascript"}
 POSTS = {"/api/dismiss": ({"id", "dismissed"}, set(), 4096),
          "/api/responses": ({"id", "revision", "values"}, set(), 4 * 1024 * 1024),
          "/api/delivery-response": ({"id", "action"}, {"choice", "note"}, 16 * 1024),
-         "/api/events": ({"type"}, {"view", "item_kind", "item", "narrow"}, 4096)}
+         "/api/events": ({"type"}, {"view", "item_kind", "item", "action", "narrow"}, 4096)}
 
 
 def public_address(value):
@@ -130,7 +130,8 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
                 operation["ask_count"] = len(for_operation(listing["asks"], operation)) if listing["available"] else None
                 operation["version_count"] = len(operation.pop("versions"))
             return {"operations": operations["operations"], "deliveries": delivered["deliveries"], "asks": listing,
-                    "unreadable": operations["unreadable"] + delivered["unreadable"]}
+                    "unreadable": operations["unreadable"] + delivered["unreadable"],
+                    "public_url": public[0] + public[2] if public else None}
 
         def report_page(self, identifier):
             manifest = reports._manifest(identifier)
@@ -146,7 +147,7 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
                 configuration["responses"] = {"fields": fields, "connection": {
                     "id": identifier, "url": f"{base}/api/report-responses/{identifier}",
                     "token": response_key(reports.root, identifier, create=True)}}
-            scripts = ("controls.js",) + (("responses.js", "report.js") if fields else ()) + ("report_page.js",)
+            scripts = ("controls.js",) + (("responses.js", "report.js") if fields else ()) + ("asks.js", "report_page.js")
             return render(document, page={"base": base, "scripts": scripts, "configuration": configuration,
                                           "navigation": review_pages.report_navigation(base, operation, identifier)}), PAGE_CSP
 
@@ -185,12 +186,17 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
                 elif path == "/api/config":
                     self.send(200, {"token": token})
                 elif path == "/api/review":
+                    if "fresh=asks" in urlsplit(self.path).query:
+                        asks.invalidate()
                     self.send(200, self.review())
                 elif path == "/api/reports":
                     self.send(200, reports.list())
                 elif path.startswith("/api/operations/"):
+                    if "fresh=asks" in urlsplit(self.path).query:
+                        asks.invalidate()
                     operation, listing = reports.operation(path.removeprefix("/api/operations/")), asks.current()
-                    self.send(200, {"operation": operation, "asks": {**listing, "asks": for_operation(listing["asks"], operation)}})
+                    self.send(200, {"operation": operation, "asks": {**listing, "asks": for_operation(listing["asks"], operation)},
+                                    "public_url": public[0] + public[2] if public else None})
                 elif path.startswith("/api/responses/"):
                     self.send(200, reports.responses(path.removeprefix("/api/responses/")))
                 elif cors:
@@ -253,12 +259,12 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
                     self.send(200, record)
                 else:
                     opened = None
-                    if body["type"] not in {"page_open", "item_open"}:
-                        raise ValueError("Pages report page_open and item_open events only.")
+                    if body["type"] not in {"page_open", "item_open", "ask_resolution"}:
+                        raise ValueError("Pages report page_open, item_open and ask_resolution events only.")
                     if body["type"] == "item_open" and body.get("item_kind") == "operation":
                         opened = reports.mark_opened(body.get("item"))
                     usage.record(body["type"], view=body.get("view"), item_kind=body.get("item_kind"), item=body.get("item"),
-                                 narrow=body.get("narrow"), remote=self.remote())
+                                 action=body.get("action"), narrow=body.get("narrow"), remote=self.remote())
                     self.send(200, {"recorded": True, "opened": opened})
             except ResponseConflict as error:
                 self.send(409, {"error": str(error)}, cors=cors)

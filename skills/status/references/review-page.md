@@ -5,8 +5,8 @@ agent, provider, and project directory on this host, and reads open asks from
 Ribbon Field. It has no Ribbon Field dependency: without Ribbon Field it shows
 reports and deliveries and states that asks are unavailable.
 
-- **Needs you:** open asks from Ribbon Field, blocking first. Each opens its
-  conversation in Ribbon Field, where it is answered. Asks are never stored here.
+- **Needs you:** open asks from Ribbon Field, blocking first. Open one to read
+  it in full and answer it; the answer goes to Ribbon Field, which stores it.
 - **Proactive work:** deliveries awaiting a response, unread first. See
   [deliveries.md](deliveries.md).
 - **Operations:** one row per operation with its latest version. A row is unread
@@ -118,21 +118,50 @@ operation unless it passes the same explicit key.
 
 ## Asks from Ribbon Field
 
-The service runs `agent-coord ask --list --all-sessions --status open` when the
-page asks and keeps the answer in memory for about 20 seconds. It finds the
-command at `AGENT_COORD_CLI`, then `~/.local/bin/agent-coord`, then `PATH`. An
-operation shows the asks filed from its conversations or from its workspace
-directory. There is no supported authenticated path for this page to resolve an
-ask, so every ask opens its Ribbon Field conversation. When the command is
-missing, too old to list asks, slow, or failing, the page states that asks are
-not shown and why; it does not show an empty list.
+Ribbon Field owns asks. This page never stores an ask or an answer.
+
+**Reading.** The service runs `agent-coord ask --list --all-sessions --status open`
+when the page asks and keeps the answer in memory for about 20 seconds. It finds
+the command at `AGENT_COORD_CLI`, then `~/.local/bin/agent-coord`, then `PATH`.
+An operation shows the asks filed from its conversations or from its workspace
+directory. A row leads with one line (the question's first line, or its first
+sentence when that line is long); opening the row shows the whole question,
+what it unblocks, and the agent's context, with web addresses as links. When
+the command is missing, too old, slow, or failing, the page states that asks
+are not shown and why; it does not show an empty list.
+
+**Answering.** On the tailnet address the page and Ribbon Field's web interface
+share one origin, so the page's script sends the user's resolution straight to
+Ribbon Field with the browser's own Ribbon Field pairing:
+
+1. `GET /api/browser/config` returns the request token when the browser is paired.
+2. `POST /api/browser/asks/<id>` with `{resolution, option?, answer?, note?}`
+   resolves the ask; `POST /api/browser/asks/<id>/snooze` with `{until}` snoozes it.
+
+Ribbon Field checks the paired-device cookie, the token, and the origin, records
+the resolution as the user's, and wakes the asking agent through its inbox. The
+page offers the resolutions Ribbon Field lists for the ask's kind (choices and
+free text for a decision; Done or Not done; Approve or Decline; Accept or
+Request changes; Grant or Decline), an optional note, Snooze, and Dismiss.
+After Ribbon Field accepts, the page reads the list again. A refused request
+keeps the typed text and shows Ribbon Field's reason.
+
+- **Browser not paired** (Ribbon Field answers 401): the page says so and links
+  to Ribbon Field. Pair the browser from Ribbon Field on the Mac (Remote access).
+- **Local address** (`http://127.0.0.1:8766`): Ribbon Field's local port is a
+  different origin and refuses the request, so the page points to the tailnet
+  address and links each ask to its thread.
+- The Status service takes no part in the answer and holds no Ribbon Field
+  credential. Do not add a proxy route for it.
 
 ## Measurement
 
 The page records content-free usage events in `<inbox>/usage/<year-month>.jsonl`:
-page opens, item opens, and responses, each with a time, the view, an item
-identifier, whether the viewport was narrow, and whether the request came through
-the public address. No titles, text, notes, or answers are recorded.
+page opens, item opens, responses, and ask resolutions made on the page, each
+with a time, the view, an item identifier, whether the viewport was narrow, and
+whether the request came through the public address. No titles, text, notes, or
+answers are recorded; an ask resolution records the ask's number and the
+resolution's name only.
 
 ```sh
 python3 -B <skill-directory>/scripts/status_metrics.py --days 7
@@ -140,8 +169,10 @@ python3 -B <skill-directory>/scripts/status_metrics.py --days 7
 
 The output reports, for the period: page opens per day; for proactive
 deliveries, the median minutes from delivery to first open and to first
-response, and the shares accepted, dismissed, ignored, and pending; and opens
-per operation report. `--since`, `--until`, and `--timezone` adjust the period;
+response, and the shares accepted, dismissed, ignored, and pending; asks
+resolved on the page by resolution (compare with `agent-coord ask --metrics`,
+which counts every resolution wherever it was made); and opens per operation
+report. `--since`, `--until`, and `--timezone` adjust the period;
 `definitions` in the output states how each share is counted.
 
 ## Other machines

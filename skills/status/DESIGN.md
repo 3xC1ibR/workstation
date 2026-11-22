@@ -130,8 +130,11 @@ marker is an 8 px disc. Chevrons are drawn with two borders; there is no icon se
   an unavailable source as an empty list.
 - No gradients, shadows, glass effects, decorative icons, entrance animation, or
   cards inside cards.
-- Do not copy Ribbon Field asks into this store or resolve them here; link to
-  Ribbon Field.
+- Do not copy Ribbon Field asks or answers into this store. Resolve them through
+  Ribbon Field's own interface from the page; link to Ribbon Field when that is
+  unavailable.
+- Never truncate text without a way to read all of it: in place for asks, on the
+  item's page for deliveries and operations.
 - Material findings in a report are never collapsed. Only background detail may
   start collapsed, and print expands it.
 
@@ -144,7 +147,7 @@ marker is an 8 px disc. Chevrons are drawn with two borders; there is no icon se
 | Operation | title, latest summary, origin, version count, unread, open asks | open, dismiss until next version, restore | Review list, report page |
 | Report version | observations, notices, metrics, actions, sections, response fields | read, answer response fields, open another version | Report page |
 | Delivery | title, summary, recommended default, decision, links, document, attachments, category, agent | read, do it (default or an option), dismiss with a reason, discuss in Ribbon Field, reopen | Review list, delivery page |
-| Ask (owned by Ribbon Field) | kind, title, blocking, what it unblocks, thread | open in Ribbon Field | Review list, report page of its operation |
+| Ask (owned by Ribbon Field) | kind, title, full question, choices, blocking, what it unblocks, thread | read in full, resolve by kind with a note, snooze, dismiss, open the thread | Review list, report page of its operation |
 
 ### Lexicon
 
@@ -197,6 +200,12 @@ Only a 120 ms colour transition on controls. Nothing moves on load.
   shown on hover or focus only, one 800 px column, "asks open" in ink instead
   of the attention colour, the assessment ahead of notices, finished actions
   quieted, and one date format.
+- 2026-11-22: Asks are read in full and answered in place. A row leads with one
+  line and opens to the whole question; text is never cut without a way to read
+  it. Resolutions go from the page's script to Ribbon Field's browser interface
+  on the shared tailnet origin, authenticated by the browser's Ribbon Field
+  pairing, so Ribbon Field stays the only store. This supersedes "link to
+  Ribbon Field" for asks; unpaired browsers and the local address still link.
 - 2026-11-22: Second scoring round. Changes: at phone width the age moves into
   the metadata line so titles span the row; operation summaries clamp to one
   line and ask reasons to three; report provenance is source and time only,

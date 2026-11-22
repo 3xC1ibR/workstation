@@ -9,6 +9,7 @@ from __future__ import annotations
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import sys
@@ -16,7 +17,20 @@ import threading
 import time
 
 FIELDS = ("id", "kind", "blocking", "context", "unblocks", "effort_minutes", "link", "due_at", "session_id",
-          "created_at", "thread_title", "project_label", "cwd", "stale", "overdue", "thread_closed")
+          "created_at", "thread_title", "project_label", "cwd", "stale", "overdue", "thread_closed", "options", "resolutions")
+TITLE_LIMIT = 140
+SENTENCE_END = re.compile(r"(?<=[.?!])\s+")
+
+
+def title_and_detail(question):
+    """Lead with one line: the first line, or its first sentence when that line is long. The rest is the detail."""
+    lines = str(question).strip().splitlines() or [""]
+    first, rest = lines[0].strip(), "\n".join(lines[1:]).strip()
+    if len(first) > TITLE_LIMIT:
+        sentence = SENTENCE_END.split(first, maxsplit=1)
+        if len(sentence) == 2 and sentence[0]:
+            first, rest = sentence[0], (sentence[1] + ("\n" + rest if rest else "")).strip()
+    return first, rest or None
 
 
 def command_path():
@@ -58,10 +72,9 @@ def read_asks(command=None, timeout=8):
         for record in listing:
             if record.get("status", "open") != "open" or record.get("snoozed"):
                 continue
-            lines = str(record["question"]).strip().splitlines() or [""]
+            title, detail = title_and_detail(record["question"])
             session = str(record["session_id"])
-            asks.append({**{field: record.get(field) for field in FIELDS}, "title": lines[0].strip(),
-                         "detail": "\n".join(lines[1:]).strip() or None,
+            asks.append({**{field: record.get(field) for field in FIELDS}, "title": title, "detail": detail,
                          "thread_link": "agentcoord://thread/" + session})
     except (ValueError, KeyError, TypeError, AttributeError):
         return {"available": False, "reason": "Ribbon Field returned an asks listing this page cannot read.", "asks": []}
@@ -80,6 +93,11 @@ class AskReader:
             if self.value is None or time.monotonic() - self.read_at > self.lifetime:
                 self.value, self.read_at = self.reader(), time.monotonic()
             return self.value
+
+    def invalidate(self):
+        """Read Ribbon Field again on the next request, after the user resolved an ask there."""
+        with self.lock:
+            self.value = None
 
 
 def for_operation(asks, operation):

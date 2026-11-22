@@ -31,7 +31,9 @@ class ReviewPageBrowserTests(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         self.server = make_server(self.root, 0, ask_reader=AskReader(lambda: {"available": True, "reason": None, "asks": [
-            {"id": 7, "session_id": "thread-a", "kind": "approval", "title": "Approve the payout", "detail": None, "blocking": True,
+            {"id": 7, "session_id": "thread-a", "kind": "approval", "title": "Approve the payout", "blocking": True,
+             "detail": "First paragraph.\n\nSecond paragraph with https://example.com/console and more.", "options": [],
+             "resolutions": ["approved", "declined", "dismissed"],
              "unblocks": "Live payouts.", "created_at": "2026-11-22T09:00:00+00:00", "cwd": "/project", "thread_title": "Operator",
              "thread_link": "agentcoord://thread/thread-a"}]}))
         worker = threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": .01}, daemon=True)
@@ -90,6 +92,48 @@ class ReviewPageBrowserTests(unittest.TestCase):
         self.assertIn(("page_open", None), events)
         self.assertIn(("item_open", None), events)
         self.assertIn(("response", "accept"), events)
+        self.assertEqual(self.failures, [])
+
+    def test_ask_is_read_in_full_and_resolved_through_ribbon_field(self):
+        page, sent = self.page, []
+        state = {"paired": True, "fail": False}
+        def ribbon_field(route):
+            request = route.request
+            if request.url.endswith("/api/browser/config"):
+                if not state["paired"]:
+                    return route.fulfill(status=401, content_type="application/json", body='{"error": "Pair this device using a fresh link from your Mac."}')
+                return route.fulfill(content_type="application/json", body='{"token": "ribbon-field-token", "askKinds": true}')
+            if state["fail"]:
+                return route.fulfill(status=400, content_type="application/json", body='{"error": "Option is not one of the offered choices."}')
+            sent.append((request.url.split("/api/browser/")[1], request.headers.get("x-agent-coord-token"), json.loads(request.post_data)))
+            route.fulfill(content_type="application/json", body='{"id": 7, "status": "resolved"}')
+        page.route("**/api/browser/**", ribbon_field)
+        page.goto(self.origin + "/")
+        row = page.locator("#asks .row")
+        expect(row.locator(".ask-detail")).to_be_hidden()
+        row.locator(".ask-toggle").click()
+        expect(row.locator(".ask-text").first).to_contain_text("Second paragraph with https://example.com/console")
+        expect(row.locator(".ask-text a")).to_have_attribute("href", "https://example.com/console")
+        expect(row.locator(".row-summary")).to_be_hidden()               # the preview gives way to the whole text
+        note = row.locator(".ask-note")
+        note.fill("Only after Tuesday")
+        state["fail"] = True
+        row.get_by_role("button", name="Approve", exact=True).click()
+        expect(row.get_by_role("alert")).to_contain_text("not one of the offered choices")
+        expect(note).to_have_value("Only after Tuesday")                 # a refused resolution keeps the note
+        state["fail"] = False
+        row.get_by_role("button", name="Approve", exact=True).click()
+        expect(page.locator("#review-notice")).to_contain_text("Approved")
+        self.assertEqual(sent, [("asks/7", "ribbon-field-token", {"resolution": "approved", "note": "Only after Tuesday"})])
+        self.assertEqual([(event["type"], event["item"], event["action"]) for event in UsageEvents(self.root).read() if event["type"] == "ask_resolution"],
+                         [("ask_resolution", "7", "approved")])
+        self.assertFalse((self.root / "asks").exists())
+        self.fits()
+        state["paired"] = False
+        page.goto(self.origin + "/")
+        page.locator("#asks .ask-toggle").click()
+        expect(page.locator(".ask-unavailable")).to_contain_text("not paired")
+        expect(page.locator("#asks .ask-links a").first).to_have_attribute("href", "agentcoord://thread/thread-a")
         self.assertEqual(self.failures, [])
 
     def test_operation_is_unread_until_its_latest_version_is_opened(self):

@@ -37,6 +37,7 @@
 .row:last-child { border-radius: 0 0 var(--radius) var(--radius); }
 .row:only-child { border-radius: var(--radius); }
 .row-summary { color: var(--ink-secondary); margin-top: var(--space-1); display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: break-word; }
+.row-summary[hidden] { display: none; }
 .row[data-kind="operation"] .row-summary { -webkit-line-clamp: 1; }
 .row[data-kind="ask"] .row-summary { -webkit-line-clamp: 3; }
 .row-recommendation { margin-top: var(--space-2); overflow-wrap: break-word; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
@@ -131,4 +132,36 @@
 }
 @media print {
   .review-controls, .row-actions, .transient-notice, .decision-panel .response-buttons { display: none; }
+}
+
+/* Asks: read in full and answered in place. Ribbon Field stores the answer. */
+.ask-toggle { display: block; width: 100%; min-height: 0; padding: 0; background: none; border: 0; border-radius: 0; text-align: left; font: inherit; font-weight: var(--weight-medium); color: var(--ink); white-space: normal; cursor: pointer; }
+.ask-toggle:hover { background: none; }
+.row.ask[data-state="blocking"] .ask-toggle { font-weight: var(--weight-strong); }
+.row.ask[data-open="true"] .ask-toggle::after { content: none; }                /* an open ask is read and answered, not toggled by a stray click */
+.row.ask[data-open="true"], .row.ask[data-open="true"]:hover { --row-surface: var(--surface); }
+.row.ask .row-aside::after { content: ""; display: inline-block; width: var(--space-2); height: var(--space-2); margin-inline-start: var(--space-2); border-right: var(--focus) solid currentColor; border-bottom: var(--focus) solid currentColor; transform: translateY(-35%) rotate(45deg); }
+.row.ask[data-open="true"] .row-aside::after { transform: translateY(10%) rotate(-135deg); }
+.ask-detail { position: relative; display: grid; gap: var(--space-3); margin-top: var(--space-2); }
+.ask-detail[hidden] { display: none; }
+.ask-text { max-width: var(--measure); white-space: pre-line; overflow-wrap: anywhere; }
+.ask-text p + p { margin-top: var(--space-2); }
+.ask-context { color: var(--ink-secondary); }
+.ask-response { display: grid; gap: var(--space-2); max-width: var(--measure); }
+.ask-options { display: grid; gap: var(--space-2); }
+.ask-options button { justify-content: flex-start; min-height: var(--control-height); padding: var(--space-2) var(--space-3); text-align: left; white-space: normal; font-size: var(--body); }
+.ask-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.ask-snooze { position: relative; margin-inline-start: auto; }
+.ask-snooze summary { display: inline-flex; align-items: center; min-height: var(--control-height); padding: 0 var(--space-3); border-radius: var(--radius-control); font-size: var(--meta); font-weight: var(--weight-medium); color: var(--ink-secondary); list-style: none; }
+.ask-snooze summary::-webkit-details-marker { display: none; }
+.ask-snooze summary:hover, .ask-snooze[open] summary { background: var(--surface-quiet); color: var(--ink); }
+.ask-snooze-choices { position: absolute; right: 0; top: calc(100% + var(--space-1)); z-index: var(--layer-menu); display: grid; width: max-content; padding: var(--space-1); background: var(--surface); border: var(--stroke) solid var(--rule-strong); border-radius: var(--radius-control); }
+.ask-snooze-choices button { justify-content: flex-start; text-align: left; color: var(--ink); }
+.ask-links { font-size: var(--meta); color: var(--ink-tertiary); }
+.ask-unavailable { max-width: var(--measure); color: var(--ink-secondary); }
+@media (max-width: 640px) {
+  .row.ask .row-meta::after { content: ""; }
+  .ask-buttons button, .ask-snooze summary { min-height: var(--touch-height); }
+  .ask-snooze-choices { right: auto; left: 0; }
+  .ask-snooze { margin-inline-start: 0; }
 }
