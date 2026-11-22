@@ -25,7 +25,7 @@ code, pre { font: .92em/var(--line) var(--mono); overflow-wrap: anywhere; }
 .notice h2 { font-size: var(--body); margin-bottom: var(--space-1); }
 .assessment + .notice { margin-top: 0; }
 .notice:has(+ :not(.notice)) { margin-bottom: var(--space-5); }
-.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--metric-width)), 1fr)); align-items: start; gap: var(--space-5) var(--space-6); padding: var(--space-4) 0 var(--space-5); border-top: var(--stroke) solid var(--rule); }
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--metric-width)), 1fr)); align-items: start; gap: var(--space-5); padding: var(--space-4) 0 var(--space-5); border-top: var(--stroke) solid var(--rule); }
 .metric { min-width: 0; overflow-wrap: anywhere; }
 .metric dt { color: var(--ink-secondary); font-size: var(--meta); }
 .value { font-size: var(--value); line-height: var(--line-tight); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; letter-spacing: -.01em; margin: var(--space-1) 0; }

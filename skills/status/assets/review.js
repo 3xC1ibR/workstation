@@ -30,12 +30,10 @@
     if (recommendation) {
       const line = make("p", null, "row-recommendation"); line.append(make("strong", "Recommended: "), recommendation); main.append(line);
     }
-    const parts = meta.filter(Boolean);
-    if (parts.length) {
-      const details = make("p", null, "row-meta");
-      parts.forEach((part, index) => { if (index) details.append(" · "); details.append(part); });
-      main.append(details);
-    }
+    const parts = meta.filter(Boolean), details = make("p", null, "row-meta"), age = make("span", null, "row-age");
+    parts.forEach((part, index) => { if (index) details.append(" · "); details.append(part); });
+    age.append(parts.length ? " · " : "", stamp(at)); details.append(age);       // shown at phone width, where there is no age column
+    main.append(details);
     const marker = make("span", null, "marker"); marker.setAttribute("aria-hidden", "true");
     const aside = make("div", null, "row-aside"); aside.append(stamp(at));
     const controls = make("div", null, "row-actions");

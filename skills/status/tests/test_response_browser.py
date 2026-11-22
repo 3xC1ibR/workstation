@@ -17,72 +17,136 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from build_status import render
 from register_status import register
 from status_server import make_server
+from delivery_store import Deliveries, publish as publish_delivery
+from ribbon_field_asks import AskReader
 from status_store import StatusReports
 from test_responses import document
+from usage_events import UsageEvents
 
 
 @unittest.skipUnless(sync_playwright, "Install Playwright and Chromium to run the browser regression")
-class ResponseBrowserTests(unittest.TestCase):
-    def test_answer_round_trip_conflict_and_refresh_preserve_input(self):
+class ReviewPageBrowserTests(unittest.TestCase):
+    def setUp(self):
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
-        root = Path(temporary.name)
-        report = document()
-        identifier = register(report, render(report), workspace="/project", agent="release-owner", root=root)
-        server = make_server(root, 0)
-        worker = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": .01}, daemon=True)
+        self.root = Path(temporary.name)
+        self.server = make_server(self.root, 0, ask_reader=AskReader(lambda: {"available": True, "reason": None, "asks": [
+            {"id": 7, "session_id": "thread-a", "kind": "approval", "title": "Approve the payout", "detail": None, "blocking": True,
+             "unblocks": "Live payouts.", "created_at": "2026-11-22T09:00:00+00:00", "cwd": "/project", "thread_title": "Operator",
+             "thread_link": "agentcoord://thread/thread-a"}]}))
+        worker = threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": .01}, daemon=True)
         worker.start()
         self.addCleanup(worker.join, 2)
-        self.addCleanup(server.server_close)
-        self.addCleanup(server.shutdown)
+        self.addCleanup(self.server.server_close)
+        self.addCleanup(self.server.shutdown)
         driver = sync_playwright().start()
         self.addCleanup(driver.stop)
         browser = driver.chromium.launch()
         self.addCleanup(browser.close)
-        context = browser.new_context(viewport={"width": 390, "height": 844}, color_scheme="dark")
-        page = context.new_page()
-        failures = []
-        page.on("pageerror", lambda error: failures.append(str(error)))
-        page.goto(f"http://127.0.0.1:{server.server_port}/")
-        row = page.locator(f'[data-report-id="{identifier}"]')
-        row.locator("summary").click()
-        owner = row.locator('input[name="owner"]')
+        self.page = browser.new_page(viewport={"width": 390, "height": 844}, color_scheme="dark")
+        self.origin = f"http://127.0.0.1:{self.server.server_port}"
+        self.failures = []
+        self.page.on("pageerror", lambda error: self.failures.append(str(error)))
+
+    def fits(self):
+        self.assertTrue(self.page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+
+    def test_delivery_is_read_accepted_with_a_note_and_reopened(self):
+        identifier = publish_delivery({"title": "CI is green again", "summary": "Every run had failed since October.",
+                                       "recommended_default": "Merge pull request 3.",
+                                       "decision": {"question": "Merge it?", "options": ["Hold for changes"]}},
+                                      workspace="/project", agent="proactive", thread_id="thread-a", body="# CI is green again\n\nDetails.", root=self.root)
+        page, deliveries = self.page, Deliveries(self.root)
+        page.goto(self.origin + "/")
+        row = page.locator("#deliveries .row")
+        expect(row).to_have_attribute("data-state", "unread")
+        expect(row).to_contain_text("Recommended: Merge pull request 3.")
+        expect(page.locator("#asks .row")).to_contain_text("Approve the payout")
+        expect(page.locator("#review-counts")).to_contain_text("1 ask (1 blocking) · 1 delivery to review")
+        self.fits()
+        row.locator(".row-title").click()
+        expect(page.get_by_role("button", name="Do it", exact=True)).to_be_visible()
+        expect(page.locator(".document h2")).to_have_count(0)            # the repeated title heading is not shown twice
+        expect(page.get_by_role("link", name="Discuss in Ribbon Field")).to_have_attribute("href", "agentcoord://thread/thread-a")
+        page.wait_for_function("document.querySelector('time').textContent.includes(',')")
+        self.assertTrue(deliveries.record(identifier)["read_at"])
+        page.get_by_role("button", name="Add a note", exact=True).click()
+        page.get_by_label("Note for the agent").fill("After Tuesday")
+        page.get_by_role("button", name="Hold for changes", exact=True).click()
+        expect(page.locator(".response-outcome")).to_contain_text("Accepted")
+        response = deliveries.record(identifier)["response"]
+        self.assertEqual((response["type"], response["choice"], response["note"]), ("accepted", "Hold for changes", "After Tuesday"))
+        self.fits()
+        page.get_by_role("link", name="Review", exact=True).click()
+        expect(page.locator("#deliveries")).to_be_hidden()                 # responded items leave the Open view
+        page.get_by_role("radio", name="Done", exact=True).check()
+        done = page.locator("#deliveries .row")
+        expect(done).to_contain_text("Accepted")
+        done.get_by_role("button", name="Reopen", exact=True).focus()
+        done.get_by_role("button", name="Reopen", exact=True).click()
+        expect(page.locator("#deliveries")).to_be_hidden()
+        self.assertIsNone(deliveries.record(identifier)["response"])
+        events = [(event["type"], event["action"]) for event in UsageEvents(self.root).read()]
+        self.assertIn(("page_open", None), events)
+        self.assertIn(("item_open", None), events)
+        self.assertIn(("response", "accept"), events)
+        self.assertEqual(self.failures, [])
+
+    def test_operation_is_unread_until_its_latest_version_is_opened(self):
+        first = {"title": "HoldCo bridge", "subject": "operator", "summary": "First version.", "generated_at": "2026-11-22T10:00:00Z"}
+        second = {**first, "summary": "Second version."}
+        register(first, render(first), workspace="/project", agent="operator", thread_id="thread-a", root=self.root)
+        latest = register(second, render(second), workspace="/project", agent="operator", thread_id="thread-a", root=self.root)
+        page = self.page
+        page.goto(self.origin + "/")
+        row = page.locator("#operations .row")
+        expect(row).to_have_count(1)
+        expect(row).to_have_attribute("data-state", "unread")
+        expect(row).to_contain_text("Second version.")
+        expect(row).to_contain_text("1 ask open")
+        row.locator(".row-title").click()
+        expect(page.locator(".version-history summary")).to_have_text("Version 2 of 2")
+        expect(page.locator("#operation-asks")).to_contain_text("Approve the payout")
+        self.fits()
+        page.locator(".version-history summary").click()
+        page.get_by_role("link", name="Version 1", exact=True).click()
+        expect(page.locator(".version-notice")).to_contain_text("You are reading version 1 of 2")
+        expect(page.locator(".assessment")).to_have_text("First version.")
+        page.get_by_role("link", name="Review", exact=True).click()
+        expect(page.locator("#operations .row")).to_have_attribute("data-state", "read")
+        page.goto(self.origin + "/reports/" + latest)
+        page.get_by_role("button", name="Dismiss", exact=True).click()
+        expect(page.get_by_role("button", name="Restore to Review", exact=True)).to_be_visible()
+        page.goto(self.origin + "/")
+        expect(page.locator("#operations")).to_be_hidden()
+        self.assertEqual(self.failures, [])
+
+    def test_report_answers_detect_a_competing_edit_and_keep_unsaved_input(self):
+        report = document()
+        identifier = register(report, render(report), workspace="/project", agent="release-owner", root=self.root)
+        page = self.page
+        page.goto(self.origin + "/reports/" + identifier)
+        owner = page.locator('input[name="owner"]')
         expect(owner).to_be_visible()
-        row.get_by_role("button", name="Save responses", exact=True).click()
-        expect(row.get_by_role("alert")).to_contain_text("required")
-        proceed = row.get_by_role("combobox", name="Proceed?")
+        expect(page.locator('.response-editor [role="status"]')).not_to_contain_text("Loading")
+        page.get_by_role("button", name="Save responses", exact=True).click()
+        expect(page.locator('.response-editor [role="alert"]')).to_contain_text("required")
+        proceed = page.get_by_role("combobox", name="Proceed?")
         expect(proceed).to_be_focused()
         proceed.press("End")
         proceed.press("Enter")
         owner.fill("Release manager")
-        row.locator('input[name="limit"]').fill("0")
-        row.locator("textarea").fill("Preserve the trial budget.")
-        row.get_by_role("button", name="Save responses", exact=True).click()
-        expect(row.get_by_role("status")).to_contain_text("The agent can read")
-        self.assertEqual(StatusReports(root).responses(identifier)["values"]["proceed"], False)
-        self.assertEqual(StatusReports(root).responses(identifier)["values"]["limit"], 0)
+        page.get_by_role("button", name="Save responses", exact=True).click()
+        expect(page.locator('.response-editor [role="status"]')).to_contain_text("The agent can read")
         owner.fill("Unsaved draft")
-        page.evaluate('document.querySelector("input[name=owner]").dataset.retained="yes"')
-        another = {"title": "Other report", "subject": "Other agent", "summary": "Complete",
-                   "generated_at": "2026-11-21T19:00:00Z"}
-        register(another, render(another), workspace="/other-project", root=root)
-        page.get_by_role("button", name="Refresh", exact=True).click()
-        expect(page.locator(".collection-row")).to_have_count(2)
+        StatusReports(self.root).save_responses(identifier, {"proceed": True, "owner": "Other page"}, 1)   # a second editor
+        page.get_by_role("button", name="Save responses", exact=True).click()
+        expect(page.locator('.response-editor [role="alert"]')).to_contain_text("another page")
         expect(owner).to_have_value("Unsaved draft")
-        expect(owner).to_have_attribute("data-retained", "yes")
-        # Model a second editor through the same storage API used by the server.
-        StatusReports(root).save_responses(identifier, {"proceed": True, "owner": "Other page"}, 1)
-        row.get_by_role("button", name="Save responses", exact=True).click()
-        expect(row.get_by_role("alert")).to_contain_text("another page")
-        expect(owner).to_have_value("Unsaved draft")
-        row.get_by_role("button", name="Discard edits and reload", exact=True).click()
+        page.get_by_role("button", name="Discard edits and reload", exact=True).click()
         expect(owner).to_have_value("Other page")
-        self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
-        self.assertEqual(page.evaluate("getComputedStyle(document.body).backgroundColor"), "rgb(255, 255, 255)")
-        page.reload()
-        row.locator("summary").click()
-        expect(owner).to_have_value("Other page")
-        self.assertEqual(failures, [])
+        self.fits()
+        self.assertEqual(self.failures, [])
 
 
 @unittest.skipUnless(sync_playwright, "Install Playwright and Chromium to run the browser regression")
@@ -120,7 +184,7 @@ class ReportPageBrowserTests(unittest.TestCase):
         self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
         self.assertEqual(self.errors, [])
 
-    def test_served_report_edits_saves_and_reloads_without_collection_navigation(self):
+    def test_served_report_edits_saves_and_reloads_in_place(self):
         report = document()
         identifier = register(report, render(report), workspace="/project", root=self.root / "inbox", viewer_url=self.origin)
         self.page.goto(self.origin + "/reports/" + identifier)
@@ -130,7 +194,6 @@ class ReportPageBrowserTests(unittest.TestCase):
         self.assertEqual(response["values"], {"owner": "Report release manager", "limit": 0, "proceed": False})
         self.page.reload()
         expect(self.page.locator('input[name="owner"]')).to_have_value("Report release manager")
-        self.assertEqual(self.page.evaluate("getComputedStyle(document.body).backgroundColor"), "rgb(255, 255, 255)")
 
     def test_portable_file_saves_to_agent_store_and_preserves_failed_input(self):
         source = self.root / "source.json"
