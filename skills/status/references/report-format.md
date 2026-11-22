@@ -22,7 +22,7 @@ produce an error, not silent loss. Put additional subject matter in a section,
 notice, or summary. This structural format is **never a reason to omit information**.
 
 Retain sources and observation times where available. `freshness_minutes` marks
-old data "Last known: refresh needed" relative to generation time, or
+old data "Stale" relative to generation time, or
 "Observation time unknown" without a timestamp. Fresh snapshots may contain old events: use the snapshot's
 time for freshness and the event time in the value or detail. The file does not
 refresh its observations; response fields retrieve and save answers separately.

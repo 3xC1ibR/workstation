@@ -118,9 +118,14 @@ def render(document, connection=None, *, page=None):
     generated = timestamp(document["generated_at"])
     zone = ZoneInfo(document.get("timezone", "UTC"))
 
-    def time_text(value):
+    def time_text(value, full=True):
         local = timestamp(value).astimezone(zone)
-        return f"{local:%b} {local.day}, {local.year}, {local.hour % 12 or 12}:{local:%M} {local:%p} {local:%Z}"
+        clock = f"{local.hour % 12 or 12}:{local:%M} {local:%p}"
+        if full:
+            return f"{local:%b} {local.day}, {local.year}, {clock} {local:%Z}"
+        # Inside the report the header already states the year and timezone.
+        year = "" if local.year == generated.astimezone(zone).year else f", {local.year}"
+        return f"{local:%b} {local.day}{year}, {clock}"
 
     def provenance(record):
         parts = []
@@ -128,7 +133,7 @@ def render(document, connection=None, *, page=None):
             parts.append(escape(record["source"]))
         observed = record.get("observed_at")
         if observed:
-            parts.append("Observed " + escape(time_text(observed)))
+            parts.append(escape(time_text(observed, full=False)))
         state = ""
         if "freshness_minutes" in record:
             if not observed:
@@ -136,12 +141,12 @@ def render(document, connection=None, *, page=None):
             else:
                 age = (generated - timestamp(observed)).total_seconds()
                 if age < -60:
-                    state = "Observation time ahead of report: verify clock"
+                    state = "Observed after the report: verify clock"
                 elif age > record["freshness_minutes"] * 60:
-                    state = "Last known: refresh needed"
+                    state = "Stale"
         if state:
             parts.append(f'<span class="freshness">{escape(state)}</span>')
-        return '<div class="provenance">' + " · ".join(parts).replace(' · <span class="freshness">', ' <span class="freshness">') + "</div>" if parts else ""
+        return '<div class="provenance">' + " · ".join(parts) + "</div>" if parts else ""
 
     def table(section):
         if "columns" not in section:
@@ -180,7 +185,7 @@ def render(document, connection=None, *, page=None):
               f'<title>{escape(document["title"])}</title>{head}</head><body><main>',
               page["navigation"] if page else "",
               f'<article class="sheet"><header class="sheet-header"><h1>{escape(document["title"])}</h1>{subject}'
-              f'<p class="sheet-meta">Observations assembled {escape(time_text(document["generated_at"]))}. '
+              f'<p class="sheet-meta">Observations assembled {escape(time_text(document["generated_at"]))}; times below use this timezone. '
               f'This report does not refresh them.</p></header>']
     output.append(f'<p class="assessment text">{escape(document["summary"])}</p>')
     for notice in document.get("notices", []):
@@ -190,7 +195,8 @@ def render(document, connection=None, *, page=None):
         for metric in document["metrics"]:
             detail = f'<dd class="detail text">{escape(metric["detail"])}</dd>' if metric.get("detail") else ""
             source = f'<dd>{provenance(metric)}</dd>' if provenance(metric) else ""
-            output.append(f'<div class="metric"><dt>{escape(metric["label"])}</dt><dd class="value">{escape(metric["value"])}</dd>{detail}{source}</div>')
+            size = " value-long" if metric["value"] and len(metric["value"]) > 16 else ""
+            output.append(f'<div class="metric"><dt>{escape(metric["label"])}</dt><dd class="value{size}">{escape(metric["value"])}</dd>{detail}{source}</div>')
         output.append('</dl>')
     if document.get("response_fields"):
         output.append('<section id="status-response-fields"><h2 class="section-heading">Your responses</h2>'

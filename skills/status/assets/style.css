@@ -32,7 +32,7 @@ code, pre { font: .92em/var(--line) var(--mono); overflow-wrap: anywhere; }
 .detail { font-size: var(--meta); color: var(--ink-secondary); }
 .freshness { color: var(--attention); }
 .metric .provenance { color: var(--ink-tertiary); margin-top: var(--space-1); }
-.metric .freshness { display: block; }
+.value-long { font-size: var(--lead); }
 .sheet section, .sheet details { margin-top: var(--space-5); }
 .section-heading { padding-bottom: var(--space-2); margin-bottom: var(--space-3); border-bottom: var(--stroke) solid var(--rule); }
 .sheet section > .text, .sheet details > .text { max-width: var(--measure); font-size: var(--reading); line-height: var(--line-reading); }

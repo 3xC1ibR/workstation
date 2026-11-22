@@ -35,7 +35,7 @@ class ReportTests(unittest.TestCase):
         document["metrics"] = [{"label": "Result", "value": "Passed", "observed_at": "2026-10-28T05:00:00Z", "freshness_minutes": 15},
                                {"label": "Unknown result", "value": None, "freshness_minutes": 15}]
         output = render(document)
-        self.assertIn("Last known: refresh needed", output)
+        self.assertIn('<span class="freshness">Stale</span>', output)
         self.assertIn("Observation time unknown", output)
         self.assertIn("Unknown", output)
 

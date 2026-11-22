@@ -104,10 +104,12 @@ def delivery_page(base, delivery, body):
     recommendation = (f'<p class="recommendation"><strong>Recommended:</strong> {escape(delivery["recommended_default"])}</p>'
                       if delivery.get("recommended_default") else "")
     question = f'<p class="decision-question">{escape(decision["question"])}</p>' if decision else ""
-    links = "".join(link_item(link, base, delivery) for link in delivery.get("links", []))
-    attachments = "".join(
+    linked = {Path(link["target"]).name for link in delivery.get("links", [])} & set(delivery["attachments"])
+    references = "".join(link_item(link, base, delivery) for link in delivery.get("links", [])) + "".join(
         f'<li><a href="{escape(base)}/deliveries/{delivery["id"]}/attachments/{index}">{escape(name)}</a></li>'
-        for index, name in enumerate(delivery["attachments"]))
+        for index, name in enumerate(delivery["attachments"]) if name not in linked)       # a linked attachment is listed once
+    heading = ("Links and attachments" if delivery["attachments"] and delivery.get("links")
+               else "Attachments" if delivery["attachments"] else "Links")
     content = (
         f'<nav class="page-navigation" aria-label="Delivery"><a class="back-link" href="{escape(base)}/">Review</a></nav>'
         f'<article class="sheet delivery"><header class="sheet-header"><h1>{escape(delivery["title"])}</h1>'
@@ -115,9 +117,8 @@ def delivery_page(base, delivery, body):
         f'<p class="assessment text">{escape(delivery["summary"])}</p>'
         f'<section class="decision-panel" aria-label="Your response">{recommendation}{question}'
         f'<div id="delivery-response"><noscript><p class="note">Enable JavaScript to respond to this delivery.</p></noscript></div></section>'
-        + (f'<section><h2 class="section-heading">Links</h2><ul class="link-list">{links}</ul></section>' if links else "")
         + (f'<section class="document">{markdown_text.render(body, delivery_resolver(base, delivery))}</section>' if body else "")
-        + (f'<section><h2 class="section-heading">Attachments</h2><ul class="link-list">{attachments}</ul></section>' if attachments else "")
+        + (f'<section><h2 class="section-heading">{heading}</h2><ul class="link-list">{references}</ul></section>' if references else "")
         + '</article>')
     return document(delivery["title"], base, content, ("controls.js", "delivery.js"), {"delivery": delivery})
 

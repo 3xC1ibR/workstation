@@ -21,6 +21,7 @@
 
   function row({key, state, closed, href, external, title, summary, recommendation, meta, at, actions}) {
     const item = make("li", null, "row"); item.dataset.key = key; item.dataset.state = state; item.dataset.closed = String(Boolean(closed));
+    item.dataset.kind = key.split("-")[0];
     const main = make("div", null, "row-main"), link = make("a", title, "row-title");
     link.href = href;
     if (state === "unread") link.setAttribute("aria-label", "Unread: " + title);
@@ -114,7 +115,7 @@
     element("review-counts").textContent = [
       review.asks.asks.length ? plural(review.asks.asks.length, "ask") + (blocking ? ` (${blocking} blocking)` : "") : null,
       awaiting ? plural(awaiting, "delivery", "deliveries") + " to review" : null,
-      updated ? plural(updated, "operation") + " updated" : null].filter(Boolean).join(" · ") || (review.asks.available ? "Nothing is waiting for you" : "");
+      updated ? plural(updated, "operation") + " unread" : null].filter(Boolean).join(" · ") || (review.asks.available ? "Nothing is waiting for you" : "");
     element("review-search").hidden = !review.deliveries.length && !review.operations.length && !review.asks.asks.length;
     const empty = element("review-empty");
     empty.hidden = shown > 0;
