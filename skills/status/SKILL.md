@@ -1,6 +1,6 @@
 ---
 name: status
-description: Produce evidence-backed status sheets with configurable agent coverage and interactive response fields. Users save answers in the local Status collection; agents retrieve them as JSON. Use for progress reports, operational briefings, status questionnaires, reading saved responses, or configuring future reports. Include material information beyond configured questions. Not a replacement for narrow git status or architecture drawings.
+description: Produce evidence-backed status sheets with configurable agent coverage and interactive response fields. Users edit and save answers directly in the report page; agents retrieve them as JSON. Use for progress reports, operational briefings, status questionnaires, reading saved responses, or configuring future reports. Include material information beyond configured questions. Not a replacement for narrow git status or architecture drawings.
 ---
 
 # Status
@@ -104,7 +104,8 @@ Do not add the viewer to another application or publish reports to a remote
 service unless the user requests that integration.
 
 Use the bundled renderer so content can change without design drift. It produces
-an offline snapshot; reloading the HTML does not retrieve fresh data. Verify
+an observation snapshot; reloading does not refresh project observations. Response
+fields retrieve their latest saved answers independently. Verify
 timestamps and coverage, open the result, and inspect desktop and narrow layouts.
 For template changes, read the interface-design skill and check expanded details,
 empty data, long text, and keyboard focus too.
@@ -117,10 +118,11 @@ see [references/responses.md](references/responses.md) for the schema and workfl
 These are questions for the user, distinct from profile questions the agent
 answers. Keep decision-changing context visible in the report.
 
-The user expands **Responses** on that report's row in the Status collection,
-edits the fields, and chooses **Save responses**. Answers persist outside the
-report snapshot, survive viewer restarts and dismissal, and are available to
-agents without a running viewer:
+The user edits the fields and chooses **Save responses directly in the open
+report page**, including its portable HTML file. Do not send the user to the
+collection to answer. The collection also offers the same editor. Answers persist
+outside the report snapshot, survive viewer restarts and dismissal, and are
+available to agents without a running viewer:
 
 ```sh
 python3 -B <skill-directory>/scripts/read_responses.py --report <inbox-receipt-id>
@@ -133,8 +135,11 @@ user with their save time, and distinguish unanswered fields from false or zero.
 Answers belong to one report and are not automatically copied to a later one.
 Saving makes answers available; it does not wake an agent, authorize unrelated
 actions, or create scheduled polling. Follow the existing task authorization.
-Portable HTML remains a readable snapshot; saving answers requires the local
-collection. Reports and answers on different machines need an authorized shared
+The local Status service must be running to save from the page. For reports with
+questions, start or verify that service before delivery; use `--viewer-url` when
+its port differs from the default. Portable HTML contains access restricted to
+that report's answers and stays readable while the service is stopped; a failed
+save retains input and never claims success. Reports and answers on different machines need an authorized shared
 collection or transfer, as described in the inbox reference.
 
 Deliver the artifact link and principal finding or next action. Include material

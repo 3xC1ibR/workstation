@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
-"""Validate a status document and build one offline HTML engineering sheet."""
+"""Validate a status document and build a portable HTML sheet with in-page responses."""
 from __future__ import annotations
 
 import argparse
+import base64
 from datetime import datetime
 import html
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -89,7 +91,21 @@ def escape(value):
     return html.escape("Unknown" if value is None else str(value), quote=True)
 
 
-def render(document):
+def response_script(document, connection):
+    assets = Path(__file__).resolve().parents[1] / "assets"
+    configuration = json.dumps({"fields": document["response_fields"], "connection": connection}, ensure_ascii=True).replace("<", "\\u003c")
+    return ("(() => {\nconst configuration = " + configuration + ";\n" +
+            "\n".join((assets / name).read_text() for name in ("controls.js", "responses.js", "report.js")) + "\n})();")
+
+
+def response_policy(document, connection):
+    digest = base64.b64encode(hashlib.sha256(response_script(document, connection).encode()).digest()).decode()
+    origin = " ".join(["'self'"] + ([urlsplit(connection["url"]).scheme + "://" + urlsplit(connection["url"]).netloc] if connection else []))
+    return (f"default-src 'none'; script-src 'sha256-{digest}'; style-src 'unsafe-inline'; img-src data:; "
+            f"connect-src {origin}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
+
+
+def render(document, connection=None):
     validate(document)
     generated = timestamp(document["generated_at"])
     zone = ZoneInfo(document.get("timezone", "UTC"))
@@ -138,6 +154,8 @@ def render(document):
         return f"<code>{escape(location)}</code>"
 
     style = (Path(__file__).resolve().parents[1] / "assets/style.css").read_text()
+    if document.get("response_fields"):
+        style += "\n" + (Path(__file__).resolve().parents[1] / "assets/inbox.css").read_text()
     subject = f'<p class="subject">{escape(document["subject"])}</p>'
     if len(document["subject"]) > 100:
         subject = (f'<details class="subject-details"><summary>{escape(document["subject"][:60])}… — expand subject</summary>'
@@ -146,7 +164,7 @@ def render(document):
               f'<meta name="viewport" content="width=device-width, initial-scale=1">'
               f'<title>{escape(document["title"])}</title><style>{style}</style></head><body><main>',
               f'<header><div><h1>{escape(document["title"])}</h1>{subject}</div>'
-              f'<p class="meta">STATUS SHEET<br>Generated {escape(time_text(document["generated_at"]))}<br>Offline snapshot</p></header>']
+              f'<p class="meta">STATUS SHEET<br>Generated {escape(time_text(document["generated_at"]))}<br>Observation snapshot</p></header>']
     for notice in document.get("notices", []):
         output.append(f'<aside class="notice"><h2>{escape(notice["title"])}</h2><p class="text">{escape(notice["text"])}</p></aside>')
     output.append(f'<p class="assessment text">{escape(document["summary"])}</p>')
@@ -159,15 +177,14 @@ def render(document):
     number = 0
     if document.get("response_fields"):
         number += 1
-        output.append(f'<section><h2 class="section-heading"><span class="reference">{number:02d}</span>Responses</h2>'
-                      '<p class="text">Open this report’s Responses in the Status collection to save answers for the agent. '
-                      'This portable snapshot does not save input.</p><dl class="response-questions">')
+        output.append(f'<section id="status-response-fields"><h2 class="section-heading"><span class="reference">{number:02d}</span>Responses</h2>'
+                      '<noscript><p>Enable JavaScript to edit and save responses in this page.</p><dl class="response-questions">')
         for field in document["response_fields"]:
             output.append(f'<dt>{escape(field["label"])}{" · Required" if field.get("required") else ""}</dt>'
                           f'<dd class="text">{escape(field.get("help", ""))}</dd>')
             if field["type"] == "choice":
                 output.append(f'<dd class="text">Choices: {escape(" / ".join(field["options"]))}</dd>')
-        output.append('</dl></section>')
+        output.append('</dl></noscript></section>')
     if document.get("actions"):
         number += 1
         output.append(f'<section><h2 class="section-heading"><span class="reference">{number:02d}</span>Next actions</h2><ol class="actions">')
@@ -190,7 +207,10 @@ def render(document):
         for source in document["sources"]:
             output.append(f'<div class="source"><p>{escape(source["label"])}</p>{source_link(source["location"])}{provenance(source)}</div>')
         output.append('</details>')
-    output.append('<footer><span>STATUS / ENGINEERING RECORD</span><span>Source observation times govern freshness.</span></footer></main></body></html>')
+    output.append('<footer><span>STATUS / ENGINEERING RECORD</span><span>Source observation times govern freshness.</span></footer></main>')
+    if document.get("response_fields"):
+        output.append('<script>' + response_script(document, connection) + '</script>')
+    output.append('</body></html>')
     return "\n".join(output)
 
 
@@ -203,6 +223,7 @@ def main():
     parser.add_argument("--provider", help="Producing provider, when known")
     parser.add_argument("--thread-id", default=os.environ.get("AGENT_COORD_SESSION_ID") or os.environ.get("CODEX_THREAD_ID"))
     parser.add_argument("--no-register", action="store_true", help="Build a preview or test fixture without adding it to the inbox")
+    parser.add_argument("--viewer-url", default=os.environ.get("AGENT_STATUS_URL", "http://127.0.0.1:8766"), help="Local Status service used by the portable page's response editor")
     args = parser.parse_args()
     try:
         document = json.loads(args.document.read_text(encoding="utf-8"))
@@ -215,7 +236,12 @@ def main():
     if not args.no_register:
         from register_status import register
         identifier = register(document, result, workspace=args.workspace, agent=args.agent,
-                              provider=args.provider, thread_id=args.thread_id)
+                              provider=args.provider, thread_id=args.thread_id, viewer_url=args.viewer_url)
+        if document.get("response_fields"):
+            from response_access import connection
+            from register_status import inbox_directory
+            result = render(document, connection(inbox_directory(), identifier, args.viewer_url))
+            args.output.write_text(result, encoding="utf-8")
         print(f"Status inbox receipt: {identifier}")
 
 

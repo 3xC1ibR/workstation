@@ -112,6 +112,21 @@ class StatusReports:
         except (ValueError, AttributeError) as error:
             raise StatusError("The report's response fields cannot be read.") from error
 
+    def interactive_content(self, identifier, viewer_url):
+        """Render interactive reports from validated JSON, never arbitrary saved HTML."""
+        manifest = self._manifest(identifier)
+        if not manifest.get("response_field_count"):
+            return self.content(identifier), REPORT_CSP
+        from build_status import render, response_policy, validate
+        from response_access import connection
+        try:
+            document = json.loads(self._read(self._directory(identifier) / "report.json", 8 * 1024 * 1024))
+            validate(document)
+            access = connection(self.root, identifier, viewer_url)
+            return render(document, access), response_policy(document, access)
+        except (ValueError, KeyError) as error:
+            raise StatusError("The interactive report cannot be read.") from error
+
     def responses(self, identifier):
         manifest = self._manifest(identifier)
         fields = self.response_fields(identifier)

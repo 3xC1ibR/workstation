@@ -36,6 +36,7 @@ button:disabled { color: var(--secondary); cursor: wait; }
 .response-field label { font-weight: 600; overflow-wrap: anywhere; }
 .response-field .collection-picker-trigger span { white-space: normal; overflow-wrap: anywhere; }
 .response-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); margin-top: var(--space-4); }
+.response-editor [role="status"] { margin-top: var(--space-3); }
 @media (max-width: 600px) {
   .collection-filter { flex: 1 1 40%; }
   #report-project-options { left: auto; width: calc(100vw - 2 * var(--space-4)); max-width: var(--text-column-width); }
@@ -45,6 +46,6 @@ button:disabled { color: var(--secondary); cursor: wait; }
   .collection-action { grid-column: 2; justify-self: start; margin-top: var(--space-3); }
 }
 @media print {
-  .collection-controls, .collection-feedback, .collection-action { display: none; }
+  .collection-controls, .collection-feedback, .collection-action, .response-actions { display: none; }
   .collection-row { break-inside: avoid; }
 }

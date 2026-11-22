@@ -9,12 +9,13 @@ it back. Future reports from the same agent still appear.
 The viewer has no Ribbon Field dependency. Existing standalone reports remain
 portable HTML files, readable and printable without a running viewer.
 
-Reports can also include agent-defined response fields. Expand **Responses** in
-a report's collection row, fill the fields, and choose **Save responses**. Saved
+Reports can also include agent-defined response fields. Fill the fields and
+choose **Save responses directly in the report page**. The collection row's
+Responses disclosure offers the same editor as a convenience. Saved
 answers are available to the agent on its next retrieval and can be edited later.
 They survive dismissal and viewer restarts. See [responses.md](responses.md) for
 agent commands and the field contract. Portable snapshots display the questions;
-the local collection saves the answers.
+the local Status service saves the answers from either page.
 
 ## Open the collection
 
@@ -92,7 +93,9 @@ is never changed by report generation. Previous inbox records remain compatible.
 Optional manifest `response_field_count` enables the response editor. Answers are
 stored separately in `responses/<sha256>.json` with a revision and save time.
 
-Only registered reports are served. Report HTML cannot execute scripts or make
-network requests; native evidence disclosures and explicit source links work.
+Only registered reports are served. Reports with response fields are rendered
+from validated JSON and run only the trusted response client. Other retained HTML
+remains sandboxed without script or network access. Evidence disclosures and
+explicit source links work.
 The page refreshes its collection; individual reports retain their recorded
 observation times.

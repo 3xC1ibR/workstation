@@ -16,6 +16,7 @@ import urllib.request
 from urllib.parse import urlsplit
 
 from register_status import inbox_directory
+from response_access import response_key
 from status_store import REPORT_CSP, ResponseConflict, StatusError, StatusReports
 
 ASSETS = Path(__file__).resolve().parents[1] / "assets"
@@ -40,7 +41,7 @@ def make_server(root, port=DEFAULT_PORT):
             if arguments and str(arguments[1] if len(arguments) > 1 else "").startswith(("4", "5")):
                 super().log_message(message, *arguments)
 
-        def send(self, status, content, content_type="application/json", *, policy=PAGE_CSP):
+        def send(self, status, content, content_type="application/json", *, policy=PAGE_CSP, cors=False):
             if not isinstance(content, bytes):
                 content = json.dumps(content, ensure_ascii=False).encode("utf-8")
             self.send_response(status)
@@ -52,12 +53,37 @@ def make_server(root, port=DEFAULT_PORT):
             self.send_header("X-Frame-Options", "DENY")
             self.send_header("Cross-Origin-Resource-Policy", "same-origin")
             self.send_header("Referrer-Policy", "no-referrer")
+            if cors and self.headers.get("Origin"):
+                self.send_header("Access-Control-Allow-Origin", self.headers["Origin"])
+                self.send_header("Vary", "Origin")
+                self.send_header("Access-Control-Allow-Methods", "GET, POST")
+                self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Status-Report-Token")
             self.end_headers()
             self.wfile.write(content)
 
         def local_request(self):
             hosts = {f"127.0.0.1:{self.server.server_port}", f"localhost:{self.server.server_port}"}
             return self.headers.get("Host") in hosts
+
+        def report_access(self, identifier):
+            try:
+                reports._manifest(identifier)
+                key = response_key(reports.root, identifier)
+                return secrets.compare_digest(self.headers.get("X-Status-Report-Token", ""), key)
+            except (ValueError, OSError):
+                return False
+
+        def do_OPTIONS(self):
+            path = urlsplit(self.path).path
+            if not self.local_request() or not path.startswith("/api/report-responses/"):
+                self.send(403, {"error": "This action does not support cross-origin access."})
+                return
+            try:
+                reports._manifest(path.removeprefix("/api/report-responses/"))
+            except StatusError:
+                self.send(404, {"error": "This report is unavailable."}, cors=True)
+                return
+            self.send(204, b"", cors=True)
 
         def do_GET(self):
             if not self.local_request():
@@ -66,57 +92,68 @@ def make_server(root, port=DEFAULT_PORT):
             path = urlsplit(self.path).path
             assets = {"/": ("inbox.html", "text/html"), "/style.css": ("style.css", "text/css"),
                       "/inbox.css": ("inbox.css", "text/css"), "/inbox.js": ("inbox.js", "text/javascript"),
-                      "/responses.js": ("responses.js", "text/javascript")}
+                      "/responses.js": ("responses.js", "text/javascript"), "/controls.js": ("controls.js", "text/javascript")}
+            cors = path.startswith("/api/report-responses/")
             try:
                 if path in assets:
                     name, content_type = assets[path]
                     self.send(200, (ASSETS / name).read_bytes(), content_type)
                 elif path == "/health":
-                    self.send(200, {"service": SERVICE, "version": 2, "inbox": str(reports.root)})
+                    self.send(200, {"service": SERVICE, "version": 3, "inbox": str(reports.root)})
                 elif path == "/api/config":
                     self.send(200, {"token": token})
                 elif path == "/api/reports":
                     self.send(200, reports.list())
                 elif path.startswith("/api/responses/"):
                     self.send(200, reports.responses(path.removeprefix("/api/responses/")))
+                elif cors:
+                    identifier = path.removeprefix("/api/report-responses/")
+                    if not self.report_access(identifier):
+                        self.send(403, {"error": "This page does not have access to this report's responses."}, cors=True)
+                        return
+                    self.send(200, reports.responses(identifier), cors=True)
                 elif path.startswith("/reports/"):
-                    self.send(200, reports.content(path.removeprefix("/reports/")).encode("utf-8"), "text/html", policy=REPORT_CSP)
+                    content, policy = reports.interactive_content(path.removeprefix("/reports/"), "http://" + self.headers["Host"])
+                    self.send(200, content.encode("utf-8"), "text/html", policy=policy)
                 else:
                     self.send(404, {"error": "This page does not exist."})
             except StatusError as error:
-                self.send(404, {"error": str(error)})
+                self.send(404, {"error": str(error)}, cors=cors)
             except OSError:
-                self.send(503, {"error": "Status storage is unavailable. Try Refresh."})
+                self.send(503, {"error": "Status storage is unavailable. Try Refresh."}, cors=cors)
 
         def do_POST(self):
-            origin = "http://" + self.headers.get("Host", "")
-            if (not self.local_request() or self.headers.get("Origin") != origin or
-                    not secrets.compare_digest(self.headers.get("X-Status-Token", ""), token)):
-                self.send(403, {"error": "Refresh the Status page before changing a report."})
-                return
             path = urlsplit(self.path).path
-            if path not in {"/api/dismiss", "/api/responses"}:
+            cors = path.startswith("/api/report-responses/")
+            identifier = path.removeprefix("/api/report-responses/") if cors else None
+            origin = "http://" + self.headers.get("Host", "")
+            authorized = self.report_access(identifier) if cors else (
+                self.headers.get("Origin") == origin and secrets.compare_digest(self.headers.get("X-Status-Token", ""), token))
+            if not self.local_request() or not authorized:
+                self.send(403, {"error": "Refresh the Status page before changing a report."}, cors=cors)
+                return
+            if not cors and path not in {"/api/dismiss", "/api/responses"}:
                 self.send(404, {"error": "This action does not exist."})
                 return
             try:
                 length = int(self.headers.get("Content-Length", "0"))
-                maximum = 4 * 1024 * 1024 if path == "/api/responses" else 4096
+                maximum = 4 * 1024 * 1024 if cors or path == "/api/responses" else 4096
                 if not 0 < length <= maximum or self.headers.get("Content-Type", "").split(";")[0] != "application/json":
                     raise ValueError("Expected a JSON request within the size limit.")
                 body = json.loads(self.rfile.read(length))
-                expected = {"id", "revision", "values"} if path == "/api/responses" else {"id", "dismissed"}
+                expected = {"revision", "values"} if cors else {"id", "revision", "values"} if path == "/api/responses" else {"id", "dismissed"}
                 if not isinstance(body, dict) or set(body) != expected:
                     raise ValueError("Choose a report and provide the expected action fields.")
-                if path == "/api/responses":
-                    self.send(200, reports.save_responses(body["id"], body["values"], body["revision"]))
+                if cors or path == "/api/responses":
+                    self.send(200, reports.save_responses(identifier if cors else body["id"], body["values"], body["revision"]), cors=cors)
                 else:
                     self.send(200, reports.dismiss(body["id"], body["dismissed"]))
             except ResponseConflict as error:
-                self.send(409, {"error": str(error)})
+                self.send(409, {"error": str(error)}, cors=cors)
             except (ValueError, UnicodeError) as error:
-                self.send(400, {"error": str(error)})
+                self.send(400, {"error": str(error)}, cors=cors)
             except OSError:
-                self.send(503, {"error": "The report could not be updated. Try again."})
+                self.send(503, {"error": "The report could not be updated. Try again."}, cors=cors)
 
     return ThreadingHTTPServer(("127.0.0.1", port), Handler)
 
@@ -133,7 +170,7 @@ def inspect_service(root, port):
         raise ValueError(f"Port {port} does not contain a Status service.") from error
     if value.get("service") != SERVICE or value.get("inbox") != str(root):
         raise ValueError(f"Port {port} belongs to another service or inbox; select a different --port.")
-    if value.get("version", 1) < 2:
+    if value.get("version", 1) < 3:
         raise ValueError("The running Status viewer needs a restart for response fields. Run install for its login service, or restart its serve process.")
     return True
 

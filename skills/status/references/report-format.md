@@ -23,7 +23,8 @@ Retain sources and observation times where available. `freshness_minutes` marks
 old data `LAST KNOWN` relative to generation time, or `OBSERVATION TIME UNKNOWN`
 without a timestamp. Fresh snapshots may contain old events: use the snapshot's
 time for freshness and the event time in the value or detail. The file does not
-update itself; the title block shows when it was generated.
+refresh its observations; response fields retrieve and save answers separately.
+The title block shows when observations were assembled.
 
 Illustrative example, not operational data:
 

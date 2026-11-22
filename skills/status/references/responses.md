@@ -16,8 +16,11 @@ Agents declare questions in a report's optional `response_fields` list:
 The fragment belongs alongside `title`, `subject`, `summary`, and other report
 content. Build normally with `build_status.py` and retain its inbox receipt ID.
 Use the actual workspace and agent metadata so later queries can find answers.
-When delivering a report with questions, link the local Status collection as
-well as the portable sheet, and tell the user to expand that report's Responses.
+When delivering a report with questions, link the report itself. Its fields and
+Save responses control work directly in that page, including when the HTML file
+is opened locally. Start or verify the local Status service before delivery.
+Use `--viewer-url http://127.0.0.1:<port>` (or `AGENT_STATUS_URL`) if it uses another
+port. Preview builds using `--no-register` display fields but cannot save answers.
 
 ## Field contract
 
@@ -81,8 +84,27 @@ The local viewer exposes `GET /api/responses/<report-id>` and
 `POST /api/responses` with `{id, revision, values}`. Writes require the same local
 Origin and `X-Status-Token` protection as dismissal. A stale revision returns
 HTTP 409. Read-only retrieval through the CLI is the usual agent interface.
-Report HTML keeps its script-free sandbox; trusted collection controls perform
-the save. An offline copy cannot save or display later answers.
+Registered report pages include the shared response editor. The service renders
+interactive reports from validated JSON and allows only the exact trusted client
+script through its content policy; arbitrary retained HTML remains sandboxed.
+Observations retain their recorded timestamps while answers load their current
+revision. Older registered reports gain the editor on refresh. Rebuild an older
+portable file from its original JSON without changing its observation times to
+give that file the editor and response connection.
+
+Portable files contain a random access key restricted to one report. It is stored
+under `<inbox>/response-keys/` outside the skill repository. The separate
+`/api/report-responses/<report-id>` route requires `X-Status-Report-Token` on both
+reads and writes, supports cross-origin local-file requests, and accepts only
+`{revision, values}` on save. A key cannot update another report, dismiss reports,
+or access the collection API. Do not publish a connected private report publicly.
+This service remains bound to loopback; another machine's localhost is not the
+collection host. The usual agent retrieval remains local and read-only.
+
+If the service is stopped or unreachable, the report still displays its questions
+and editable fields. Failed saves retain input and report the failure; they do not
+silently store browser-only answers that the agent cannot read. Restart the local
+service and retry. Leaving with unsaved input uses the browser's normal guard.
 
 After updating the skill, reload a running viewer: `status_server.py install`
 restarts its existing macOS login service; otherwise restart its specific `serve`

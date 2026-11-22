@@ -1,5 +1,8 @@
 """Optional real-browser regression test; run with Playwright and Chromium installed."""
 from pathlib import Path
+import json
+import os
+import subprocess
 import sys
 import tempfile
 import threading
@@ -80,6 +83,77 @@ class ResponseBrowserTests(unittest.TestCase):
         row.locator("summary").click()
         expect(owner).to_have_value("Other page")
         self.assertEqual(failures, [])
+
+
+@unittest.skipUnless(sync_playwright, "Install Playwright and Chromium to run the browser regression")
+class ReportPageBrowserTests(unittest.TestCase):
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root = Path(temporary.name)
+        self.server = make_server(self.root / "inbox", 0)
+        worker = threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": .01}, daemon=True)
+        worker.start()
+        self.addCleanup(worker.join, 2)
+        self.addCleanup(self.server.server_close)
+        self.addCleanup(self.server.shutdown)
+        driver = sync_playwright().start()
+        self.addCleanup(driver.stop)
+        self.browser = driver.chromium.launch()
+        self.addCleanup(self.browser.close)
+        self.page = self.browser.new_page(viewport={"width": 390, "height": 844}, color_scheme="dark")
+        self.origin = f"http://127.0.0.1:{self.server.server_port}"
+        self.errors = []
+        self.page.on("pageerror", lambda error: self.errors.append(str(error)))
+
+    def save_in_page(self, owner):
+        page = self.page
+        expect(page.locator('input[name="owner"]')).to_be_visible()
+        expect(page.locator('.response-editor [role="status"]')).not_to_contain_text("Loading")
+        page.locator('input[name="owner"]').fill(owner)
+        page.locator('input[name="limit"]').fill("0")
+        proceed = page.get_by_role("combobox", name="Proceed?")
+        proceed.press("End")
+        proceed.press("Enter")
+        page.get_by_role("button", name="Save responses", exact=True).click()
+        expect(page.locator('.response-editor [role="status"]')).to_contain_text("The agent can read")
+        self.assertTrue(page.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+        self.assertEqual(self.errors, [])
+
+    def test_served_report_edits_saves_and_reloads_without_collection_navigation(self):
+        report = document()
+        identifier = register(report, render(report), workspace="/project", root=self.root / "inbox", viewer_url=self.origin)
+        self.page.goto(self.origin + "/reports/" + identifier)
+        self.save_in_page("Report release manager")
+        self.assertEqual(self.page.url, self.origin + "/reports/" + identifier)
+        response = StatusReports(self.root / "inbox").responses(identifier)
+        self.assertEqual(response["values"], {"owner": "Report release manager", "limit": 0, "proceed": False})
+        self.page.reload()
+        expect(self.page.locator('input[name="owner"]')).to_have_value("Report release manager")
+        self.assertEqual(self.page.evaluate("getComputedStyle(document.body).backgroundColor"), "rgb(255, 255, 255)")
+
+    def test_portable_file_saves_to_agent_store_and_preserves_failed_input(self):
+        source = self.root / "source.json"
+        source.write_text(json.dumps(document()))
+        output = self.root / "report.html"
+        scripts = Path(__file__).resolve().parents[1] / "scripts"
+        receipt = subprocess.check_output([sys.executable, "-B", str(scripts / "build_status.py"), str(source),
+            "--output", str(output), "--viewer-url", self.origin, "--workspace", "/project"], text=True,
+            env={**os.environ, "AGENT_STATUS_INBOX": str(self.root / "inbox")})
+        identifier = receipt.split("Status inbox receipt: ")[1].splitlines()[0]
+        self.page.goto(output.as_uri())
+        self.save_in_page("Portable release manager")
+        command = [sys.executable, "-B", str(scripts / "read_responses.py"), "--inbox", str(self.root / "inbox"), "--report", identifier]
+        answers = json.loads(subprocess.check_output(command, text=True))["responses"][0]
+        self.assertEqual(answers["values"]["owner"], "Portable release manager")
+        self.page.reload()
+        expect(self.page.locator('input[name="owner"]')).to_have_value("Portable release manager")
+        self.page.locator('input[name="owner"]').fill("Unsaved portable edit")
+        self.page.route("**/api/report-responses/*", lambda route: route.abort("failed"))
+        self.page.get_by_role("button", name="Save responses", exact=True).click()
+        expect(self.page.locator('.response-editor [role="alert"]')).to_contain_text("Could not reach")
+        expect(self.page.locator('input[name="owner"]')).to_have_value("Unsaved portable edit")
+        self.assertEqual(StatusReports(self.root / "inbox").responses(identifier)["values"]["owner"], "Portable release manager")
 
 
 if __name__ == "__main__":

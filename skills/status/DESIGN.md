@@ -20,9 +20,10 @@ Objects: report, subject, observation, source, notice, action, section, response
 field, saved response.
 Actions: read, expand supporting evidence, follow a source, print. The shared
 collection adds filter, dismiss, and restore; dismissal applies to one report.
-Agents may attach response fields to a report. The collection adds an inline
-Responses disclosure with labeled controls and Save responses. Saving records
-user input separately from observations; it does not execute the next action.
+Agents may attach response fields to a report. The report itself presents labeled
+controls and Save responses, including when opened from its portable HTML file.
+The collection offers the same editor as a convenience. Saving records user
+input separately from observations; it does not execute the next action.
 
 Opening hierarchy: subject and observation context; urgent notices; assessment;
 requested observations; next actions; supporting sections and sources. Arbitrary
@@ -71,6 +72,9 @@ Tab traversal, and outside-click dismissal. Options wrap on narrow screens.
 
 ## Decision record
 
+- 2026-11-22: Put editing and saving inside the open report. Portable files use
+  access restricted to their own report to reach the local answer store. Reuse
+  the existing response controls and protect unsaved input on failures.
 - 2026-11-21: Add report-specific response fields and durable user answers in the
   existing collection rows. Reuse the sheet's controls and filter pickers; keep
   portable snapshots inert, make save state explicit, and preserve unsaved input

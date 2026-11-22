@@ -1,7 +1,7 @@
 "use strict";
-// The report snapshot stays inert. These trusted controls belong to the collection.
-window.createStatusResponses = (report, {make, request, createPicker, pickers, time}) => {
-  const details = make("details", null, "response-editor");
+// Shared by the report itself and its optional collection editor.
+window.createStatusResponses = (report, {make, request, createPicker, pickers, time, expanded = false, initialState}) => {
+  const details = make(expanded ? "div" : "details", null, "response-editor");
   const summary = make("summary", `Responses · ${report.response_field_count} fields`);
   const status = make("p", "", "collection-note"), failure = make("p", "", "collection-error");
   status.setAttribute("role", "status"); failure.setAttribute("role", "alert"); failure.hidden = true;
@@ -10,7 +10,8 @@ window.createStatusResponses = (report, {make, request, createPicker, pickers, t
   const save = make("button", "Save responses"), reload = make("button", "Load saved responses");
   save.type = "submit"; reload.type = "button";
   actions.append(save, reload); fields.append(actions); form.append(fields);
-  details.append(summary, status, failure, form); form.hidden = true;
+  if (!expanded) details.append(summary);
+  details.append(status, failure, form); form.hidden = true;
   let state, loading = false;
   const controls = new Map();
   const showError = message => { failure.textContent = message; failure.hidden = !message; };
@@ -58,6 +59,7 @@ window.createStatusResponses = (report, {make, request, createPicker, pickers, t
       if (control.tagName === "SELECT") pickers.set(control.id, createPicker(control));
       control.addEventListener("input", markDirty);
     }
+    form.append(status, failure);
     form.hidden = false;
   }
   async function load() {
@@ -71,7 +73,11 @@ window.createStatusResponses = (report, {make, request, createPicker, pickers, t
       if (!state) { form.hidden = false; save.disabled = true; }
     } finally { loading = false; fields.disabled = false; if (state) save.disabled = false; }
   }
-  details.addEventListener("toggle", () => { if (details.open && !state) load(); });
+  if (expanded) queueMicrotask(() => {
+    if (initialState) { build(initialState); savedState(initialState); }
+    load();
+  });
+  else details.addEventListener("toggle", () => { if (details.open && !state) load(); });
   reload.onclick = load;
   form.onsubmit = async event => {
     event.preventDefault();

@@ -15,6 +15,7 @@ from build_status import render, validate
 from register_status import register
 from status_server import make_server
 from status_store import ResponseConflict, StatusError, StatusReports
+from response_access import response_key
 
 
 def document():
@@ -103,7 +104,7 @@ class ResponseTests(unittest.TestCase):
         failure = subprocess.run(command, capture_output=True, text=True)
         self.assertNotEqual(failure.returncode, 0)
 
-    def test_field_schema_rejects_ambiguous_definitions_and_snapshot_stays_inert(self):
+    def test_field_schema_rejects_ambiguous_definitions_and_escapes_report_content(self):
         for fields in ([{"id": "name", "label": "Name", "type": "unsupported"}],
                        [{"id": "../name", "label": "Name", "type": "text"}],
                        [{"id": "name", "label": "Name", "type": "choice", "options": ["A", "A"]}],
@@ -113,8 +114,11 @@ class ResponseTests(unittest.TestCase):
                 validate({**self.document, "response_fields": fields})
         snapshot = render(self.document)
         self.assertIn("Instructions &lt;agent&gt;", snapshot)
-        self.assertNotIn("<script", snapshot)
-        self.assertNotIn("<input", snapshot)
+        self.assertIn("status-response-fields", snapshot)
+        self.document["response_fields"][0]["label"] = '</script><script>window.compromised=true</script>'
+        snapshot = render(self.document)
+        self.assertEqual(snapshot.count("<script>"), 1)
+        self.assertEqual(snapshot.count("</script>"), 1)
 
     def test_http_save_requires_origin_token_and_revision(self):
         server = make_server(self.root, 0)
@@ -147,6 +151,32 @@ class ResponseTests(unittest.TestCase):
         self.assertEqual(request("/api/responses/../private")[0], 404)
         self.assertEqual(request("/responses.js")[0], 200)
         self.assertNotIn("allow-scripts", request("/reports/" + self.identifier)[1]["Content-Security-Policy"])
+
+        # Local-file pages use a separate key restricted to this report alone.
+        key = response_key(self.root, self.identifier)
+        portable = {"Origin": "null", "X-Status-Report-Token": key, "Content-Type": "application/json"}
+        endpoint = "/api/report-responses/" + self.identifier
+        status, metadata, content = request(endpoint, headers=portable)
+        self.assertEqual(status, 200)
+        self.assertEqual(metadata["Access-Control-Allow-Origin"], "null")
+        self.assertNotIn("token", json.loads(content))
+        self.assertEqual(request(endpoint, headers={"Origin": "null"})[0], 403)
+        self.assertEqual(request(endpoint, {"revision": 1, "values": {"proceed": True}}, portable)[0], 200)
+        self.assertEqual(request(endpoint, {"revision": 1, "values": {"proceed": False}}, portable)[0], 409)
+        other = {**self.document, "subject": "other-agent"}
+        other_id = register(other, render(other), workspace="/other", root=self.root)
+        self.assertEqual(request("/api/report-responses/" + other_id, headers=portable)[0], 403)
+        self.assertEqual(request("/api/dismiss", {"id": self.identifier, "dismissed": True}, portable)[0], 403)
+
+    def test_interactive_page_rejects_untrusted_retained_scripts_and_retains_answers(self):
+        self.reports.save_responses(self.identifier, {"proceed": False}, 0)
+        original = self.root / "reports" / self.identifier / "report.html"
+        original.write_text('<script>window.compromised=true</script>')
+        page, policy = self.reports.interactive_content(self.identifier, "http://127.0.0.1:8766")
+        self.assertNotIn("window.compromised", page)
+        self.assertIn("script-src 'sha256-", policy)
+        self.assertNotIn("script-src 'unsafe-inline'", policy)
+        self.assertEqual(self.reports.responses(self.identifier)["values"], {"proceed": False})
 
 
 if __name__ == "__main__":

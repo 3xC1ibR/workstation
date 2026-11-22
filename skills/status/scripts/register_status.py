@@ -12,14 +12,14 @@ import shutil
 import socket
 import tempfile
 
-from build_status import validate
+from build_status import render, validate
 
 
 def inbox_directory():
     return Path(os.environ.get("AGENT_STATUS_INBOX", Path.home() / ".local/state/agent-status/inbox")).expanduser()
 
 
-def register(document, html, *, workspace, agent=None, provider=None, thread_id=None, root=None):
+def register(document, html, *, workspace, agent=None, provider=None, thread_id=None, root=None, viewer_url=None):
     validate(document)
     if not isinstance(html, str) or not html.strip() or len(html.encode()) > 8 * 1024 * 1024:
         raise ValueError("A nonempty HTML report of at most 8 MB is required")
@@ -28,6 +28,9 @@ def register(document, html, *, workspace, agent=None, provider=None, thread_id=
     canonical = json.dumps({"document": document, "origin": origin}, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
     identifier = hashlib.sha256(canonical.encode()).hexdigest()
     root = Path(root) if root else inbox_directory()
+    if document.get("response_fields"):
+        from response_access import connection
+        html = render(document, connection(root, identifier, viewer_url or os.environ.get("AGENT_STATUS_URL", "http://127.0.0.1:8766")))
     reports = root / "reports"
     reports.mkdir(parents=True, exist_ok=True)
     destination = reports / identifier
@@ -63,10 +66,15 @@ def main():
     parser.add_argument("--agent")
     parser.add_argument("--provider")
     parser.add_argument("--thread-id")
+    parser.add_argument("--viewer-url", default=os.environ.get("AGENT_STATUS_URL", "http://127.0.0.1:8766"))
     arguments = parser.parse_args()
-    identifier = register(json.loads(arguments.document.read_text()), arguments.html.read_text(),
+    document = json.loads(arguments.document.read_text())
+    identifier = register(document, arguments.html.read_text(),
                           workspace=arguments.workspace, agent=arguments.agent, provider=arguments.provider,
-                          thread_id=arguments.thread_id)
+                          thread_id=arguments.thread_id, viewer_url=arguments.viewer_url)
+    if document.get("response_fields"):
+        from response_access import connection
+        arguments.html.write_text(render(document, connection(inbox_directory(), identifier, arguments.viewer_url)), encoding="utf-8")
     print(identifier)
 
 
