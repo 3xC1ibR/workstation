@@ -111,8 +111,8 @@ def render(document, connection=None, *, page=None):
 
     Without `page` the result is a portable file with its style and response
     editor embedded. The Status service passes `page` (base path, navigation
-    markup and a configuration object) to serve the same sheet with shared
-    assets and its own navigation.
+    markup, markup to place under the header, and a configuration object) to
+    serve the same sheet with shared assets and its own navigation.
     """
     validate(document)
     generated = timestamp(document["generated_at"])
@@ -186,7 +186,8 @@ def render(document, connection=None, *, page=None):
               page["navigation"] if page else "",
               f'<article class="sheet"><header class="sheet-header"><h1>{escape(document["title"])}</h1>{subject}'
               f'<p class="sheet-meta">Observations assembled {escape(time_text(document["generated_at"]))}; times below use this timezone. '
-              f'This report does not refresh them.</p></header>']
+              f'This report does not refresh them.</p></header>',
+              page.get("after_header", "") if page else ""]
     output.append(f'<p class="assessment text">{escape(document["summary"])}</p>')
     for notice in document.get("notices", []):
         output.append(f'<aside class="notice"><h2>{escape(notice["title"])}</h2><p class="text">{escape(notice["text"])}</p></aside>')

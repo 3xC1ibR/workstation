@@ -63,23 +63,22 @@
     const state = draft(ask.id), item = make("li", null, "row ask");
     item.dataset.key = "ask-" + ask.id; item.dataset.kind = "ask"; item.dataset.state = ask.blocking ? "blocking" : "waiting";
     const marker = make("span", null, "marker"); marker.setAttribute("aria-hidden", "true");
-    const main = make("div", null, "row-main"), toggle = make("button", null, "row-title ask-toggle");
-    toggle.type = "button"; toggle.append(ask.title);
+    const main = make("div", null, "row-main"), toggle = make("button", null, "ask-toggle");
     const stamp = make("time", elapsed(ask.created_at)); stamp.dateTime = ask.created_at; stamp.title = time(ask.created_at);
-    const aside = make("div", null, "row-aside"); aside.append(stamp.cloneNode(true));
+    const aside = make("span", null, "row-aside"); aside.append(stamp);
+    toggle.type = "button"; toggle.append(make("span", ask.title, "row-title"), aside);       // the heading strip, age and chevron toggle together
     const kind = ask.kind ? ask.kind[0].toUpperCase() + ask.kind.slice(1) : "Ask";
     const meta = make("p", null, "row-meta");
     const parts = [ask.blocking && make("span", "Blocking", "flag-blocking"), kind + (ask.effort_minutes ? `, ${ask.effort_minutes} min` : ""),
       ask.thread_title || ask.project_label, ask.overdue && make("span", "Overdue", "flag-attention"),
       ask.stale && make("span", ask.thread_closed ? "Thread closed" : "Agent inactive", "flag-attention")].filter(Boolean);
     parts.forEach((part, index) => { if (index) meta.append(" · "); meta.append(part); });
-    const age = make("span", null, "row-age"); age.append(" · ", stamp); meta.append(age);
     const rest = [ask.detail, ask.unblocks && "Unblocks: " + ask.unblocks, ask.context].filter(Boolean).join("\n\n");
     const preview = rest ? make("p", rest.replace(/\s+/g, " "), "row-summary") : null;
     const body = make("div", null, "ask-detail"); body.id = `ask-${ask.id}-detail`;
     toggle.setAttribute("aria-controls", body.id);
-    main.append(toggle); if (preview) main.append(preview); main.append(body, meta);
-    item.append(marker, main, aside);
+    main.append(toggle, meta); if (preview) main.append(preview); main.append(body);
+    item.append(marker, main);
 
     async function resolve(payload, action) {
       if (state.busy) return;

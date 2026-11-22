@@ -5,7 +5,6 @@
   let review = null, signature = "", undo = null, noticeTimer = null, revision = 0;
   const pending = new Set();
   const view = () => document.querySelector('input[name="view"]:checked').value;
-  const folder = path => (path || "").split("/").filter(Boolean).pop() || "";
   const plural = (count, noun, many = noun + "s") => `${count} ${count === 1 ? noun : many}`;
   const matches = (query, ...parts) => !query || parts.filter(Boolean).join(" ").toLowerCase().includes(query);
 
@@ -19,22 +18,20 @@
   }
   function failure(text) { element("review-error").textContent = text; element("review-error").hidden = !text; }
 
-  function row({key, state, closed, href, external, title, summary, recommendation, meta, at, actions}) {
+  // A row is a title and one quiet line: state words first, then the kind, then an excerpt.
+  function row({key, state, closed, href, title, flags, excerpt, at, actions}) {
     const item = make("li", null, "row"); item.dataset.key = key; item.dataset.state = state; item.dataset.closed = String(Boolean(closed));
     item.dataset.kind = key.split("-")[0];
     const main = make("div", null, "row-main"), link = make("a", title, "row-title");
     link.href = href;
     if (state === "unread") link.setAttribute("aria-label", "Unread: " + title);
-    if (external) link.setAttribute("aria-label", title + " (opens Ribbon Field)");
     main.append(link);
-    if (summary) main.append(make("p", summary, "row-summary"));
-    if (recommendation) {
-      const line = make("p", null, "row-recommendation"); line.append(make("strong", "Recommended: "), recommendation); main.append(line);
+    const parts = [...flags, excerpt].filter(Boolean);
+    if (parts.length) {
+      const details = make("p", null, "row-meta");
+      parts.forEach((part, index) => { if (index) details.append(" · "); details.append(part); });
+      main.append(details);
     }
-    const parts = meta.filter(Boolean), details = make("p", null, "row-meta"), age = make("span", null, "row-age");
-    parts.forEach((part, index) => { if (index) details.append(" · "); details.append(part); });
-    age.append(parts.length ? " · " : "", stamp(at)); details.append(age);       // shown at phone width, where there is no age column
-    main.append(details);
     const marker = make("span", null, "marker"); marker.setAttribute("aria-hidden", "true");
     const aside = make("div", null, "row-aside"); aside.append(stamp(at));
     const controls = make("div", null, "row-actions");
@@ -47,6 +44,13 @@
   }
   const stamp = value => { const node = make("time", elapsed(value)); node.dateTime = value; node.title = time(value); return node; };
   const flag = (text, className) => make("span", text, className);
+  function excerpt(text, lead) {
+    if (!text) return null;
+    const node = make("span", null, "row-excerpt");
+    if (lead) node.append(make("strong", lead + " "));
+    node.append(text);
+    return node;
+  }
 
   // Ribbon Field accepted a resolution: drop the ask at once, then read Ribbon Field's list again.
   function askChanged(message, id) {
@@ -62,18 +66,18 @@
     actions.push(closed ? ["Reopen", () => respond(delivery, "reopen"), "quiet"] : ["Dismiss", () => respond(delivery, "dismiss"), "quiet"]);
     return row({
       key: "delivery-" + delivery.id, state: delivery.status === "new" ? "unread" : "read", closed,
-      href: `${base}/deliveries/${delivery.id}`, title: delivery.title, summary: delivery.summary,
-      recommendation: closed ? null : delivery.recommended_default,
-      meta: [outcome, delivery.category || delivery.origin.agent], at: delivery.received_at, actions});
+      href: `${base}/deliveries/${delivery.id}`, title: delivery.title, flags: [outcome, delivery.category || delivery.origin.agent],
+      excerpt: !closed && delivery.recommended_default ? excerpt(delivery.recommended_default, "Recommended:") : excerpt(delivery.summary),
+      at: delivery.received_at, actions});
   }
   function operationRow(operation) {
     const dismissed = Boolean(operation.dismissed_at);
     return row({
       key: "operation-" + operation.id, state: operation.unread && !dismissed ? "unread" : "read", closed: dismissed,
-      href: `${base}/reports/${operation.latest}`, title: operation.title, summary: operation.summary,
-      meta: [operation.ask_count ? flag(plural(operation.ask_count, "ask") + " open", "flag-needs") : null,
-             operation.response_field_count ? flag(plural(operation.response_field_count, "question") + " for you", "flag-needs") : null,
-             operation.origin.agent || folder(operation.origin.workspace)], at: operation.received_at,
+      href: `${base}/reports/${operation.latest}`, title: operation.title,
+      flags: [operation.ask_count ? flag(plural(operation.ask_count, "ask") + " open", "flag-needs") : null,
+              operation.response_field_count ? flag(plural(operation.response_field_count, "question") + " for you", "flag-needs") : null],
+      excerpt: excerpt(operation.summary), at: operation.received_at,
       actions: [dismissed ? ["Restore", () => dismissOperation(operation, false), "quiet"] : ["Dismiss", () => dismissOperation(operation, true), "quiet"]]});
   }
 

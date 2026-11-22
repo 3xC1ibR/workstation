@@ -93,9 +93,9 @@
   // Age as a person would say it: relative within a day, then the calendar date. The exact time stays in the title.
   function elapsed(value, now = Date.now()) {
     const seconds = Math.max(0, (now - new Date(value).getTime()) / 1000), date = new Date(value);
-    if (seconds < 90) return "just now";
-    if (seconds < 3600) return `${Math.round(seconds / 60)} min ago`;
-    if (seconds < 86400) return `${Math.round(seconds / 3600)} h ago`;
+    if (seconds < 90) return "now";
+    if (seconds < 3600) return `${Math.round(seconds / 60)} min`;
+    if (seconds < 86400) return `${Math.round(seconds / 3600)} h`;
     return date.toLocaleDateString(undefined, {month: "short", day: "numeric",
       ...(date.getFullYear() === new Date(now).getFullYear() ? {} : {year: "numeric"})});
   }

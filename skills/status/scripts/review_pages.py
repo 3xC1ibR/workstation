@@ -44,8 +44,14 @@ def document(title, base, body, scripts, configuration=None):
             f'{tags}</head><body><main>{body}{data_block(configuration) if configuration is not None else ""}</main></body></html>')
 
 
+OPERATION_ASKS = '<section id="operation-asks" class="context-asks" aria-label="Asks from this operation" hidden></section>'
+
+
 def report_navigation(base, operation, report):
-    """Navigation above a served report: return link, version position, and history."""
+    """Navigation above a served report: return link, version position, and history.
+
+    The operation's asks are placed separately, under the report's title (OPERATION_ASKS).
+    """
     versions = operation["versions"]                       # newest first
     position = next(index for index, version in enumerate(versions) if version["id"] == report)
     number, total, latest = len(versions) - position, len(versions), position == 0
@@ -60,7 +66,7 @@ def report_navigation(base, operation, report):
     return (f'<nav class="page-navigation" aria-label="Report"><a class="back-link" href="{escape(base)}/">Review</a>'
             f'<details class="version-history"><summary>Version {number} of {total}</summary><ol reversed>{history}</ol></details>'
             f'<button id="operation-dismiss" class="quiet" type="button" hidden></button></nav>'
-            f'{earlier}<section id="operation-asks" class="context-asks" aria-label="Asks from this operation" hidden></section>')
+            f'{earlier}')
 
 
 def link_item(link, base, delivery):
@@ -115,7 +121,7 @@ def delivery_page(base, delivery, body):
         f'<article class="sheet delivery"><header class="sheet-header"><h1>{escape(delivery["title"])}</h1>'
         f'<p class="sheet-meta">{origin_text(delivery)}{" · " if origin_text(delivery) else ""}Delivered {moment_tag(delivery["received_at"])}</p></header>'
         f'<p class="assessment text">{escape(delivery["summary"])}</p>'
-        f'<section class="decision-panel" aria-label="Your response">{recommendation}{question}'
+        f'<section class="response-panel" aria-label="Your response">{recommendation}{question}'
         f'<div id="delivery-response"><noscript><p class="note">Enable JavaScript to respond to this delivery.</p></noscript></div></section>'
         + (f'<section class="document">{markdown_text.render(body, delivery_resolver(base, delivery))}</section>' if body else "")
         + (f'<section><h2 class="section-heading">{heading}</h2><ul class="link-list">{references}</ul></section>' if references else "")

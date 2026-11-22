@@ -149,7 +149,8 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
                     "token": response_key(reports.root, identifier, create=True)}}
             scripts = ("controls.js",) + (("responses.js", "report.js") if fields else ()) + ("asks.js", "report_page.js")
             return render(document, page={"base": base, "scripts": scripts, "configuration": configuration,
-                                          "navigation": review_pages.report_navigation(base, operation, identifier)}), PAGE_CSP
+                                          "navigation": review_pages.report_navigation(base, operation, identifier),
+                                          "after_header": review_pages.OPERATION_ASKS}), PAGE_CSP
 
         def do_OPTIONS(self):
             path = self.route()

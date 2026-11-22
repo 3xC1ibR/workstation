@@ -1,23 +1,25 @@
 /* Design tokens for the review page and its reports. DESIGN.md mirrors these values. */
 :root {
-  --canvas: #f6f5f1; --surface: #ffffff; --surface-quiet: #efede8;
-  --ink: #1b1b1f; --ink-secondary: #5c5c66; --ink-tertiary: #6a6a73;
-  --rule: #e3e1da; --rule-strong: #c9c6bd;
-  --accent: #2c50c8; --accent-ink: #ffffff; --accent-tint: #e9eefc;
-  --attention: #a14a04; --attention-tint: #fcf1de;
-  --critical: #b3261e; --critical-tint: #fcebe9;
-  --positive: #17693f; --positive-tint: #e4f3ea;
+  --canvas: #ffffff; --surface: #ffffff; --surface-quiet: #f3f3f5; --surface-raised: #ffffff;
+  --ink: #1c1c1e; --ink-secondary: #505057; --ink-tertiary: #6c6c73;
+  --rule: #e7e7ea; --rule-strong: #c8c8ce;
+  --accent: #1f5fd6;
+  --action: #1c1c1e; --action-ink: #ffffff; --action-hover: #3a3a3f;
+  --attention: #9a5300; --attention-tint: #fcf1de;
+  --critical: #c0341d; --critical-tint: #fcebe7;
+  --positive: #17693f;
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
   --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 72px;
-  --meta: 13px; --body: 15px; --reading: 16px; --lead: 18px; --heading: 19px; --title: 28px; --title-narrow: 24px; --value: 22px;
-  --line-tight: 1.3; --line: 1.5; --line-reading: 1.62;
-  --weight-medium: 500; --weight-strong: 600; --weight-title: 680;
-  --stroke: 1px; --focus: 2px; --marker: 8px; --accent-edge: 3px;
-  --radius: 10px; --radius-control: 8px; --radius-round: 999px;
-  --page-width: 800px; --measure: 70ch;
-  --metric-width: 190px; --cell-width: 96px; --record-width: 150px; --text-cell-width: 300px;
-  --control-height: 36px; --touch-height: 44px;
-  --layer-menu: 2; --layer-notice: 3;
+  --meta: 13px; --body: 15px; --reading: 16px; --heading: 17px; --lead: 18px; --value: 22px; --title: 30px;
+  --line-tight: 1.25; --line: 1.5; --line-reading: 1.6;
+  --weight-medium: 500; --weight-strong: 600; --weight-title: 700;
+  --tracking-title: -.022em; --tracking-heading: -.012em;
+  --stroke: 1px; --focus: 2px; --glyph-stroke: 1.5px; --marker: 8px; --accent-edge: 3px;
+  --radius: 10px; --radius-control: 8px; --radius-small: 4px; --radius-round: 999px;
+  --page-width: 720px; --page-inset: 32px; --page-top: 56px; --row-bleed: 20px; --measure: 68ch;
+  --metric-width: 190px; --search-width: 200px; --cell-width: 96px; --record-width: 150px; --text-cell-width: 300px;
+  --control-compact: 32px; --control-height: 36px; --touch-height: 44px;
+  --layer-row-action: 1; --layer-menu: 2; --layer-notice: 3;
   --quick: 120ms;
   --sans: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Inter", "Segoe UI", system-ui, sans-serif;
   --mono: ui-monospace, "SF Mono", Menlo, Consolas, monospace;
@@ -25,12 +27,17 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --canvas: #141416; --surface: #1c1c1f; --surface-quiet: #232327;
-    --ink: #ededf0; --ink-secondary: #a3a3ad; --ink-tertiary: #8f8f99;
-    --rule: #2b2b30; --rule-strong: #3c3c43;
-    --accent: #8ea6ff; --accent-ink: #0f1430; --accent-tint: #1d2444;
+    --canvas: #18181a; --surface: #18181a; --surface-quiet: #242427; --surface-raised: #36363b;
+    --ink: #ececef; --ink-secondary: #b4b4bc; --ink-tertiary: #92929b;
+    --rule: #2c2c30; --rule-strong: #47474d;
+    --accent: #7fa8ff;
+    --action: #ececef; --action-ink: #18181a; --action-hover: #ffffff;
     --attention: #f0a94e; --attention-tint: #33250f;
-    --critical: #ff8a80; --critical-tint: #3a1a18;
-    --positive: #6fcf97; --positive-tint: #15301f;
+    --critical: #ff8a75; --critical-tint: #3a1b16;
+    --positive: #6fcf97;
   }
+}
+/* Phone width: the page inset shrinks, the title steps down, and an open ask keeps a margin from the screen edge. */
+@media (max-width: 640px) {
+  :root { --title: 26px; --page-inset: 20px; --page-top: 24px; --row-bleed: 12px; }
 }
