@@ -48,7 +48,7 @@
   window.StatusDelivery = {propose};
 
   function proposalBlock() {
-    const block = make("div", null, "response-proposal"), buttons = make("div", null, "response-buttons");
+    const block = make("div", null, "response-proposal"), buttons = make("div", null, "response-buttons"), quiet = make("div", null, "response-quiet");
     const what = proposal.action === "dismiss" ? "dismiss this delivery"
       : proposal.choice === "recommended_default" ? "accept the recommended default" : `accept \u201c${proposal.choice}\u201d`;
     block.append(make("p", `The document proposes: ${what}.`));
@@ -57,8 +57,8 @@
     confirm.type = ignore.type = "button"; confirm.disabled = busy || !proposalReady; ignore.disabled = busy;
     confirm.onclick = () => respond(proposal.action, proposal.choice, proposal.note);
     ignore.onclick = () => { proposal = null; render(); };
-    buttons.append(confirm, ignore);
-    block.append(buttons, make("p", "Nothing is recorded until you confirm.", "note"));
+    quiet.append(ignore); buttons.append(confirm, quiet);
+    block.append(buttons);
     return block;
   }
 
