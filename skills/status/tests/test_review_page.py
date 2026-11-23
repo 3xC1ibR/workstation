@@ -61,7 +61,12 @@ class Workspace(unittest.TestCase):
         arguments.setdefault("workspace", "/work")
         return delivery_store.publish(document or delivery(), root=self.root, **arguments)
 
+    @staticmethod
+    def refuse_resolution(ask_id, body, *, snooze=False):
+        raise StatusError("Tests do not resolve asks in Ribbon Field.")
+
     def serve(self, **arguments):
+        arguments.setdefault("ask_resolver", self.refuse_resolution)      # never the real Ribbon Field
         server = make_server(self.root, 0, **arguments)
         worker = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": .01}, daemon=True)
         worker.start()

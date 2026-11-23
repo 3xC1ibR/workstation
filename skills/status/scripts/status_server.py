@@ -62,7 +62,7 @@ def public_address(value):
     return f"https://{address.netloc}", address.netloc, address.path.rstrip("/")
 
 
-def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
+def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, ask_resolver=resolve_ask):
     root = Path(root).resolve()
     reports, deliveries, usage, states = StatusReports(root), Deliveries(root), UsageEvents(root), DocumentStates(root)
     asks = ask_reader or AskReader()
@@ -360,7 +360,7 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
                 elif path == "/api/ask-resolution":
                     if self.remote():
                         raise PermissionError("On the tailnet address, answers go through Ribbon Field's paired-device sign-in.")
-                    result = resolve_ask(body["id"], body["body"], snooze=body.get("snooze") is True)
+                    result = ask_resolver(body["id"], body["body"], snooze=body.get("snooze") is True)
                     asks.invalidate()
                     self.send(200, result)
                 elif path == "/api/delivery-response":

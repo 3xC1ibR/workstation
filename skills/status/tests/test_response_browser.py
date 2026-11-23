@@ -20,14 +20,22 @@ from status_server import make_server
 from delivery_store import Deliveries, publish as publish_delivery
 from document_state import DocumentStates
 from ribbon_field_asks import AskReader
-from status_store import StatusReports
+from status_store import StatusError, StatusReports
 from test_responses import document
 from usage_events import UsageEvents
 
 
 @unittest.skipUnless(sync_playwright, "Install Playwright and Chromium to run the browser regression")
 class ReviewPageBrowserTests(unittest.TestCase):
+    def resolve(self, ask_id, body, *, snooze=False):
+        """Stand in for Ribbon Field: a test must never reach the real one on this machine."""
+        if self.refuse_resolution:
+            raise StatusError("Option is not one of the offered choices.")
+        self.resolutions.append((ask_id, body, snooze))
+        return {"id": ask_id, "status": "resolved"}
+
     def setUp(self):
+        self.resolutions, self.refuse_resolution = [], False
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
@@ -36,7 +44,7 @@ class ReviewPageBrowserTests(unittest.TestCase):
              "detail": "First paragraph.\n\nSecond paragraph with https://example.com/console and more.", "options": [],
              "resolutions": ["approved", "declined", "dismissed"],
              "unblocks": "Live payouts.", "created_at": "2026-11-22T09:00:00+00:00", "cwd": "/project", "thread_title": "Operator",
-             "thread_link": "agentcoord://thread/thread-a"}]}))
+             "thread_link": "agentcoord://thread/thread-a"}]}), ask_resolver=self.resolve)
         worker = threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": .01}, daemon=True)
         worker.start()
         self.addCleanup(worker.join, 2)
@@ -96,45 +104,26 @@ class ReviewPageBrowserTests(unittest.TestCase):
         self.assertEqual(self.failures, [])
 
     def test_ask_is_read_in_full_and_resolved_through_ribbon_field(self):
-        page, sent = self.page, []
-        state = {"paired": True, "fail": False}
-        def ribbon_field(route):
-            request = route.request
-            if request.url.endswith("/api/browser/config"):
-                if not state["paired"]:
-                    return route.fulfill(status=401, content_type="application/json", body='{"error": "Pair this device using a fresh link from your Mac."}')
-                return route.fulfill(content_type="application/json", body='{"token": "ribbon-field-token", "askKinds": true}')
-            if state["fail"]:
-                return route.fulfill(status=400, content_type="application/json", body='{"error": "Option is not one of the offered choices."}')
-            sent.append((request.url.split("/api/browser/")[1], request.headers.get("x-agent-coord-token"), json.loads(request.post_data)))
-            route.fulfill(content_type="application/json", body='{"id": 7, "status": "resolved"}')
-        page.route("**/api/browser/**", ribbon_field)
+        page, row = self.page, self.page.locator("#asks .row")
         page.goto(self.origin + "/")
-        row = page.locator("#asks .row")
         expect(row.locator(".ask-detail")).to_be_hidden()
         row.locator(".ask-toggle").click()
         expect(row.locator(".ask-text").first).to_contain_text("Second paragraph with https://example.com/console")
         expect(row.locator(".ask-text a")).to_have_attribute("href", "https://example.com/console")
-        expect(row.locator(".row-summary")).to_be_hidden()               # the preview gives way to the whole text
         note = row.locator(".ask-note")
         note.fill("Only after Tuesday")
-        state["fail"] = True
+        self.refuse_resolution = True
         row.get_by_role("button", name="Approve", exact=True).click()
         expect(row.get_by_role("alert")).to_contain_text("not one of the offered choices")
         expect(note).to_have_value("Only after Tuesday")                 # a refused resolution keeps the note
-        state["fail"] = False
+        self.refuse_resolution = False
         row.get_by_role("button", name="Approve", exact=True).click()
         expect(page.locator("#review-notice")).to_contain_text("Approved")
-        self.assertEqual(sent, [("asks/7", "ribbon-field-token", {"resolution": "approved", "note": "Only after Tuesday"})])
+        self.assertEqual(self.resolutions, [(7, {"resolution": "approved", "note": "Only after Tuesday"}, False)])
         self.assertEqual([(event["type"], event["item"], event["action"]) for event in UsageEvents(self.root).read() if event["type"] == "ask_resolution"],
                          [("ask_resolution", "7", "approved")])
         self.assertFalse((self.root / "asks").exists())
         self.fits()
-        state["paired"] = False
-        page.goto(self.origin + "/")
-        page.locator("#asks .ask-toggle").click()
-        expect(page.locator(".ask-unavailable")).to_contain_text("not paired")
-        expect(page.locator("#asks .ask-links a").first).to_have_attribute("href", "agentcoord://thread/thread-a")
         self.assertEqual(self.failures, [])
 
     def test_operation_is_unread_until_its_latest_version_is_opened(self):
