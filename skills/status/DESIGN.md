@@ -1,7 +1,7 @@
 ---
 name: Status review page
 colors:
-  primary: "#1c1c1e"        # --action: the one primary action of a view
+  primary: "#1c1c1e"        # --action: the one solid button of a panel
   accent: "#1f5fd6"         # --accent: unread marker, links, keyboard focus
   bg: "#ffffff"             # --canvas
   surface: "#ffffff"        # --surface: the page itself, menus and controls
@@ -18,7 +18,13 @@ typography:
   title:   { fontFamily: system-ui, fontSize: 30px, fontWeight: 700, lineHeight: 1.25 }
   heading: { fontFamily: system-ui, fontSize: 20px, fontWeight: 700, lineHeight: 1.25 }
   reading: { fontFamily: system-ui, fontSize: 16px, lineHeight: 1.6 }
+  table:   { fontFamily: system-ui, fontSize: 15px, lineHeight: 1.5 }
   meta:    { fontFamily: system-ui, fontSize: 13px, lineHeight: 1.5 }
+layout:
+  page: 1120px        # --page-width
+  main: 640px         # --main-width, also --measure
+  rail: 416px         # --rail-width
+  gutter: 64px        # --gutter
 rounded:
   sm: 4px
   control: 8px
@@ -53,70 +59,122 @@ One standalone page where the owner reviews two kinds of agent work: **operation
 (long-running efforts with a living report) and **proactive work** (finished,
 unrequested work an agent delivers). It also shows what agents are asking of
 him in Ribbon Field, without owning those asks. He opens it a few times a day,
-often on a phone, to decide what to read, act on, or dismiss.
+on a desktop and on a phone, to decide what to answer, read, or dismiss.
 
-Feeling: a calm triage list. Posture: transient. It must read at a glance, so
-chrome is minimal and every row leads with what the item is. Light and dark
-themes follow the system. Reference applications, recorded as defaults the
-owner has not yet confirmed: **Linear Inbox** for triage and **Things** for calm
-lists.
+Direction: a **calm task list**. Ink on a white page; hairlines and space do the
+grouping; colour only states something; the only outlined things are controls.
+Posture: transient. It must read at a glance, so chrome is minimal and every
+row is a title, one quiet line, and an age. Light and dark themes follow the
+system. Reference applications: **Things** for calm lists and **Linear Inbox**
+for triage.
 
 ## Colors
 
 Colour carries state, never decoration. Most of every screen is ink on paper.
 
-- **Accent** marks unread items, links, and the single primary action of a view.
-- **Critical** marks a blocking ask and a failed request. Nothing else is red.
-- **Attention** marks report notices, stale or overdue asks, stale observations,
-  and the notice shown on an earlier version.
+- **Ink** is also the action colour: the one solid button of a panel is ink on
+  paper (paper on ink in the dark theme), not the accent.
+- **Accent** marks unread items, links in text, and keyboard focus. Nothing else.
+- **Critical** marks the word "Blocking" and a failed request. Nothing else is red.
+- **Attention** marks stale or overdue asks, an inactive agent, stale
+  observations, an unavailable source, and the notice on an earlier version.
 - **Positive** marks an accepted delivery. Dismissed is neutral, not red.
-- A tint appears only behind the text whose state it marks.
+- A tint appears only behind the text whose state it marks (failure, earlier
+  version). The quiet surface is the ground of a hovered row, the chosen view,
+  the search field in use, and code.
+- Every text colour is at least 4.5:1 on the canvas and on the quiet surface, in
+  both themes.
 
 ## Typography
 
 System sans-serif for everything; monospace only for code and file paths.
-Numbers use tabular figures. Titles are the strongest element of a row;
-metadata is one quiet style in every state. Unread raises the title's weight and
-shows the marker; it never dims the rest. No uppercase tracked labels above
-headings, and no reference numerals on sections.
+Five sizes: title 30 px (26 px at phone width), report headings 20 px, text
+16 px, tables 15 px, metadata and desktop controls 13 px. Controls use 16 px at
+phone width. List section headings ("Needs you", "Operations") are set at text
+size in bold on a hairline, with a count in regular grey. Numbers use tabular
+figures.
+
+A row title is 16 px at 1.35: medium weight for an ask and for an unread item,
+regular for a read one. Metadata is one grey in every state; only a state word
+is coloured. A title too long for its lines ends at a whole word (the script
+fits it), never inside a figure, and the full title stays in its tooltip and
+accessible name. A list title is shown without its closing full stop. No
+uppercase tracked labels, and no reference numerals on sections.
+
+Prose (the assessment, notices, section text, ask text) keeps the 640 px measure
+at line height 1.6. A line that begins with a number is set as a step with its
+number hanging; a web address in text is linked as written and may break after
+a slash.
 
 ## Layout
 
-A single centred column of 800 px on every page, so edges do not move between
-the list, a delivery, and a report. Spacing uses the 4 px scale. A row is a
-marker column, the content, and its age at the right; at phone width the age
-ends the metadata line instead. Row metadata holds at most three items: a
-state word, a kind or category, and an origin. Delivery summaries clamp to two
-lines, operation summaries to one, ask reasons to three. Row actions appear
-over the age on hover or keyboard focus; a touch user responds on the item's
-own page, where controls reach 44 px. Reading text is limited to about 70
-characters. Wide tables scroll inside a labelled, focusable region, keep their
-first column while scrolling at phone width, and announce that they scroll.
+The page is 1120 px wide: a **main column of 640 px**, a 64 px gutter, and a
+**rail of 416 px**. Below 1000 px everything is one column; at phone width the
+page inset is 24 px. Spacing uses the 4 px scale.
+
+- **Review page.** What asks for a decision takes the main column (asks, then
+  proactive work); the living reports take the rail, in every view. Each
+  section is one list, newest first; asks keep Ribbon Field's order. Items with
+  nothing new for seven days wait in one closed native "Older" group with a
+  count at the end of their section; a search that matches inside opens it, and
+  a section holding nothing newer shows its rows directly.
+- **Row.** A title on one line (two at phone width) with its age in a fixed
+  right column ("now", "52m", "15h", then "Nov 9"), and one line beneath:
+  state words, then what it costs (kind and effort, for an ask other than a
+  decision), then the source or an excerpt. A delivery's excerpt is
+  "Recommended: ..." while it is open. Rows bleed 20 px past the column so the
+  hover tint and focus ring share one box while text stays on the column edge.
+  Row actions appear on hover or keyboard focus; a touch user responds on the
+  item's page.
+- **Margin mark.** One mark hangs left of the text column: an 8 px accent disc
+  for an unread delivery or operation, a chevron for an ask (it opens in place).
+- **Open ask.** It opens in place between two hairlines on the column. Order:
+  title, the line beneath, what answering unblocks and the place to act, the
+  response, then the whole question and its context, in ink. Nothing in it is
+  boxed except its controls.
+- **Report.** Navigation, title, one quiet line (subject, "As of ..."), then the
+  opening: the operation's asks, the assessment and the notices in the main
+  column, with the measures in the rail as rows (label, value at the right,
+  particulars beneath). Sections follow at full width with prose at the
+  measure. A table of up to three columns keeps the main column and wraps at
+  phone width when it has two; a wider table takes the page and scrolls
+  sideways under its first column, with edge shadows where it continues.
+- **Delivery.** Title and one quiet line, then the summary and the write-up in
+  the main column; the response stays in the rail beside them while he reads
+  (it follows the summary below 1000 px). An interactive document is read in
+  the main column; another application takes the page's width.
 
 ## Elevation & Depth
 
-Flat. Layers, bottom to top: canvas; surfaces (lists, sheets); menus (version
-history, response choices); one transient notice. No shadows; a one-pixel rule
-separates a surface from the canvas.
+Flat. Layers, bottom to top: canvas; row actions; menus (version history,
+snooze, response choices); one transient notice. No shadows on surfaces; a
+menu is outlined. The only gradient is the edge shadow of a scrolling table,
+which states that the table continues.
 
 ## Shapes
 
-Containers 10 px, controls 8 px, small insets 4 px. One-pixel rules. The unread
-marker is an 8 px disc. Chevrons are drawn with two borders; there is no icon set.
+Containers 10 px, controls 8 px, small insets 4 px. One-pixel rules. Chevrons
+are drawn with two borders; the search glyph is the page's one drawn icon.
 
 ## Components
 
 | Component | Variants | Use for | Do not use for |
 |---|---|---|---|
-| Row | unread, read, blocking, waiting, closed | One operation, delivery, or ask in a list | Anything with more than two actions |
-| Button | standard, primary, quiet | Primary: the one affirmative response on a delivery page. Quiet: dismiss, restore, undo, add a note | A primary button on every list row |
-| Segmented control | - | Open / Done / All | Navigation between pages |
+| Row | ask (collapsed, open), unread, read, closed | One operation, delivery, or ask in a list | Anything with more than two row actions |
+| Button | standard, primary, quiet | Primary: the one solid button of a panel, never greyed out. Standard: a second resolution (Decline, Not done). Quiet: snooze, dismiss, change, undo | A primary button on a list row |
+| Choices | - | Options of an ask or a delivery as rows: one is chosen, then sent with the panel's primary button; choosing the chosen row clears it | Sending on a single tap |
+| Line field | - | One ruled line for an answer or a note that grows with what is written | Report response fields (those keep outlined inputs) |
+| Action line | - | Primary at the left, quiet words at the right ending on the rule's edge; "Discuss" leads to the conversation | A second row of actions |
+| View switch | - | Open / Done / All as three words, the chosen one on the quiet surface | Navigation between pages |
+| Search | idle, in use | A glyph and a word until used; the glyph alone at phone width | A filter menu |
+| Older group | - | Items with nothing new for seven days, as a native disclosure with a count | Hiding asks |
 | Report sheet | portable, served | A status report and a delivery's detail | Lists |
-| Notice | attention | Material exceptions inside a report | Routine information |
-| Response panel | awaiting, accepted, dismissed | The owner's response to a delivery | Report response fields (those use the response editor) |
-| Response editor | - | Agent-defined questions inside a report | Delivery responses |
+| Notice | - | A material exception in a report: a strong first line and a paragraph directly under the assessment | Routine information |
+| Measure | tile, rail row | A metric with its provenance | Prose |
+| Response panel | awaiting, accepted, dismissed, earlier version | The owner's response to a delivery | Report response fields |
+| Response editor | - | Agent-defined questions inside a report, with "Save responses" as its primary | Delivery responses |
 | Version history | - | Earlier versions of an operation report or of a delivery | Anything else |
-| Embedded document | retained document, application; unavailable on this address | Content an agent built, in a sandboxed frame across the column inside an item's page or the embedded view | Anything the page itself renders; agent markup is never written into a page |
+| Embedded document | retained document, application; unavailable on this address | Content an agent built, in a sandboxed frame inside an item's page or the embedded view. Its outline is the trust boundary: the one outlined region | Anything the page itself renders; agent markup is never written into a page |
 | Response proposal | - | A response the embedded document proposes, inside the response panel with Confirm and Ignore | Recording a response without the owner's Confirm |
 | Transient notice | with Undo | Confirming a change that removed a row from view | States the page already shows |
 
@@ -124,19 +182,24 @@ marker is an 8 px disc. Chevrons are drawn with two borders; there is no icon se
 
 - Never use eyebrow labels: no small uppercase or tracked label above a heading
   or value.
-- One primary button per view, at most. List rows use standard and quiet buttons.
-- Every reversible action offers Undo or Reopen instead of a confirmation.
+- One solid button per panel, and it is never greyed out: with nothing to send
+  it leads to where an answer goes.
+- Nothing is boxed except controls and an agent's embedded document.
+- Every reversible action offers Undo or Reopen instead of a confirmation. An
+  ask's resolution is not reversible, so a choice is chosen and then sent.
 - Omit an empty section. Say plainly when a source is unavailable; never show
   an unavailable source as an empty list.
-- No gradients, shadows, glass effects, decorative icons, entrance animation, or
-  cards inside cards.
+- No decorative gradients, shadows, glass effects, decorative icons, entrance
+  animation, or cards inside cards.
 - Do not copy Ribbon Field asks or answers into this store. Resolve them through
-  Ribbon Field's own interface from the page; link to Ribbon Field when that is
-  unavailable.
+  Ribbon Field from the page, on both addresses.
 - Never truncate text without a way to read all of it: in place for asks, on the
   item's page for deliveries and operations.
+- Show an agent's text as written: titles, addresses and provenance are not
+  rewritten, shortened to a domain, or hidden.
 - Material findings in a report are never collapsed. Only background detail may
   start collapsed, and print expands it.
+- Style values live only in `assets/tokens.css`; `drift_check.py diff` stays clean.
 
 ## Conceptual model
 
@@ -151,7 +214,7 @@ marker is an 8 px disc. Chevrons are drawn with two borders; there is no icon se
 | Interactive document | kind (retained document or address of an application), the item version it belongs to | use inside the item's page; follow its links in the same tab | Report page, delivery page |
 | Document state | the value the document saved, save time, revision, saving version | saved and loaded by the document through the page; read by agents | Not shown; `read_responses.py` |
 | Embedded application | address on the tailnet host, the item it was opened from | read inside the page's frame, go back, open on its own | Embedded view |
-| Ask (owned by Ribbon Field) | kind, title, full question, choices, blocking, what it unblocks, thread | read in full, resolve by kind with a note, snooze, dismiss, open the thread | Review list, report page of its operation |
+| Ask (owned by Ribbon Field) | kind, title, full question, choices, blocking, what it unblocks, thread | answer in place (choose and send, or write), resolve by kind with a note, snooze, dismiss, discuss in the thread | Review list, report page of its operation |
 
 ### Lexicon
 
@@ -168,29 +231,78 @@ marker is an 8 px disc. Chevrons are drawn with two borders; there is no icon se
 
 ## Motion
 
-Only a 120 ms colour transition on controls. Nothing moves on load.
+Only a 120 ms transition on control colours, the search field's width, and the
+ask chevron. Nothing moves on load.
 
 ## States
 
-- **Empty:** one heading and one sentence saying what will appear here.
-- **Loading:** the counts line says "Loading…"; lists stay empty.
+- **Empty:** one sentence in grey ("No reports or deliveries yet", "All
+  reviewed", "No matches").
+- **Loading:** the counts announcement says "Loading…"; lists stay empty.
 - **Failure:** a critical-tinted message above the lists; unsaved input stays.
 - **Source unavailable:** "Asks unavailable" in the attention colour, with the
-  reason, directly under the header and in the counts line.
+  reason, under the header.
 - **Earlier version:** an attention notice with a link to the latest version.
+- **Counts:** the header's counts line is an announcement for assistive
+  technology; sighted readers have the section counts.
 
 ## Signature details
 
-1. The accent disc in the left margin is the only unread signal.
-2. A delivery row leads its second line with "Recommended:" so the default is
+1. Ink on a white page in a main column and a rail; hairlines and space do the
+   grouping, and nothing is boxed but controls.
+2. One answer form everywhere: choices as rows, a ruled line for words, one
+   solid ink button, quiet words at the right.
+3. An ask is answered where it is listed, between two hairlines, with the
+   response directly under its title.
+4. A delivery row leads its second line with "Recommended:" so the default is
    readable without opening the item.
-3. Report sheets open with the assessment in lead type; notices follow it, and
-   both precede any metric.
-4. Rows are fully clickable; row actions sit above that target and stay hidden
-   until hover or focus, so the resting list is titles, summaries, and ages.
+5. The margin mark: an accent disc for unread, a chevron for an ask.
 
 ## Decision record
 
+- 2026-11-22: **The page is rebuilt as a calm task list.** Direction: ink on a
+  white page, no containers, a margin mark for state, one quiet line under each
+  title, colour only for state. Why: of four directions it was the only one
+  whose restraint matched Things and Linear Inbox, and it keeps every ask on
+  one screen, which triage needs. Method: four directions were derived from
+  random seeds and outside inspirations (a railway timetable, an editorial
+  front page, a calm task list, a bookkeeper's ledger); one blind critic ranked
+  them against Things and Linear Inbox and put the task list first among the
+  four; then every iteration was judged by a fresh critic that saw screenshots
+  only, with one fixed prompt, and was followed by a removal pass.
+  Scores, each from a different critic, out of 10: iteration 1, 6.4; iteration
+  2, 6.4; iteration 3, 6.8; iteration 4, 6.4; iteration 5, 6.4. The target of
+  9 was not reached. The loop was stopped after iteration 5, at the owner's
+  cost limit, because the scores were not converging; iterations 6 to 8 were
+  not run.
+  What was built across the iterations: the response directly under an open
+  ask's title (owner's request); one list per section, newest first, with a
+  closed "Older" group for items quiet for seven days (owner's request);
+  printed links that lead with the tailnet address (owner's request); one row
+  grammar with the age in a fixed right column and a margin chevron for asks;
+  titles fitted at a whole word; one answer form (choices, line field, one
+  solid button) on asks and deliveries; four then five type sizes and one
+  control height; notices without a coloured bar; and, after the owner set the
+  page to 1120 px, a main column with a rail on all three pages.
+  After iteration 5's critic one change was made and not scored: the marks
+  that gave each kind a shape (a square for a delivery, a circle for a report)
+  were returned to the unread disc of iterations 2 to 4, because a hollow
+  square beside a title read as a checkbox that cannot be ticked.
+  Declined, with the reason: putting the question before the response in an
+  open ask (the owner asked for the response first); removing the ask chevron
+  (a collapsed ask must show that it opens, on touch too); relabelling "Do it"
+  with a generated verb, showing addresses as domains, hiding provenance, and
+  stripping the subject line (each rewrites or hides what the agent wrote);
+  removing the outline of an embedded document (it is the trust boundary
+  between the page's controls and agent-built content); renaming the sections
+  (the owner's own vocabulary); a text grey lighter than 4.5:1.
+  Open: critics disagree on the rail (the fourth asked for measures as rows,
+  the fifth called the rows a wall of grey) and on the answer form (ruled
+  line and dividers against a filled field); the report below its opening has
+  full-width section rules over 640 px text; the embedded-address view is
+  titled with a raw path; agent text repeats itself and prints raw addresses,
+  which publishing guidance, not styling, would fix; and the page has no
+  drawn signature of its own, which every critic from the third on noted.
 - 2026-11-22: The page becomes a host for what agents build. The owner asked
   that reports be interactive when appropriate, that the page not limit what
   agents code or generate, and that links not open new pages. (1) Agent

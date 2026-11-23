@@ -15,7 +15,7 @@
   --line-tight: 1.25; --line-snug: 1.35; --line: 1.5; --line-reading: 1.6;
   --weight-medium: 500; --weight-strong: 600; --weight-title: 700;
   --tracking-title: -.022em; --tracking-heading: -.012em;
-  --stroke: 1px; --focus: 2px; --glyph-stroke: 1.5px; --marker: 10px; --accent-edge: 3px;
+  --stroke: 1px; --focus: 2px; --glyph-stroke: 1.5px; --marker: 8px; --accent-edge: 3px;
   --radius: 10px; --radius-control: 8px; --radius-small: 4px; --radius-round: 999px;
   /* A wide page is a main column and a rail: 640 + 64 + 416 = 1120. Text keeps the measure inside either. */
   --page-width: 1120px; --main-width: 640px; --rail-width: 416px; --gutter: 64px; --page-inset: 32px; --page-top: 56px; --row-bleed: 20px; --measure: 640px;

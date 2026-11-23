@@ -33,10 +33,7 @@
 .row-main { display: contents; }
 /* One mark hangs in the margin, left of the text column that every page shares: a dot for unread, a chevron for an ask that opens in place. */
 .marker { position: absolute; left: calc(var(--row-inset) - var(--space-2) - var(--marker)); top: calc(var(--row-pad) + (var(--reading) * var(--line-snug) - var(--marker)) / 2); width: var(--marker); height: var(--marker); border-radius: var(--radius-round); }
-/* The mark's shape is the kind of item: a square for delivered work, a circle for a living report. Filled means unread. */
-.row[data-kind="delivery"] .marker { border: var(--glyph-stroke) solid var(--ink-tertiary); border-radius: var(--focus); }
-.row[data-kind="operation"] .marker { border: var(--glyph-stroke) solid var(--ink-tertiary); }
-.row[data-state="unread"] .marker { border-color: var(--accent); background: var(--accent); }
+.row[data-state="unread"] .marker { background: var(--accent); }
 .row.ask .marker { width: calc(var(--marker) - var(--focus)); height: calc(var(--marker) - var(--focus)); margin: var(--stroke) 0 0 calc(-1 * var(--stroke)); border-radius: 0; border-right: var(--glyph-stroke) solid var(--ink-tertiary); border-bottom: var(--glyph-stroke) solid var(--ink-tertiary); transform: rotate(-45deg); transition: transform var(--quick); }
 .row.ask[data-open="true"] .marker { transform: translate(var(--stroke), calc(-1 * var(--stroke))) rotate(45deg); }
 /* Every row is a title on one line with its age at the right. An ask and an unread item are set at medium weight, a read one at regular. */
