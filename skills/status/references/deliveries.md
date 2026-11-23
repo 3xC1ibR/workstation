@@ -50,14 +50,62 @@ copy, and so does a link target whose file name matches an attachment. Other
 file paths are shown as text with a Copy path control, because they exist only
 on the Mac. Images and binary files are not retained; link to them.
 
-The command prints `{"delivery": "<id>", "local_url": "...", "url": "..."}`;
+The command prints
+`{"delivery": "<id>", "series": "<id>", "version_number": 1, "local_url": "...", "url": "..."}`;
 `url` is present when the service has a recorded tailnet address. Publishing
-the same delivery again returns the same identifier. A delivery is immutable;
-publish a corrected one as a new delivery and say what it replaces.
+the same delivery again returns the same identifier. Each published version is
+immutable.
 
 Write for a reader deciding in a minute: lead with what it is, state the
 recommended default as an action, and ask at most one decision. Offer **Do it**
 only for something within your authority once he accepts it.
+
+`--interactive /absolute/path/file.html` or `--embed /path/` adds one
+interactive document, shown inside the delivery's page under the response
+controls: a plan to adjust, a picker, a calculator, a timeline, data to
+explore. Use the Markdown write-up for simple content. See
+[interactive-documents.md](interactive-documents.md).
+
+## Versions
+
+A delivery can live: a plan that is revised, a draft that is corrected, a
+result that is updated. Publish the revision as a **new version of the same
+delivery**, so the page keeps one row and his responses stay with it.
+
+```sh
+python3 -B <skill-directory>/scripts/publish_delivery.py delivery.json --key thanksgiving-plan ...
+python3 -B <skill-directory>/scripts/publish_delivery.py delivery.json --replaces <delivery-id> ...
+```
+
+- `--key <stable-key>` (1 to 80 lowercase letters, digits, and single hyphens,
+  the rule for operation keys) makes every delivery published with that key a
+  version of one delivery, from any workspace or conversation. Choose it when
+  you publish the first version of work you expect to revise.
+- `--replaces <delivery-id>` publishes a new version of an existing delivery
+  that has no key. Name any of its versions.
+- Without either flag a delivery is the only version of itself, as before.
+  The two flags exclude each other.
+
+Versions of one delivery share a **series** identifier: a hash of the key, or
+the first version's identifier for `--replaces`. `<page>/deliveries/<series>`
+always shows the latest version; `<page>/deliveries/<version-id>` shows that
+version. Publishing content identical to the latest version returns that
+version and adds nothing.
+
+What he sees: one row for the delivery with its latest version. The delivery
+page shows the latest version, a version menu, and an "earlier version" notice
+on older ones. When a new version arrives after he read or responded, the row
+is unread again and returns to Open, and the page states which version his
+response was given on ("You accepted version 1; this is version 2") with
+**Change response** still available. A response is always given on the latest
+version and is validated against that version's default and options.
+
+Publish a new version when the same piece of work changed: a correction, new
+information, or the plan revised after his response. Publish a new delivery
+when it is different work or a different decision. Do not publish a version to
+repeat a proposal he dismissed. His earlier acceptance covers the version he
+accepted, not the next one: read `response.version` and act only on what he
+accepted.
 
 ## His responses
 
@@ -69,7 +117,8 @@ only for something within your authority once he accepts it.
 | Discuss | **Discuss in Ribbon Field** opens `thread` | `discussed_at` |
 | Reopen | **Change response** or Undo | `response` returns to null |
 
-Every response is appended to `history` with its time.
+Responses belong to the delivery, across its versions. `response` and every
+`history` event record the `version` they were given on, with the time.
 
 ```sh
 python3 -B <skill-directory>/scripts/read_responses.py --delivery <id>
@@ -77,9 +126,12 @@ python3 -B <skill-directory>/scripts/read_responses.py --deliveries \
   --agent stable-agent-name --since 2026-11-22T15:00:00Z
 ```
 
+`--delivery` accepts a version identifier or a series identifier.
 `--workspace`, `--provider`, and `--thread-id` further restrict the origin.
-`--since` selects deliveries with any response after that time; it does not
-consume or acknowledge anything. No service is needed. Output:
+`--since` selects deliveries with any response, or any state saved by an
+interactive document, after that time; it does not consume or acknowledge
+anything. No service is needed. A delivery with several versions is one
+record, describing its latest version. Output:
 
 ```json
 {
@@ -87,16 +139,26 @@ consume or acknowledge anything. No service is needed. Output:
     "id": "<id>", "title": "...", "origin": {"workspace": "...", "agent": "...", "provider": "...", "thread_id": "...", "host": "..."},
     "received_at": "2026-11-22T15:21:00+00:00", "status": "accepted",
     "read_at": "2026-11-22T16:02:10+00:00",
-    "response": {"type": "accepted", "choice": "recommended_default", "note": "After Tuesday", "at": "2026-11-22T16:03:41+00:00"},
+    "response": {"type": "accepted", "choice": "recommended_default", "note": "After Tuesday", "at": "2026-11-22T16:03:41+00:00", "version": "<version-id>"},
     "discussed_at": null,
-    "history": [{"action": "read", "at": "..."}, {"action": "accept", "choice": "recommended_default", "note": "After Tuesday", "at": "..."}],
-    "recommended_default": "...", "decision": {"question": "...", "options": ["..."]}
+    "history": [{"action": "read", "at": "...", "version": "<version-id>"},
+                {"action": "accept", "choice": "recommended_default", "note": "After Tuesday", "at": "...", "version": "<version-id>"}],
+    "recommended_default": "...", "decision": {"question": "...", "options": ["..."]},
+    "key": "thanksgiving-plan", "series": "<series-id>", "version": "<latest-version-id>", "version_count": 2,
+    "interactive": {"kind": "document", "address": null},
+    "document_state": {"state": {"guests": 12}, "saved_at": "2026-11-22T16:03:20+00:00", "revision": 3, "version": "<version-id>"}
   }],
   "unreadable": 0
 }
 ```
 
-`status` is `new`, `read`, `accepted`, or `dismissed`. Read responses on the
+`status` is `new`, `read`, `accepted`, or `dismissed`. `id` and `version` are
+the latest version; `key` is null without `--key`; `response.version` differs
+from `version` when he responded before the latest version arrived.
+`recommended_default` and `decision` are the latest version's.
+`interactive` and `document_state` are null without an interactive document.
+`document_state` is what that document saved, such as selections or a draft;
+it is never a response or an approval. Read responses on the
 next wake before proposing more work. An acceptance approves exactly the chosen
 default or option, with the note as a condition. A response does not wake an
 agent or start work by itself; act on it within your existing authorization. A

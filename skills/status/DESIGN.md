@@ -118,7 +118,9 @@ marker is an 8 px disc. Chevrons are drawn with two borders; there is no icon se
 | Notice | attention | Material exceptions inside a report | Routine information |
 | Response panel | awaiting, accepted, dismissed | The owner's response to a delivery | Report response fields (those use the response editor) |
 | Response editor | - | Agent-defined questions inside a report | Delivery responses |
-| Version history | - | Earlier versions of an operation report | Anything else |
+| Version history | - | Earlier versions of an operation report or of a delivery | Anything else |
+| Embedded document | retained document, application; unavailable on this address | Content an agent built, in a sandboxed frame across the column inside an item's page or the embedded view | Anything the page itself renders; agent markup is never written into a page |
+| Response proposal | - | A response the embedded document proposes, inside the response panel with Confirm and Ignore | Recording a response without the owner's Confirm |
 | Transient notice | with Undo | Confirming a change that removed a row from view | States the page already shows |
 
 ## Do's and Don'ts
@@ -147,7 +149,11 @@ marker is an 8 px disc. Chevrons are drawn with two borders; there is no icon se
 |---|---|---|---|
 | Operation | title, latest summary, origin, version count, unread, open asks | open, dismiss until next version, restore | Review list, report page |
 | Report version | observations, notices, metrics, actions, sections, response fields | read, answer response fields, open another version | Report page |
-| Delivery | title, summary, recommended default, decision, links, document, attachments, category, agent | read, do it (default or an option), dismiss with a reason, discuss in Ribbon Field, reopen | Review list, delivery page |
+| Delivery | title, summary, recommended default, decision, links, document, attachments, category, agent, key or series, latest version, version count, unread | read, do it (default or an option), dismiss with a reason, discuss in Ribbon Field, reopen | Review list, delivery page |
+| Delivery version | one immutable publication of a delivery; number, received time | read, open another version; responses are given on the latest | Delivery page |
+| Interactive document | kind (retained document or address of an application), the item version it belongs to | use inside the item's page; follow its links in the same tab | Report page, delivery page |
+| Document state | the value the document saved, save time, revision, saving version | saved and loaded by the document through the page; read by agents | Not shown; `read_responses.py` |
+| Embedded application | address on the tailnet host, the item it was opened from | read inside the page's frame, go back, open on its own | Embedded view |
 | Ask (owned by Ribbon Field) | kind, title, full question, choices, blocking, what it unblocks, thread | read in full, resolve by kind with a note, snooze, dismiss, open the thread | Review list, report page of its operation |
 
 ### Lexicon
@@ -186,6 +192,27 @@ Only a 120 ms colour transition on controls. Nothing moves on load.
 
 ## Decision record
 
+- 2026-11-22: The page becomes a host for what agents build. The owner asked
+  that reports be interactive when appropriate, that the page not limit what
+  agents code or generate, and that links not open new pages. (1) Agent
+  content runs in a sandboxed frame with an opaque origin (`allow-scripts
+  allow-forms allow-modals allow-popups allow-downloads`, never
+  `allow-same-origin`), and a retained document is served only with a
+  `Content-Security-Policy` `sandbox` directive, because the tailnet origin is
+  shared with Ribbon Field and a script with that origin could act as the
+  owner there. Nothing else about the content is restricted. (2) An
+  application on the host is framed directly at its own address and not
+  proxied: a proxy would make the Status service a relay to local ports and
+  still could not rewrite the absolute paths an application uses. Embeddable
+  applications must therefore tolerate an opaque origin. (3) A document
+  reaches the page only through a message bridge whose every message the page
+  validates; it may propose a response but never record one, which takes the
+  owner's Confirm in the page's own response panel. What a document saves is
+  its own state, not an approval. (4) Deliveries have versions, published
+  under a stable key or as a replacement; responses stay attached to the
+  series and name the version they were given on, and a newer version makes
+  the row unread again. (5) Everything on this host opens in the same tab with
+  a way back; only another website opens a new tab.
 - 2026-11-22: Replace the monochrome engineering-sheet contract with this
   review-page contract. The owner found the sheet "too minimalist and
   limiting" and asked for an opinionated design with clear visual priority,

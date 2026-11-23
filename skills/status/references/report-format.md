@@ -21,6 +21,14 @@ Content is escaped plain text; use `\n` for paragraph breaks. Unknown fields
 produce an error, not silent loss. Put additional subject matter in a section,
 notice, or summary. This structural format is **never a reason to omit information**.
 
+When the content is better explored than read (a timeline, a comparison to
+filter, a calculator), add one interactive document to the version with
+`build_status.py --interactive /absolute/path/file.html` or `--embed /path/`.
+The page shows it inside the report, after the assessment, metrics, and
+response fields. The structured report stays the record: keep the assessment,
+notices, and actions in the JSON. See
+[interactive-documents.md](interactive-documents.md).
+
 Retain sources and observation times where available. `freshness_minutes` marks
 old data "Stale" relative to generation time, or
 "Observation time unknown" without a timestamp. Fresh snapshots may contain old events: use the snapshot's

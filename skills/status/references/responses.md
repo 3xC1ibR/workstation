@@ -64,6 +64,12 @@ Output is JSON: `responses` is a list of report records containing `id`, `title`
 `origin`, `fields`, `values`, `revision`, and `updated_at`. An unanswered report
 has revision 0, an empty `values` object, and a null save time. `unreadable` reports
 collection coverage gaps; a corrupt selected response fails explicitly.
+Each record also carries `operation`, `interactive`, and `document_state`:
+what the operation's interactive document saved, or null without one (see
+[interactive-documents.md](interactive-documents.md)). Saved state is the
+document's own data, never an answer or an approval. A workspace, agent, or
+thread listing includes a report without response fields when its document
+saved state.
 `--since` selects save times strictly after the timestamp; it does not consume
 or acknowledge answers. Dismissed reports are included. No service is needed.
 Answers belong to one report version; a later version of the same operation
