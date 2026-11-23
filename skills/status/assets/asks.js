@@ -208,6 +208,7 @@
         const address = make("a", publicUrl + "/"); address.href = publicUrl + "/";
         note.append("Answers are sent through Ribbon Field's tailnet address. Open this page at ", address, " to answer here, or answer in Ribbon Field.");
       } else note.append("Ribbon Field is not reachable at this address, so answer this ask in Ribbon Field.");
+      note.append(" ", discuss());                  // the conversation is always one step away, also when nothing can be sent from here
       return note;
     }
     function draw() {
