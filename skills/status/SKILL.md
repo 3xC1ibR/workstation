@@ -119,23 +119,39 @@ alone (briefing.md has the prompt). Do not grade your own report.
 ## Messages from the review page
 
 The owner can select any text on a report or delivery and send it to the
-conversation that published it, with "Explain" or a question of his own. The
-message starts `Question from the review page about your report "<title>"`,
-quotes the selection, names the section, and says how to publish a new version.
-Use your judgment, and do both when both help:
+conversation that published it, with "Explain" or a question of his own. Such a
+message reads:
+
+```
+Question from the review page about your report "<title>" (version <n>), under "<section>":
+
+> <the selected text>
+
+The passage it comes from:
+
+> <the paragraph, list item, or cell around it>
+
+<his question, or: Explain this: what it means, why it matters, and what you recommend.>
+```
+
+It names a report or delivery you published. Use your judgment, and do both
+when both help:
 
 - **Answer in the conversation** when the question is his alone: context, a
   reason, a definition, your recommendation.
-- **Publish a new version** when the report itself fell short: the passage was
+- **Publish a new version** when the item itself fell short: the passage was
   unclear, wrong, stale, or missing something any reader would need. Rebuild
-  with the same operation identity the message names (`--operation <key>`, or
-  the same workspace and agent); for a delivery, `--key` or `--replaces`. Add a
-  `changes` entry saying what you clarified. His open page switches to the new
-  version within seconds, at the same place.
+  the report with the identity you published it under (`--operation <key>`, or
+  the same `--workspace` and `--agent`), starting from its latest JSON; for a
+  delivery, publish with its `--key` or `--replaces <id>`. Add a `changes`
+  entry saying what you clarified. An open report page switches to the new
+  version within seconds, at the same place, so you need not send a link.
 
-Answering is not authority to act beyond the answer: a question is not an
-approval. If he asks you to do something, do it within your existing
-authorization and say so.
+To find the version he means, match the title and version number among the
+operation's reports: each version's JSON is
+`~/.local/state/agent-status/inbox/reports/<id>/report.json`, beside a
+`manifest.json` with its title and origin. A question is not an approval: act
+beyond answering only within your existing authorization, and say what you did.
 
 ## Present and verify
 

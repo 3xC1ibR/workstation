@@ -1,6 +1,6 @@
 "use strict";
 // Selected text on a report or a delivery goes to the conversation of the agent that published it. "Explain" sends it
-// with a standing request; "Question…" with the owner's own words. The message tells the agent to answer in the
+// with a standing request; "Question…" with the owner's own words. The skill tells the agent to answer in the
 // conversation or publish a new version of the item, whichever serves; an open report switches to a new version itself.
 (() => {
   const {make, request, measure} = window.StatusControls;
@@ -15,31 +15,24 @@
   function target(configuration) {
     if (configuration.conversation) {
       const c = configuration.conversation;
-      const identity = c.operation_key ? `--operation ${c.operation_key}`
-        : c.agent ? `--workspace ${c.workspace} --agent ${c.agent}` : `--workspace ${c.workspace}, from this conversation`;
       return {kind: "report", view: "operation", usageKind: "operation", id: configuration.report, session: c.session, link: c.link,
-        label: `your report "${c.title}" (version ${c.version})`, address: c.address,
-        publish: `To revise it, publish a new version with build_status.py ${identity}; this version's JSON is ${c.document}.`};
+        label: `your report "${c.title}" (version ${c.version})`};
     }
     const d = configuration.delivery;
     const thread = typeof d?.thread === "string" && d.thread.match(/^agentcoord:\/\/thread\/([A-Za-z0-9_-]{1,128})$/);
     if (!thread) return null;
     return {kind: "delivery", view: "delivery", usageKind: "delivery", id: d.id, session: thread[1], link: d.thread,
-      label: `your delivery "${d.title}"` + (d.version_count > 1 ? ` (version ${d.versions.length - d.versions.findIndex(v => v.id === d.id)})` : ""),
-      address: location.href.split("#")[0],
-      publish: `To revise it, publish a new version with publish_delivery.py ${d.key ? `--key ${d.key}` : `--replaces ${d.id}`}.`};
+      label: `your delivery "${d.title}"` + (d.version_count > 1 ? ` (version ${d.versions.length - d.versions.findIndex(v => v.id === d.id)})` : "")};
   }
 
-  // The words the agent receives: where the text is, the text quoted, the request, and how to respond.
+  // The words the agent receives: where the text is, the text and its passage quoted, and the request. How to respond
+  // is the status skill's standing instruction ("Messages from the review page"), not part of each message.
   function message(selection, note) {
     const quoted = selection.text.length > QUOTE_LIMIT ? selection.text.slice(0, QUOTE_LIMIT) + "…" : selection.text;
     return [`Question from the review page about ${item.label}` + (selection.heading ? `, under "${selection.heading}"` : "") + ":",
       "", ...quoted.split("\n").map(line => "> " + line), "",
       ...(selection.context ? ["The passage it comes from:", "", ...selection.context.split("\n").map(line => "> " + line), ""] : []),
-      note || EXPLAIN, "",
-      "Use your judgment: answer here in the conversation, or publish a new version if the item itself should change " +
-      "(it was unclear, wrong, or missing something). Do both when both help. An open report page switches to a new version by itself.",
-      item.publish, `Page: ${item.address}`].join("\n");
+      note || EXPLAIN].join("\n");
   }
 
   // The heading of the part of the page the selection starts in, so the agent knows where to look.

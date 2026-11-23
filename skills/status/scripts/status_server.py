@@ -220,15 +220,10 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, as
             except ValueError:
                 session = None
             if session:
-                # What a selection message needs: where it goes, and how the agent publishes a new version of this report.
-                origin = manifest["origin"]
+                # What a selection message needs: where it goes, and which report and version it is about.
                 number = len(operation["versions"]) - [v["id"] for v in operation["versions"]].index(identifier)
-                configuration["conversation"] = {
-                    "session": session, "link": "agentcoord://thread/" + session, "title": manifest["title"], "version": number,
-                    "generated_at": manifest["generated_at"], "operation_key": origin.get("operation"),
-                    "workspace": origin.get("workspace"), "agent": origin.get("agent"),
-                    "document": str(reports.root / "reports" / identifier / "report.json"),
-                    "address": (self.public_url() or f"http://127.0.0.1:{port}") + "/reports/" + identifier}
+                configuration["conversation"] = {"session": session, "link": "agentcoord://thread/" + session,
+                                                 "title": manifest["title"], "version": number}
             if fields:
                 configuration["responses"] = {"fields": fields, "connection": {
                     "id": identifier, "url": f"{base}/api/report-responses/{identifier}",

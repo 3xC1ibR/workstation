@@ -285,8 +285,9 @@ ask chevron. Nothing moves on load.
   reply (the local service to Ribbon Field's loopback queue; on the tailnet
   the paired browser), to the conversation of the operation's latest version,
   or the delivery's thread; the page names only the item, and the service
-  resolves the conversation. It quotes the text, the section, the version, and
-  the exact identity for publishing a new version. Explain sends on one tap
+  resolves the conversation. It quotes the text, its passage, the section and
+  the version, and nothing else: how to respond is a standing instruction in
+  SKILL.md (owner, same day), not boilerplate in every message. Explain sends on one tap
   because a request for an explanation commits him to nothing, unlike an
   ask's resolution. An open report checks for a new version every 5 seconds
   and switches to it at the same scroll position, saying so; while he is

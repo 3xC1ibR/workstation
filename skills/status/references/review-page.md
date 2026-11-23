@@ -301,7 +301,8 @@ Requests from the sandbox itself carry an opaque origin and are refused.
 On a report or delivery page, selecting text shows **Explain** and
 **Question…**. The message goes to the conversation of the agent behind the
 item: for a report, the conversation of its operation's latest version; for a
-delivery, its `thread`. On this Mac the page posts `{kind, id, message}` to
+delivery, its `thread`. The message carries only the item's title and version, the
+section, the selection, its passage, and the request; how to respond is in SKILL.md. On this Mac the page posts `{kind, id, message}` to
 `/api/item-message` and the service queues it in Ribbon Field (the same
 loopback path as an ask's reply); on the tailnet address a paired browser
 queues it in Ribbon Field directly, and an unpaired one says so. The service

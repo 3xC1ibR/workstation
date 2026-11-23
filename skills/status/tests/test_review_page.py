@@ -1202,9 +1202,7 @@ class SelectionMessageTests(Workspace):
         self.assertIn("selection_messages.js", page)
         configuration = json.loads(page.split('id="status-configuration">')[1].split("</script>")[0])
         conversation = configuration["conversation"]
-        self.assertEqual((conversation["session"], conversation["operation_key"], conversation["agent"], conversation["version"]),
-                         ("thread-a", "holdco-bridge", "lead", 1))
-        self.assertTrue(conversation["document"].endswith(f"{identifier}/report.json"))
+        self.assertEqual(conversation, {"session": "thread-a", "link": "agentcoord://thread/thread-a", "title": "HoldCo bridge", "version": 1})
         self.assertEqual(self.request("/selection_messages.js")[0], 200)
 
     def test_an_open_report_can_ask_for_its_latest_version_cheaply(self):
