@@ -26,8 +26,9 @@
       section.hidden = !asks.available || !asks.asks.length;
       if (section.hidden) return;
       const list = make("ol", null, "rows");
-      for (const ask of asks.asks) list.append(window.StatusAsks.createAskRow(ask, {changed: () => showAsks(true), publicUrl: public_url}));
-      section.replaceChildren(make("h2", asks.asks.length === 1 ? "This operation needs you" : `This operation needs you (${asks.asks.length})`), list);
+      for (const ask of asks.asks) list.append(window.StatusAsks.createAskRow(ask, {changed: () => showAsks(true), publicUrl: public_url, within: "operation"}));
+      const heading = make("h2", "Needs you "); heading.append(make("span", String(asks.asks.length), "count"));
+      section.replaceChildren(heading, list);
     }).catch(() => {});
   }
   showAsks();

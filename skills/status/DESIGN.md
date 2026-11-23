@@ -4,24 +4,21 @@ colors:
   primary: "#1c1c1e"        # --action: the one primary action of a view
   accent: "#1f5fd6"         # --accent: unread marker, links, keyboard focus
   bg: "#ffffff"             # --canvas
-  surface: "#ffffff"        # --surface: the page itself; menus and response panels
-  surface-quiet: "#f3f3f5"  # --surface-quiet: row hover, search field, segmented track, code
+  surface: "#ffffff"        # --surface: the page itself, menus and controls
+  surface-quiet: "#f3f3f5"  # --surface-quiet: row hover, the chosen view, the search field in use, code
   fg: "#1c1c1e"             # --ink
   fg-muted: "#505057"       # --ink-secondary: secondary prose
   fg-faint: "#6c6c73"       # --ink-tertiary: row metadata and ages, at least 4.5:1 on every surface
   border: "#e7e7ea"         # --rule: hairlines
-  border-strong: "#c8c8ce"  # --rule-strong: control outlines and the response panel
+  border-strong: "#c8c8ce"  # --rule-strong: control outlines
   danger: "#c0341d"         # --critical: blocking asks, failures
   warning: "#9a5300"        # --attention: notices, stale or overdue, earlier version
   success: "#17693f"        # --positive: accepted
 typography:
   title:   { fontFamily: system-ui, fontSize: 30px, fontWeight: 700, lineHeight: 1.25 }
-  heading: { fontFamily: system-ui, fontSize: 17px, fontWeight: 700, lineHeight: 1.25 }
-  lead:    { fontFamily: system-ui, fontSize: 18px, lineHeight: 1.5 }
+  heading: { fontFamily: system-ui, fontSize: 20px, fontWeight: 700, lineHeight: 1.25 }
   reading: { fontFamily: system-ui, fontSize: 16px, lineHeight: 1.6 }
-  body:    { fontFamily: system-ui, fontSize: 15px, lineHeight: 1.5 }
   meta:    { fontFamily: system-ui, fontSize: 13px, lineHeight: 1.5 }
-  value:   { fontFamily: system-ui, fontSize: 22px, fontWeight: 600, lineHeight: 1.25 }
 rounded:
   sm: 4px
   control: 8px

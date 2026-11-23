@@ -2,7 +2,8 @@
 (() => {
   const {make, time, elapsed, base, request, measure} = window.StatusControls;
   const element = id => document.getElementById(id);
-  let review = null, signature = "", undo = null, noticeTimer = null, revision = 0;
+  let review = null, signature = "", undo = null, noticeTimer = null, revision = 0, searched = "";
+  const WEEK = 7 * 86400e3, olderOpen = {deliveries: false, operations: false};       // the reader's own choice for each Older group
   const pending = new Set();
   const view = () => document.querySelector('input[name="view"]:checked').value;
   const plural = (count, noun, many = noun + "s") => `${count} ${count === 1 ? noun : many}`;
@@ -87,13 +88,27 @@
       actions: [dismissed ? ["Restore", () => dismissOperation(operation, false), "quiet"] : ["Dismiss", () => dismissOperation(operation, true), "quiet"]]});
   }
 
-  function fill(section, items, build, count) {
-    const node = element(section), list = node.querySelector(".rows");
-    const focused = document.activeElement?.closest?.(".row"), focusKey = focused?.dataset.key;
-    const focusIndex = focused ? [...focused.querySelectorAll("a, button, textarea")].indexOf(document.activeElement) : -1;
+  function fill(list, items, build) {
+    const focused = document.activeElement?.closest?.(".row"), focusKey = list.contains(focused) && focused.dataset.key;
+    const focusIndex = focusKey ? [...focused.querySelectorAll("a, button, textarea")].indexOf(document.activeElement) : -1;
     list.replaceChildren(...items.map(build));
-    node.querySelector(".count").textContent = count == null ? "" : String(count);
     if (focusKey) [...(list.querySelector(`[data-key="${focusKey}"]`)?.querySelectorAll("a, button, textarea") || [])][focusIndex]?.focus({preventScroll: true});
+  }
+  // One list, newest first. Items with nothing new for a week go to the closed Older group; a search that matches inside opens it.
+  function section(name, items, build, query) {
+    const node = element(name), group = node.querySelector(".older"), at = item => Date.parse(item.received_at) || 0;
+    if (group) items.sort((first, second) => at(second) - at(first));              // asks keep Ribbon Field's order
+    let older = group ? items.filter(item => Date.now() - at(item) > WEEK) : [];
+    if (older.length === items.length) older = [];                                   // a section holding nothing newer shows its rows directly
+    fill(node.querySelector(".rows"), items.filter(item => !older.includes(item)), build);
+    node.querySelector(".count").textContent = String(items.length);
+    node.hidden = !items.length;
+    if (group) {
+      fill(group.querySelector(".rows"), older, build);
+      group.querySelector(".count").textContent = String(older.length);
+      group.hidden = !older.length;
+      if (query !== searched) group.open = query ? true : olderOpen[name];
+    }
     return items.length;
   }
 
@@ -104,20 +119,12 @@
     const asks = show === "done" ? [] : review.asks.asks.filter(ask => matches(query, ask.title, ask.detail, ask.context, ask.unblocks, ask.project_label, ask.thread_title));
     const deliveries = review.deliveries.filter(delivery => wanted(settled(delivery)) &&
       matches(query, delivery.title, delivery.summary, delivery.recommended_default, delivery.category, delivery.origin.agent, delivery.origin.workspace));
-    deliveries.sort((first, second) => (Date.parse(second.received_at) || 0) - (Date.parse(first.received_at) || 0));
     const operations = review.operations.filter(operation => wanted(Boolean(operation.dismissed_at)) &&
       matches(query, operation.title, operation.subject, operation.summary, operation.origin.agent, operation.origin.workspace));
-    // Newest version first in one list; unread dots and ask counts stay on the rows. Reports quiet for a week sink to the end.
-    const WEEK = 7 * 86400e3, at = operation => Date.parse(operation.received_at) || 0;
-    const quiet = operation => Date.now() - at(operation) > WEEK;
-    operations.sort((first, second) => (quiet(first) - quiet(second)) || (at(second) - at(first)));
-    const shown = fill("asks", asks, askRow, asks.length) + fill("deliveries", deliveries, deliveryRow, deliveries.length) +
-      fill("operations", operations, operationRow, operations.length);
-    element("asks").hidden = !asks.length;
+    const shown = section("asks", asks, askRow, query) + section("deliveries", deliveries, deliveryRow, query) + section("operations", operations, operationRow, query);
+    searched = query;
     element("review-source").hidden = review.asks.available || show === "done";
     element("review-source").replaceChildren(...(review.asks.available ? [] : [make("strong", "Asks unavailable. "), review.asks.reason]));
-    element("deliveries").hidden = !deliveries.length;
-    element("operations").hidden = !operations.length;
     const awaiting = review.deliveries.filter(delivery => !settled(delivery)).length;
     const updated = review.operations.filter(operation => operation.unread && !operation.dismissed_at).length;
     const blocking = review.asks.asks.filter(ask => ask.blocking).length;
@@ -125,7 +132,7 @@
       review.asks.asks.length ? plural(review.asks.asks.length, "ask") + (blocking ? ` (${blocking} blocking)` : "") : null,
       awaiting ? plural(awaiting, "delivery", "deliveries") + " to review" : null,
       updated ? plural(updated, "operation") + " unread" : null].filter(Boolean).join(" · ") || (review.asks.available ? "Nothing is waiting for you" : "");
-    element("review-search").hidden = !review.deliveries.length && !review.operations.length && !review.asks.asks.length;
+    element("review-search").parentElement.hidden = !review.deliveries.length && !review.operations.length && !review.asks.asks.length;
     const empty = element("review-empty");
     empty.hidden = shown > 0;
     if (!shown) {
@@ -161,7 +168,7 @@
     finally { pending.delete(key); signature = ""; await load(); }
   }
   function respond(delivery, action, choice) {
-    const message = {accept: "Accepted. The agent reads this on its next wake.", dismiss: "Dismissed.", reopen: ""}[action];
+    const message = {accept: "Accepted.", dismiss: "Dismissed.", reopen: ""}[action];
     return change("delivery-" + delivery.id, () => request("/api/delivery-response", {id: delivery.id, action, ...(choice ? {choice} : {})}),
       message, action === "reopen" ? null : () => respond(delivery, "reopen"));
   }
@@ -177,6 +184,10 @@
     history.replaceState(null, "", view() === "open" ? location.pathname : "?view=" + view()); render();
   });
   element("review-search").addEventListener("input", render);
+  for (const name of Object.keys(olderOpen)) {
+    const group = element(name).querySelector(".older");
+    group.addEventListener("toggle", () => { if (!element("review-search").value.trim()) olderOpen[name] = group.open; });
+  }
   element("review-undo").onclick = () => { const reverse = undo; element("review-notice").hidden = true; undo = null; if (reverse) reverse(); };
   document.addEventListener("visibilitychange", () => { if (!document.hidden && !window.StatusAsks.editing()) load(); });
   const timer = setInterval(() => { if (!document.hidden && !pending.size && !window.StatusAsks.editing()) load(); }, 20000);

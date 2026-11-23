@@ -8,7 +8,7 @@ window.createStatusResponses = (report, {make, request, createPicker, pickers, t
   const form = make("form"), fields = make("fieldset", null, "response-fields");
   const actions = make("div", null, "response-actions");
   const save = make("button", "Save responses"), reload = make("button", "Load saved responses");
-  save.type = "submit"; reload.type = "button";
+  save.type = "submit"; save.className = "primary"; reload.type = "button"; reload.className = "quiet";
   actions.append(save, reload); fields.append(actions); form.append(fields);
   if (!expanded) details.append(summary);
   details.append(status, failure, form); form.hidden = true;

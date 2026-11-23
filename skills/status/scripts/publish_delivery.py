@@ -39,12 +39,12 @@ def main():
         record = Deliveries(root).record(identifier)
     except (ValueError, KeyError, OSError) as error:
         parser.error(str(error))
+    # `url` opens on every device and comes first when the service has a recorded tailnet address; `local_url` is the fallback on this Mac.
     from status_server import DEFAULT_PORT, saved_public_url
-    result = {"delivery": identifier, "series": record["series"], "version_number": record["number"],
-              "local_url": f"http://127.0.0.1:{DEFAULT_PORT}/deliveries/{identifier}"}
-    public = saved_public_url(root)
+    result, public = {"delivery": identifier, "series": record["series"], "version_number": record["number"]}, saved_public_url(root)
     if public:
         result["url"] = f"{public}/deliveries/{identifier}"
+    result["local_url"] = f"http://127.0.0.1:{DEFAULT_PORT}/deliveries/{identifier}"
     print(json.dumps(result, indent=2))
 
 

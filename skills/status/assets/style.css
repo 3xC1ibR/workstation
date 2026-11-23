@@ -1,40 +1,44 @@
 /* Base, report sheet, and controls. Values come from tokens.css. */
 * { box-sizing: border-box; }
 html { -webkit-text-size-adjust: 100%; }
-body { margin: 0; background: var(--canvas); color: var(--ink); font: var(--body)/var(--line) var(--sans); -webkit-font-smoothing: antialiased; }
+body { margin: 0; background: var(--canvas); color: var(--ink); font: var(--reading)/var(--line) var(--sans); -webkit-font-smoothing: antialiased; }
 main { max-width: calc(var(--page-width) + 2 * var(--page-inset)); margin: auto; padding: var(--page-top) var(--page-inset) var(--space-8); }
 p, h1, h2, h3, h4, dl, dd, figure { margin: 0; }
 h1 { font-size: var(--title); line-height: var(--line-tight); font-weight: var(--weight-title); letter-spacing: var(--tracking-title); overflow-wrap: anywhere; text-wrap: balance; }
 h2 { font-size: var(--heading); line-height: var(--line-tight); font-weight: var(--weight-title); letter-spacing: var(--tracking-heading); }
-h3 { font-size: var(--body); font-weight: var(--weight-strong); }
+h3 { font-size: var(--reading); font-weight: var(--weight-strong); }
 a { color: var(--accent); text-decoration: none; overflow-wrap: anywhere; }
 a:hover { text-decoration: underline; text-underline-offset: var(--space-1); }
 code, pre { font: .92em/var(--line) var(--mono); overflow-wrap: anywhere; }
 :is(a, summary, button, input, select, textarea, [tabindex]):focus-visible { outline: var(--focus) solid var(--accent); outline-offset: var(--focus); border-radius: var(--radius-small); }
 .secondary, .provenance, .sheet-meta, .subject, footer { color: var(--ink-tertiary); font-size: var(--meta); }
 .text { white-space: pre-line; overflow-wrap: anywhere; }
+/* A line that begins with a number hangs its number in the margin of its own text. */
+.step { display: grid; grid-template-columns: auto minmax(0, 1fr); column-gap: var(--space-1); white-space: normal; }
 .numeric { font-variant-numeric: tabular-nums; }
+.announcement { position: absolute; width: var(--stroke); height: var(--stroke); overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* Report sheet: ink on the page itself, divided by hairlines. */
-.sheet-header { display: grid; gap: var(--space-2); }
+.sheet-header { display: grid; gap: var(--space-1); }
+.sheet-header h1 { margin-bottom: var(--space-1); }
 .subject { overflow-wrap: anywhere; }
 .subject-details summary { display: block; min-height: 0; padding: 0; color: var(--ink-tertiary); font-size: var(--meta); font-weight: 400; letter-spacing: 0; }
 .subject-details summary::after { content: none; }
-.assessment { font-size: var(--lead); line-height: var(--line); padding: var(--space-5) 0; max-width: var(--measure); }
-.notice { margin-top: var(--space-4); padding: var(--space-1) 0 var(--space-1) var(--space-4); border-inline-start: var(--accent-edge) solid var(--attention); max-width: var(--measure); }
-.notice h2 { font-size: var(--body); font-weight: var(--weight-strong); letter-spacing: 0; margin-bottom: var(--space-1); }
+.assessment { line-height: var(--line-reading); padding: var(--space-5) 0; max-width: var(--measure); }
+.notice { margin-top: var(--space-4); padding-inline-start: var(--space-4); border-inline-start: var(--accent-edge) solid var(--attention); max-width: var(--measure); line-height: var(--line-reading); }
+.notice h2 { font-size: var(--reading); line-height: inherit; font-weight: var(--weight-strong); letter-spacing: 0; }
 .assessment + .notice { margin-top: 0; }
 .notice:has(+ :not(.notice)) { margin-bottom: var(--space-5); }
 .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--metric-width)), 1fr)); align-items: start; gap: var(--space-5); padding: var(--space-4) 0; border-block: var(--stroke) solid var(--rule); }
 .metric { min-width: 0; overflow-wrap: anywhere; }
 .metric dt { color: var(--ink-secondary); font-size: var(--meta); }
-.value { font-size: var(--value); line-height: var(--line-tight); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; letter-spacing: var(--tracking-heading); margin: var(--space-1) 0; }
+.value { font-size: var(--heading); line-height: var(--line-tight); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; letter-spacing: var(--tracking-heading); margin: var(--space-1) 0; }
 .detail { font-size: var(--meta); color: var(--ink-secondary); }
 .freshness { color: var(--attention); }
 .metric .provenance { margin-top: var(--space-1); }
-.sheet section { margin-top: var(--space-6); }
+.sheet section { margin-top: var(--space-7); }
 .section-heading { padding-bottom: var(--space-2); margin-bottom: var(--space-3); border-bottom: var(--stroke) solid var(--rule); }
-.sheet section > .text, .sheet details > .text { max-width: var(--measure); font-size: var(--reading); line-height: var(--line-reading); }
+.sheet section > .text, .sheet details > .text { max-width: var(--measure); line-height: var(--line-reading); }
 .actions { padding: 0; margin: 0; list-style: none; }
 .actions li { padding: var(--space-3) 0; border-bottom: var(--stroke) solid var(--rule); }
 .actions li:first-child { padding-top: 0; }
@@ -45,7 +49,6 @@ code, pre { font: .92em/var(--line) var(--mono); overflow-wrap: anywhere; }
 .actions [data-status="settled"] .action-title { color: var(--ink-secondary); font-weight: 400; }
 .provenance { margin-top: var(--space-2); overflow-wrap: anywhere; }
 .table-region { max-width: 100%; overflow-x: auto; margin-top: var(--space-3); }
-.scroll-note { display: none; font-size: var(--meta); color: var(--ink-tertiary); margin-top: var(--space-3); }
 table { width: 100%; border-collapse: collapse; font-size: var(--meta); font-variant-numeric: tabular-nums; }
 th, td { padding: var(--space-2) var(--space-4) var(--space-2) 0; border-bottom: var(--stroke) solid var(--rule); text-align: left; vertical-align: top; min-width: var(--cell-width); overflow-wrap: anywhere; }
 th:last-child, td:last-child { padding-inline-end: 0; }
@@ -53,7 +56,7 @@ tbody tr:last-child td { border-bottom: 0; }
 th { font-weight: var(--weight-strong); color: var(--ink-secondary); border-bottom-color: var(--rule-strong); }
 .text-column { min-width: var(--text-cell-width); }
 .empty { color: var(--ink-secondary); padding: var(--space-3) 0; }
-.sheet details { margin-top: var(--space-6); border-top: var(--stroke) solid var(--rule); }
+.sheet details { margin-top: var(--space-7); border-top: var(--stroke) solid var(--rule); }
 .sheet details + details { margin-top: 0; }
 .sheet > details:last-child { border-bottom: var(--stroke) solid var(--rule); }
 .sheet details[open] { padding-bottom: var(--space-4); }
@@ -65,58 +68,55 @@ details[open] > summary::after { transform: translateY(25%) rotate(-135deg); }
 .response-questions dt { margin-top: var(--space-4); font-weight: var(--weight-strong); }
 footer { margin-top: var(--space-5); }
 
-/* Controls */
+/* Controls: one height and one text size, both larger at phone width. */
 input, select, textarea, button { font: inherit; color: var(--ink); max-width: 100%; }
-input, select, textarea { width: 100%; background: var(--surface); border: var(--stroke) solid var(--rule-strong); border-radius: var(--radius-control); min-height: var(--control-height); padding: var(--space-2) var(--space-3); }
-textarea { display: block; resize: vertical; line-height: var(--line); }
+input, select, textarea { width: 100%; background: var(--surface); border: var(--stroke) solid var(--rule-strong); border-radius: var(--radius-control); min-height: var(--control-height); padding: var(--space-1) var(--space-3); }
+textarea { display: block; resize: none; field-sizing: content; line-height: var(--line); }
 ::placeholder { color: var(--ink-tertiary); opacity: 1; }
-button { cursor: pointer; background: var(--surface); border: var(--stroke) solid var(--rule-strong); border-radius: var(--radius-control); min-height: var(--control-height); padding: 0 var(--space-3); font-size: var(--meta); font-weight: var(--weight-medium); white-space: nowrap; transition: background var(--quick), border-color var(--quick), color var(--quick); }
+button { cursor: pointer; background: var(--surface); border: var(--stroke) solid var(--rule-strong); border-radius: var(--radius-control); min-height: var(--control-height); padding: 0 var(--space-3); font-size: var(--control-text); font-weight: var(--weight-medium); white-space: nowrap; transition: background var(--quick), border-color var(--quick), color var(--quick); }
 button:hover { background: var(--surface-quiet); }
 button:disabled { color: var(--ink-tertiary); cursor: default; }
+/* One solid button per panel states its main action; it is never greyed out. */
 button.primary { background: var(--action); border-color: var(--action); color: var(--action-ink); font-weight: var(--weight-strong); }
 button.primary:hover { background: var(--action-hover); border-color: var(--action-hover); }
-button.primary:disabled { background: var(--surface-quiet); border-color: transparent; color: var(--ink-tertiary); }
 button.quiet { background: none; border-color: transparent; color: var(--ink-secondary); }
 button.quiet:hover { background: var(--surface-quiet); color: var(--ink); }
 .picker { display: grid; position: relative; min-width: 0; }
 .picker-native { grid-area: 1 / 1; visibility: hidden; pointer-events: none; }
-.picker-trigger { grid-area: 1 / 1; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-width: 0; width: 100%; text-align: left; font-size: var(--body); font-weight: 400; white-space: normal; padding: var(--space-2) var(--space-3); }
+.picker-trigger { grid-area: 1 / 1; display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); min-width: 0; width: 100%; text-align: left; font-size: var(--reading); font-weight: 400; white-space: normal; padding: var(--space-1) var(--space-3); }
 .picker-trigger span { overflow-wrap: anywhere; }
 .picker-trigger::after { content: ""; flex-shrink: 0; width: var(--space-2); height: var(--space-2); border-right: var(--glyph-stroke) solid var(--ink-secondary); border-bottom: var(--glyph-stroke) solid var(--ink-secondary); transform: translateY(-25%) rotate(45deg); }
 .picker-trigger[aria-expanded="true"] { border-color: var(--accent); }
 .picker-options { position: absolute; top: calc(100% + var(--space-1)); left: 0; right: 0; z-index: var(--layer-menu); max-height: 50vh; overflow: auto; overscroll-behavior: contain; background: var(--surface); border: var(--stroke) solid var(--rule-strong); border-radius: var(--radius-control); padding: var(--space-1); }
-.picker-option { display: flex; align-items: center; min-height: var(--control-height); padding: var(--space-2) var(--space-3); border-radius: var(--radius-small); cursor: pointer; overflow-wrap: anywhere; }
+.picker-option { display: flex; align-items: center; min-height: var(--control-height); padding: var(--space-1) var(--space-3); border-radius: var(--radius-small); cursor: pointer; overflow-wrap: anywhere; }
 .picker-option[aria-selected="true"] { font-weight: var(--weight-strong); }
 .picker-option[data-active="true"] { background: var(--surface-quiet); }
 .note { font-size: var(--meta); color: var(--ink-secondary); overflow-wrap: anywhere; }
 .failure { padding: var(--space-3) var(--space-4); background: var(--critical-tint); color: var(--critical); border-radius: var(--radius-control); font-size: var(--meta); }
 
-/* A bordered panel is where the owner responds; nothing else on a page is boxed. */
-.response-panel, .response-editor { margin-inline: calc(-1 * var(--row-bleed)); padding: var(--space-4) calc(var(--row-bleed) - var(--stroke)); border: var(--stroke) solid var(--rule-strong); border-radius: var(--radius); }
-#status-response-fields > .section-heading { border-bottom: 0; padding-bottom: 0; }
+/* The response editor of a report: its fields sit on the page under the section heading. */
 .response-fields { border: 0; padding: 0; margin: 0; min-width: 0; }
-.response-field { display: grid; gap: var(--space-2); margin-top: var(--space-4); min-width: 0; }
+.response-field { display: grid; gap: var(--space-1); margin-top: var(--space-4); min-width: 0; }
 .response-field:first-child { margin-top: 0; }
 .response-field label { font-weight: var(--weight-strong); overflow-wrap: anywhere; }
+.response-field .note { margin-bottom: var(--space-1); }
 .response-actions { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-4); }
 .response-editor [role="status"] { margin-top: var(--space-3); }
 .response-editor > [role="status"]:empty { display: none; }
 
 @media (max-width: 640px) {
-  .assessment { font-size: var(--reading); line-height: var(--line-reading); }
   .metrics { grid-template-columns: 1fr 1fr; gap: var(--space-4); }
-  .scroll-note { display: block; }
-  th:first-child, td:first-child { position: sticky; left: 0; background: var(--surface); min-width: var(--record-width); border-right: var(--stroke) solid var(--rule); }
-  button { min-height: var(--touch-height); font-size: var(--body); }
-  input, select, textarea, .picker-trigger { min-height: var(--touch-height); font-size: var(--reading); }
-  .picker-option, .subject-details summary { min-height: var(--touch-height); }
-  .subject-details summary { display: flex; }
+  /* A wide table scrolls under its first column; a table of two columns wraps instead. */
+  table:not(.table-pair) :is(th, td):first-child { position: sticky; left: 0; background: var(--surface); min-width: var(--record-width); border-right: var(--stroke) solid var(--rule); }
+  .table-pair :is(th, td) { min-width: 0; }
+  .table-pair :is(th, td):first-child { width: 38%; }
+  .subject-details summary { display: flex; min-height: var(--touch-height); }
   .source a { display: inline-flex; align-items: center; min-height: var(--touch-height); }
 }
 @media print {
   main { max-width: none; padding: 0; }
   .table-region { overflow: visible; }
-  .scroll-note, .response-actions, .page-navigation { display: none; }
+  .response-actions, .page-navigation { display: none; }
   details::details-content { display: block; content-visibility: visible; }
   section, .metric, .notice, .actions li { break-inside: avoid; }
 }

@@ -51,8 +51,10 @@ file paths are shown as text with a Copy path control, because they exist only
 on the Mac. Images and binary files are not retained; link to them.
 
 The command prints
-`{"delivery": "<id>", "series": "<id>", "version_number": 1, "local_url": "...", "url": "..."}`;
-`url` is present when the service has a recorded tailnet address. Publishing
+`{"delivery": "<id>", "series": "<id>", "version_number": 1, "url": "...", "local_url": "..."}`.
+`url` is present, and comes first, when the service has a recorded tailnet
+address: give the user that link, because it opens on every device. `local_url`
+opens only on the Mac and is the fallback. Publishing
 the same delivery again returns the same identifier. Each published version is
 immutable.
 

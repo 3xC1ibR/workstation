@@ -65,34 +65,36 @@
   function render() {
     const response = delivery.response, content = [];
     if (response) {
-      const outcome = make("div", null, "response-outcome"), line = make("p");
+      const outcome = make("div", null, "response-outcome"), line = make("p"), quiet = make("div", null, "response-quiet");
       const accepted = response.type === "accepted";
       line.append(make("span", accepted ? "Accepted" : "Dismissed", accepted ? "outcome-accepted" : "outcome-dismissed"),
         ` ${time(response.at)}` + (accepted && response.choice !== "recommended_default" ? `: ${response.choice}` : accepted ? ": the recommended default" : ""));
       outcome.append(line);
       if (delivery.latest) {
         const reopen = make("button", "Change response", "quiet"); reopen.type = "button"; reopen.disabled = busy; reopen.onclick = () => respond("reopen");
-        outcome.append(reopen);
+        quiet.append(reopen);
       }
-      content.push(outcome);
+      outcome.append(quiet); content.push(outcome);
       if (response.version !== delivery.id) {
         const given = delivery.response_version_number ? `version ${delivery.response_version_number}` : "an earlier version";
         content.push(make("p", `You ${accepted ? "accepted" : "dismissed"} ${given}; this is version ${delivery.number}.`, "response-version"));
       }
       if (response.note) content.push(make("p", "Your note: " + response.note, "note text"));
-      content.push(make("p", accepted ? "The agent reads this response on its next wake." : "The agent sees the dismissal and your reason on its next wake.", "note"));
     } else if (delivery.latest) {
+      // One solid button accepts the recommendation; the other answers are outlined, and the rest stay quiet.
       const buttons = make("div", null, "response-buttons");
       const add = (label, handler, className) => { const button = make("button", label, className || ""); button.type = "button"; button.disabled = busy; button.onclick = handler; buttons.append(button); };
       if (delivery.recommended_default) add("Do it", () => respond("accept", "recommended_default"), "primary");
       for (const option of options) add(option, () => respond("accept", option));
-      add("Dismiss", () => respond("dismiss"));
-      buttons.append(make("span", null, "spacer"));
-      if (!noteOpen) add("Add a note", () => { noteOpen = true; render(); panel.querySelector("textarea").focus(); }, "quiet");
+      const quiet = make("div", null, "response-quiet"), answers = buttons;
+      buttons.append(quiet);
+      const addQuiet = (label, handler) => { add(label, handler, "quiet"); quiet.append(answers.lastElementChild); };
+      if (!noteOpen) addQuiet("Add a note", () => { noteOpen = true; render(); panel.querySelector("textarea").focus(); });
+      addQuiet("Dismiss", () => respond("dismiss"));
       content.push(buttons);
       if (noteOpen) {
-        const field = make("textarea", null, "response-note"); field.rows = 3; field.value = noteText; field.maxLength = 4000;
-        field.placeholder = "A note or reason for the agent. Sent with Do it, an option, or Dismiss.";
+        const field = make("textarea", null, "response-note"); field.rows = 2; field.value = noteText; field.maxLength = 4000;
+        field.placeholder = "A note or reason for the agent, sent with your response";
         field.setAttribute("aria-label", "Note for the agent"); field.oninput = () => { noteText = field.value; };
         content.push(field);
       }
@@ -100,13 +102,14 @@
     if (!delivery.latest) {
       const later = make("p", "Responses are given on the latest version. ", "note"), link = make("a", "Open the latest version");
       link.href = `${base}/deliveries/${delivery.version}`; later.append(link); content.push(later);
-    } else if (delivery.thread) {
-      const discuss = make("a", "Discuss in Ribbon Field", "link-button"); discuss.href = delivery.thread;
-      discuss.onclick = () => { request("/api/delivery-response", {id: delivery.id, action: "discuss"}).then(next => { delivery = next; }).catch(() => {}); };
-      content[0].append(discuss);
     }
     if (proposal && delivery.latest) content.push(proposalBlock());
     if (failed) { const alert = make("p", failed, "failure"); alert.setAttribute("role", "alert"); content.push(alert); }
+    if (delivery.thread && delivery.latest) {
+      const discuss = make("a", "Discuss in Ribbon Field"); discuss.href = delivery.thread;
+      discuss.onclick = () => { request("/api/delivery-response", {id: delivery.id, action: "discuss"}).then(next => { delivery = next; }).catch(() => {}); };
+      content[0].querySelector(".response-quiet").append(discuss);
+    }
     panel.replaceChildren(...content);
   }
   render();

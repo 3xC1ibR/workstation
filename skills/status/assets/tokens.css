@@ -1,6 +1,6 @@
 /* Design tokens for the review page and its reports. DESIGN.md mirrors these values. */
 :root {
-  --canvas: #ffffff; --surface: #ffffff; --surface-quiet: #f3f3f5; --surface-raised: #ffffff;
+  --canvas: #ffffff; --surface: #ffffff; --surface-quiet: #f3f3f5;
   --ink: #1c1c1e; --ink-secondary: #505057; --ink-tertiary: #6c6c73;
   --rule: #e7e7ea; --rule-strong: #c8c8ce;
   --accent: #1f5fd6;
@@ -10,15 +10,16 @@
   --positive: #17693f;
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
   --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 72px;
-  --meta: 13px; --body: 15px; --reading: 16px; --heading: 17px; --lead: 18px; --value: 22px; --title: 30px;
-  --line-tight: 1.25; --line: 1.5; --line-reading: 1.6;
+  /* Four sizes: metadata and controls, text, section headings, the page title. */
+  --meta: 13px; --reading: 16px; --heading: 20px; --title: 30px;
+  --line-tight: 1.25; --line-snug: 1.35; --line: 1.5; --line-reading: 1.6;
   --weight-medium: 500; --weight-strong: 600; --weight-title: 700;
   --tracking-title: -.022em; --tracking-heading: -.012em;
   --stroke: 1px; --focus: 2px; --glyph-stroke: 1.5px; --marker: 8px; --accent-edge: 3px;
   --radius: 10px; --radius-control: 8px; --radius-small: 4px; --radius-round: 999px;
   --page-width: 720px; --page-inset: 32px; --page-top: 56px; --row-bleed: 20px; --measure: 68ch;
-  --metric-width: 190px; --search-width: 200px; --cell-width: 96px; --record-width: 150px; --text-cell-width: 300px;
-  --control-compact: 32px; --control-height: 36px; --touch-height: 44px;
+  --metric-width: 190px; --search-width: 108px; --search-width-active: 176px; --cell-width: 96px; --record-width: 150px; --text-cell-width: 300px;
+  --control-height: 32px; --control-text: var(--meta); --touch-height: 44px;
   --embedded-height: 480px; --embedded-application-height: 80vh;
   --layer-row-action: 1; --layer-menu: 2; --layer-notice: 3;
   --quick: 120ms;
@@ -28,7 +29,7 @@
 }
 @media (prefers-color-scheme: dark) {
   :root {
-    --canvas: #18181a; --surface: #18181a; --surface-quiet: #242427; --surface-raised: #36363b;
+    --canvas: #18181a; --surface: #18181a; --surface-quiet: #242427;
     --ink: #ececef; --ink-secondary: #b4b4bc; --ink-tertiary: #92929b;
     --rule: #2c2c30; --rule-strong: #47474d;
     --accent: #7fa8ff;
@@ -38,7 +39,7 @@
     --positive: #6fcf97;
   }
 }
-/* Phone width: the page inset shrinks, the title steps down, and an open ask keeps a margin from the screen edge. */
+/* Phone width: the page inset shrinks, the title steps down, and controls grow to touch size. */
 @media (max-width: 640px) {
-  :root { --title: 26px; --page-inset: 20px; --page-top: 24px; --row-bleed: 12px; }
+  :root { --title: 26px; --page-inset: 20px; --page-top: 20px; --row-bleed: 12px; --control-height: 44px; --control-text: var(--reading); }
 }
