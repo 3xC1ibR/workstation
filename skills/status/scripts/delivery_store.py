@@ -238,16 +238,23 @@ class Deliveries:
         """The versions of one series, newest first; empty when nothing was published in it."""
         return self._series()[0].get(series, [])
 
-    def _resolve(self, identifier):
-        """(version, versions of its series) for a version identifier, or for a series identifier its latest version."""
+    def _resolve(self, identifier, exact=False):
+        """(version, versions of its series) for an identifier.
+
+        A series identifier names the latest version of the series. That holds when it is also the identifier of
+        the series' first version, as it is for a delivery continued with --replaces: the address of a delivery
+        keeps showing the delivery as it now stands. `exact` asks for the version with that identifier instead.
+        """
         if not isinstance(identifier, str) or not IDENTIFIER.fullmatch(identifier):
             raise StatusError("Invalid delivery identifier.")
         groups = self._series()[0]
+        if not exact and identifier in groups:
+            return groups[identifier][0], groups[identifier]
         for versions in groups.values():
             for version in versions:
                 if version["id"] == identifier:
                     return version, versions
-        if identifier in groups:
+        if identifier in groups:                    # a series named where a version was asked for: its latest version
             return groups[identifier][0], groups[identifier]
         self.manifest(identifier)                   # an unreadable record reports its own reason
         raise StatusError("This delivery is unavailable.")
@@ -286,8 +293,13 @@ class Deliveries:
                 "document_state": self.states.summary(series) if any(version["interactive"] for version in versions) else None}
 
     def record(self, identifier):
-        """One version (the latest, for a series identifier) with the user's response state for its series."""
+        """The delivery an identifier names, with the user's response state: the latest version for a series
+        identifier, otherwise the version with that identifier."""
         return self._record(*self._resolve(identifier))
+
+    def version(self, identifier):
+        """Exactly the version with this identifier, with the user's response state for its series."""
+        return self._record(*self._resolve(identifier, exact=True))
 
     def list(self):
         """One record per series: its latest version, newest first."""

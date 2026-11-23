@@ -234,6 +234,7 @@ document.getElementById("grow").onclick = () => {{ document.getElementById("cont
         page.goto(f"{self.origin}/deliveries/{identifier}")
         host = page.locator("#embedded-document")
         expect(host).to_have_attribute("sandbox", "allow-scripts allow-forms allow-modals allow-popups allow-downloads")
+        expect(host).to_have_attribute("allow", "clipboard-write")
         document = page.frame_locator("#embedded-document")
         expect(document.locator("#state")).to_have_text("loaded null")              # nothing saved yet, answered by the page
         expect(document.locator("#attempts")).to_have_text(refused)
@@ -405,7 +406,12 @@ class SharedHostBrowserTests(unittest.TestCase):
 <script src="/status/document_bridge.js"></script></head><body><div style="height: 700px">Menu</div><p id="attempts">running</p>
 <a id="inside" href="/thanksgiving/menu.html">Menu page</a><a id="report" href="/status/deliveries/OTHER">Other delivery</a>
 <a id="ribbon" href="/api/browser/asks/7?resolution=approved">Ribbon Field address</a>
+<p id="kept">waiting</p><button id="keep">Keep</button><p id="copied">not copied</p><button id="copy">Copy</button>
 <script>
+const note = (id, text) => {{ document.getElementById(id).textContent = text; }};
+StatusDocument.loadState().then(({{state}}) => note("kept", "kept " + JSON.stringify(state)), () => note("kept", "no state here"));
+document.getElementById("keep").onclick = () => StatusDocument.saveState({{seats: 4}}).then(() => note("kept", "saved"), () => note("kept", "refused"));
+document.getElementById("copy").onclick = () => navigator.clipboard.writeText("Table one").then(() => note("copied", "copied"), error => note("copied", "refused " + error.name + ": " + error.message));
 (async () => {{
   const results = [], attempt = async (name, action) => {{ try {{ results.push(name + ":" + await action()); }} catch {{ results.push(name + ":blocked"); }} }};
   await attempt("ribbon-field", async () => (await (await fetch("/api/browser/config", {{credentials: "include"}})).json()).token);
@@ -508,6 +514,7 @@ class SharedHostBrowserTests(unittest.TestCase):
         browser = driver.chromium.launch(args=[f"--host-resolver-rules=MAP {HOST}:443 127.0.0.1:{relay.server_port}"])
         self.addCleanup(browser.close)
         context = browser.new_context(viewport={"width": 390, "height": 844}, ignore_https_errors=True)
+        context.grant_permissions(["clipboard-write"])            # a headless browser refuses what a person's browser allows on a click
         context.add_cookies([{"name": "ribbon_field_session", "value": "paired", "domain": HOST, "path": "/",
                               "httpOnly": True, "secure": True, "sameSite": "Strict"}])
         self.page = context.new_page()
@@ -562,9 +569,25 @@ class SharedHostBrowserTests(unittest.TestCase):
         written.get_by_role("link", name="another delivery").click()
         page.wait_for_url(f"{SHARED}/status/deliveries/{self.other}")
         self.assertEqual(len(page.context.pages), 1)
+        page.goto(f"{SHARED}/status/embedded?address=/thanksgiving/")                # opened from no item: the view keeps no state
+        expect(page.frame_locator("#embedded-document").locator("#kept")).to_have_text("no state here")
         page.goto(f"{SHARED}/status/deliveries/{embedding}")                         # a delivery whose interactive document is the application
+        expect(page.locator("#embedded-document")).to_have_attribute("allow", "clipboard-write")
         application = page.frame_locator("#embedded-document")
         expect(application.locator("#attempts")).to_have_text("/thanksgiving/ " + refused)
+        expect(application.locator("#kept")).to_have_text("kept null")
+        application.locator("#keep").click()
+        expect(application.locator("#kept")).to_have_text("saved")
+        application.locator("#copy").click()                                         # the one permission the frame has: writing to the clipboard
+        expect(application.locator("#copied")).to_have_text("copied")
+        page.goto(f"{SHARED}/status/embedded?address=/thanksgiving/&from={embedding}")      # the same application at full height, from that delivery
+        expect(page.frame_locator("#embedded-document").locator("#kept")).to_have_text('kept {"seats":4}')
+        self.assertEqual(DocumentStates(self.root).read(embedding)["state"], {"seats": 4})
+        page.goto(f"{SHARED}/status/embedded?address=/thanksgiving/&from={retained}")       # from a delivery it does not belong to: no state
+        expect(page.frame_locator("#embedded-document").locator("#kept")).to_have_text("no state here")
+        page.goto(f"{SHARED}/status/deliveries/{embedding}")
+        application = page.frame_locator("#embedded-document")
+        expect(application.locator("#kept")).to_have_text('kept {"seats":4}')
         application.locator("#ribbon").click()
         page.wait_for_timeout(700)
         self.assertEqual(page.url, f"{SHARED}/status/deliveries/{embedding}")

@@ -69,6 +69,10 @@ that origin**:
   `<iframe sandbox="allow-scripts allow-forms allow-modals allow-popups allow-downloads">`
   with `referrerpolicy="no-referrer"`. There is no `allow-same-origin`, no
   top navigation, and no `allow-popups-to-escape-sandbox`.
+- Of the browser's permissions the frame is given exactly one,
+  `allow="clipboard-write"`, so a document's own Copy control works after a
+  click. It cannot read the clipboard, and it has no camera, microphone,
+  location, or full-screen permission.
 - A retained document is served only at `<page>/deliveries/<id>/interactive`
   and `<page>/reports/<id>/interactive`, always with
   `Content-Security-Policy: sandbox allow-scripts allow-forms allow-modals allow-popups allow-downloads; frame-ancestors 'self'`.
@@ -91,6 +95,8 @@ origin:
   need that header. Classic scripts, styles, and images load without it.
 - The document cannot read or navigate the page around it. Windows it opens
   stay in the sandbox.
+- `navigator.clipboard.writeText` works from a click. Reading the clipboard is
+  refused.
 - For the page's light and dark themes, declare `color-scheme: light dark` and
   style both. A document that declares nothing is shown on a light background.
 
@@ -235,17 +241,30 @@ interactive document (`--embed /thanksgiving/`), and any link to it from a
 write-up, a link list, a report source, or a document opens it framed by the
 review page at `<page>/embedded?address=/thanksgiving/&from=<item-id>`, with a
 link back to the item and "Open on its own". Both use the same sandbox, so
-the application must work with an opaque origin:
+the application must work with an opaque origin.
+
+Saved state follows the item. In that view the application loads and saves
+the same state as in the item's page when `from` names a report or delivery
+version whose interactive document is exactly that address. Opened without
+`from`, from another item, or at another address of the application, the view
+keeps no state: loading rejects, and the application starts from its defaults.
+
+What the opaque origin means for the application:
 
 - **No cookies and no same-origin requests.** A session cookie is not sent and
   cannot be read. The application's own `fetch` calls are cross-origin: they
   succeed only if its server answers `Origin: null` without credentials, for
-  example with `Access-Control-Allow-Origin: *`. An application that needs a
-  signed-in session cannot work embedded; link to it instead.
-- **Subresources load normally:** scripts, styles, images, and media by
-  relative or absolute address. Module scripts and fonts need the
-  cross-origin header above. Do not send `Cross-Origin-Resource-Policy: same-origin`
-  on files the embedded page loads.
+  example with `Access-Control-Allow-Origin: null` when the request's Origin
+  is `null`. An application that needs a signed-in session cannot work
+  embedded; link to it instead.
+- **Module scripts need that header too.** A page whose code is
+  `<script type="module">` shows nothing when framed unless its server sends
+  the header on every script, including on a `304` answer. `python -m
+  http.server` does not; a few lines around `SimpleHTTPRequestHandler` do.
+  Classic scripts, styles, images, and media load without it. Do not send
+  `Cross-Origin-Resource-Policy: same-origin` on files the embedded page loads.
+- **No `localStorage`.** Reading `window.localStorage` throws. Guard it, and
+  keep selections through `StatusDocument.saveState` when framed.
 - **Allow framing by the host.** Do not send `X-Frame-Options: DENY`; a
   `frame-ancestors` policy must include the host's origin.
 - **Size and links.** Load `<review page path>/document_bridge.js` to size the

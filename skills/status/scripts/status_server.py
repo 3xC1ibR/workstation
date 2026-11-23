@@ -209,8 +209,24 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, as
             if interactive:
                 embedded = review_pages.interactive_section(
                     interactive, self.frame_source(interactive, "/deliveries/" + record["id"]), record["title"],
-                    f"{self.public_url()}/deliveries/{record['id']}" if public else None, "delivery")
+                    self.public_url() + review_pages.delivery_route(record["series"], record["id"], record["latest"]) if public else None,
+                    "delivery")
             return review_pages.delivery_page(self.addresses(), record, deliveries.document(record["id"]), embedded, self.public_url())
+
+        def delivery_version(self, identifier):
+            """The version a delivery address shows: the latest of the series it names, or the one ?version= names.
+
+            A series continued with --replaces has the identifier of its first version, so that identifier alone
+            names the delivery as it now stands; an earlier version is always addressed with ?version=.
+            """
+            query = parse_qs(urlsplit(self.path).query, keep_blank_values=True)
+            record, wanted = deliveries.record(identifier), query.get("version", [None])[0]
+            if wanted is None:
+                return record
+            version = deliveries.version(wanted)
+            if version["id"] != wanted or version["series"] != record["series"]:
+                raise StatusError("This delivery has no such version.")
+            return version
 
         def embedded_page(self):
             """The page frame around another application on this host, named by ?address= and optionally ?from=<item>."""
@@ -220,21 +236,31 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, as
                 interactive_documents.validate_address(address, public[2] if public else None)
             except ValueError as error:
                 raise StatusError("This address cannot be shown inside the review page.") from error
-            back = None
-            for find, route in ((deliveries.record, "/deliveries/"), (reports._manifest, "/reports/")):
+            back = item = None                       # the report or delivery version the reader came from, when ?from= names one
+            try:
+                record = deliveries.version(origin)
+                if record["id"] == origin:
+                    back = (review_pages.delivery_route(record["series"], origin, record["latest"]), record["title"])
+                    item = ("delivery", origin, record["latest"], record["interactive"])
+            except StatusError:
+                pass
+            if back is None:
                 try:
-                    back = (route + origin, find(origin)["title"])
-                    break
+                    manifest = reports._manifest(origin)
+                    back = ("/reports/" + origin, manifest["title"])
+                    item = ("report", origin, reports.operation(manifest["operation_id"])["latest"] == origin, manifest["interactive"])
                 except StatusError:
-                    continue
+                    pass
+            # The application keeps the item's saved state only when it is that item's own interactive document.
+            owner = item[:3] if item and item[3] == {"kind": "address", "address": address} else None
             elsewhere = f"{self.public_url()}/embedded?address={address}" + (f"&from={origin}" if back else "") if public else None
             return review_pages.embedded_page(self.base(), address, public[0] + address if self.remote() else None, back, elsewhere,
-                                              self.public_url())
+                                              self.public_url(), owner)
 
         def document_state_item(self, kind, identifier):
             """(state key, whether this version may save) for the item a document state request names."""
             if kind == "delivery":
-                record = deliveries.record(identifier)
+                record = deliveries.version(identifier)
                 if record["id"] != identifier or not record["interactive"]:
                     raise StatusError("This delivery version has no interactive document.")
                 return record["series"], record["latest"]
@@ -317,13 +343,13 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, as
                     self.send(302, b"", "text/plain", location=f"{base}/reports/{operation['latest']}")
                 elif path.startswith("/deliveries/"):
                     parts = path.removeprefix("/deliveries/").split("/")
-                    record = deliveries.record(parts[0])                # a version, or the latest version of a series
                     if len(parts) == 1:
-                        page = self.delivery_page(record)
-                    elif len(parts) == 2 and parts[1] == "interactive":
-                        self.send_interactive_document(deliveries.interactive_document(record["id"]))
+                        page = self.delivery_page(self.delivery_version(parts[0]))
+                    elif len(parts) == 2 and parts[1] == "interactive":      # retained files belong to exactly one version
+                        self.send_interactive_document(deliveries.interactive_document(deliveries.version(parts[0])["id"]))
                         return
                     elif len(parts) == 3 and parts[1] == "attachments" and parts[2].isdecimal():
+                        record = deliveries.version(parts[0])
                         page = review_pages.attachment_page(self.addresses(), record, *deliveries.attachment(record["id"], int(parts[2])))
                     else:
                         raise StatusError("This page does not exist.")

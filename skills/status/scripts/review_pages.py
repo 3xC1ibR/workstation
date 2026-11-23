@@ -113,21 +113,22 @@ def document(title, base, body, scripts, configuration=None):
 OPERATION_ASKS = '<section id="operation-asks" class="context-asks" aria-label="Asks from this operation" hidden></section>'
 
 
-def version_navigation(base, label, route, versions, current, controls=""):
+def version_navigation(base, label, address, versions, current, controls=""):
     """Navigation above an item with versions: return link, version position, history, and an earlier-version notice.
 
-    `versions` are newest first, each with id and received_at; `route` is the path of one version, such as /reports/.
+    `versions` are newest first, each with id and received_at; `address` gives the path of one version from its
+    position in that list and its identifier.
     """
     position = next(index for index, version in enumerate(versions) if version["id"] == current)
     number, total = len(versions) - position, len(versions)
     marked = ' aria-current="page"'
     history = "".join(
-        f'<li><a href="{escape(base)}{route}{version["id"]}"{marked if version["id"] == current else ""}>'
+        f'<li><a href="{escape(base + address(index, version["id"]))}"{marked if version["id"] == current else ""}>'
         f'Version {len(versions) - index}</a> <span class="secondary">{moment_tag(version["received_at"])}</span></li>'
         for index, version in enumerate(versions))
     earlier = ("" if position == 0 else
                f'<p class="version-notice">You are reading version {number} of {total}, received {moment_tag(versions[position]["received_at"])}. '
-               f'<a href="{escape(base)}{route}{versions[0]["id"]}">Open the latest version</a></p>')
+               f'<a href="{escape(base + address(0, versions[0]["id"]))}">Open the latest version</a></p>')
     return (f'<nav class="page-navigation" aria-label="{label}"><a class="back-link" href="{escape(base)}/">Review</a>'
             f'<details class="version-history"><summary>Version {number} of {total}</summary><ol reversed>{history}</ol></details>'
             f'{controls}</nav>{earlier}')
@@ -135,14 +136,24 @@ def version_navigation(base, label, route, versions, current, controls=""):
 
 def report_navigation(base, operation, report):
     """Navigation above a served report. The operation's asks are placed separately, under the report's title (OPERATION_ASKS)."""
-    return version_navigation(base, "Report", "/reports/", operation["versions"], report,
+    return version_navigation(base, "Report", lambda index, version: "/reports/" + version, operation["versions"], report,
                               '<button id="operation-dismiss" class="quiet" type="button" hidden></button>')
 
 
+def delivery_route(series, version, latest):
+    """The path of one version of a delivery. The latest version is the delivery's own address. An earlier one is
+    named under its series, because a series continued with --replaces has the identifier of its first version."""
+    return f"/deliveries/{version}" if latest else f"/deliveries/{series}?version={version}"
+
+
 def embedded_frame(source, title):
-    """The only way agent-built content enters a page: a frame without this page's origin or the right to navigate it."""
+    """The only way agent-built content enters a page: a frame without this page's origin or the right to navigate it.
+
+    Of the browser's permissions the frame is given one, writing to the clipboard, so a document's own Copy control
+    works. It cannot read the clipboard.
+    """
     return (f'<iframe id="embedded-document" class="embedded-document" src="{escape(source)}" sandbox="{interactive_documents.SANDBOX}" '
-            f'referrerpolicy="no-referrer" loading="lazy" title="{escape(title)}"></iframe>')
+            f'allow="{interactive_documents.PERMISSIONS}" referrerpolicy="no-referrer" loading="lazy" title="{escape(title)}"></iframe>')
 
 
 def interactive_section(interactive, source, title, public_item, noun):
@@ -215,7 +226,8 @@ def delivery_page(addresses, delivery, body, embedded="", public_url=None):
         for index, name in enumerate(delivery["attachments"]) if name not in linked)       # a linked attachment is listed once
     heading = ("Links and attachments" if delivery["attachments"] and delivery.get("links")
                else "Attachments" if delivery["attachments"] else "Links")
-    navigation = (version_navigation(base, "Delivery", "/deliveries/", delivery["versions"], delivery["id"]) if delivery["version_count"] > 1
+    version_address = lambda index, version: delivery_route(delivery["series"], version, index == 0)
+    navigation = (version_navigation(base, "Delivery", version_address, delivery["versions"], delivery["id"]) if delivery["version_count"] > 1
                   else f'<nav class="page-navigation" aria-label="Delivery"><a class="back-link" href="{escape(base)}/">Review</a></nav>')
     content = (
         f'{navigation}'
@@ -239,17 +251,20 @@ def attachment_page(addresses, delivery, name, content):
     base = addresses.base
     rendered = (markdown_text.render(content, delivery_resolver(addresses, delivery)) if name.lower().endswith((".md", ".markdown"))
                 else f"<pre>{html.escape(content, quote=False)}</pre>")
-    body = (f'<nav class="page-navigation" aria-label="Attachment"><a class="back-link" href="{escape(base)}/deliveries/{delivery["id"]}">'
+    origin = delivery_route(delivery["series"], delivery["id"], delivery["latest"])
+    body = (f'<nav class="page-navigation" aria-label="Attachment"><a class="back-link" href="{escape(base + origin)}">'
             f'{escape(delivery["title"])}</a></nav><article class="sheet delivery"><header class="sheet-header"><h1>{escape(name)}</h1></header>'
             f'<section class="document">{rendered}</section></article>')
     return document(name, base, body, ("controls.js", "delivery.js"), {"attachment": True})
 
 
-def embedded_page(base, address, source, back, elsewhere, public_url=None):
+def embedded_page(base, address, source, back, elsewhere, public_url=None, item=None):
     """The page frame around another application on this host.
 
     `source` is the frame address, or None on an address where the application is not served; `back` is
-    (route, title) of the item the reader came from; `elsewhere` is this view on the public address.
+    (route, title) of the item the reader came from; `elsewhere` is this view on the public address. `item` is
+    (kind, identifier, latest) when the application is that item's own interactive document: the view then keeps
+    the item's saved document state, as the item's page does. Otherwise the view keeps no state.
     """
     route, label = back if back else ("/", "Review")
     if source:
@@ -263,4 +278,5 @@ def embedded_page(base, address, source, back, elsewhere, public_url=None):
             f'<article class="sheet"><header class="sheet-header"><h1>{escape(address)}</h1>{heading}</header>'
             f'<section class="embedded embedded-application" aria-label="Application">{content}</section></article>')
     return document(address, base, body, ("controls.js", "embedded_host.js"),
-                    {"embedded": {"kind": None, "item": None, "latest": False, "public_url": public_url}})
+                    {"embedded": {"kind": item[0] if item else None, "item": item[1] if item else None,
+                                  "latest": bool(item and item[2]), "public_url": public_url}})

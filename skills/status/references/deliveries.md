@@ -89,10 +89,18 @@ python3 -B <skill-directory>/scripts/publish_delivery.py delivery.json --replace
   The two flags exclude each other.
 
 Versions of one delivery share a **series** identifier: a hash of the key, or
-the first version's identifier for `--replaces`. `<page>/deliveries/<series>`
-always shows the latest version; `<page>/deliveries/<version-id>` shows that
-version. Publishing content identical to the latest version returns that
-version and adds nothing.
+the first version's identifier for `--replaces`.
+
+| Address | Shows |
+| --- | --- |
+| `<page>/deliveries/<series>` | The latest version, always. For a `--replaces` series this is the address the first version was given, so a link sent earlier now opens the delivery as it stands. |
+| `<page>/deliveries/<latest-version-id>` | The latest version. |
+| `<page>/deliveries/<series>?version=<version-id>` | That version, with the earlier-version notice when it is not the latest. The version menu uses this address. |
+| `<page>/deliveries/<earlier-version-id>` | That version, when the identifier is not also a series identifier. |
+
+`read_responses.py --delivery` follows the same rule: a series identifier
+selects the delivery and reports its latest version. Publishing content
+identical to the latest version returns that version and adds nothing.
 
 What he sees: one row for the delivery with its latest version. The delivery
 page shows the latest version, a version menu, and an "earlier version" notice
