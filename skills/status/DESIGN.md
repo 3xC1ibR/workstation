@@ -264,6 +264,13 @@ ask chevron. Nothing moves on load.
 
 ## Decision record
 
+- 2026-11-23: An ask takes a reply as well as a resolution. The owner said the
+  offered answers are often not what he wants to say. The free-text line is
+  always present; **Reply** sends his words to the asking conversation as a
+  user message naming the ask, through Ribbon Field's own message queue (the
+  local forwarding or the paired browser, as for resolutions), and leaves the
+  ask open marked "Replied". The mark comes from the content-free event log,
+  so no reply text is stored here. The quiet link is "Reply in conversation".
 - 2026-11-22: **The page is rebuilt as a calm task list.** Direction: ink on a
   white page, no containers, a margin mark for state, one quiet line under each
   title, colour only for state. Why: of four directions it was the only one

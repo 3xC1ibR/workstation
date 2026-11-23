@@ -203,6 +203,21 @@ the address the page is open on:
 Neither path is open to an interactive document: its sandbox has no origin, so
 Ribbon Field and the Status service refuse its requests.
 
+**Replying without resolving.** When no offered answer fits, **Reply** sends
+the words in the ask's text line to the asking conversation as a user message
+that names the ask number and title, and leaves the ask open. On the local
+address the Status service forwards it (`POST /api/ask-reply {id, text}`,
+local address only) to Ribbon Field's loopback interface,
+`POST /api/browser/sessions/<conversation>/queue`; on the tailnet address the
+page's script calls that same Ribbon Field route with the browser's pairing.
+Ribbon Field delivers a queued message when the conversation is idle. The ask
+then shows "Replied" until the agent resolves, replaces or withdraws it; that
+mark is read from the usage log (an `ask_resolution` event with action
+`replied`), which holds the ask number and a time, never the words. The
+conversation is taken from Ribbon Field's listing, not from the page. A reply
+to an ask from a conversation Ribbon Field cannot message (a terminal session)
+fails with its reason; use **Reply in conversation**, which opens the thread.
+
 ## Measurement
 
 The page records content-free usage events in `<inbox>/usage/<year-month>.jsonl`:

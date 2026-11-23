@@ -68,6 +68,8 @@ class Workspace(unittest.TestCase):
 
     def serve(self, **arguments):
         arguments.setdefault("ask_resolver", self.refuse_resolution)      # never the real Ribbon Field
+        arguments.setdefault("ask_replier", lambda ask, text: self.refuse_resolution(ask["id"], text))
+        arguments.setdefault("ask_reader", AskReader(lambda: {"available": False, "reason": "Tests do not read Ribbon Field.", "asks": []}))
         server = make_server(self.root, 0, **arguments)
         worker = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": .01}, daemon=True)
         worker.start()
@@ -1054,6 +1056,33 @@ class AskTests(Workspace):
         now = datetime.now(timezone.utc) + timedelta(minutes=1)
         summary = summarize(self.reports, self.deliveries, events, since=now - timedelta(days=1), until=now, zone=ZoneInfo("UTC"))
         self.assertEqual(summary["asks_resolved_on_page"], {"total": 2, "by_resolution": {"answered": 1, "snoozed": 1}, "narrow_viewport": 2})
+
+    def test_reply_goes_to_the_asking_conversation_and_the_ask_stays_open_marked_replied(self):
+        ask = {"id": 7, "session_id": "thread-a", "kind": "decision", "title": "Which export format?", "detail": None, "blocking": False,
+               "created_at": "2026-11-22T09:00:00+00:00", "cwd": "/work", "thread_link": "agentcoord://thread/thread-a",
+               "options": ["CSV", "JSON"], "resolutions": ["answered", "dismissed"]}
+        sent = []
+        def replier(record, text):
+            sent.append((record["id"], record["session_id"], text))
+            return {"queued": True, "id": "queue-item"}
+        self.serve(ask_reader=AskReader(lambda: {"available": True, "reason": None, "asks": [ask]}, lifetime=60),
+                   ask_replier=replier, public_url=PUBLIC)
+        self.assertIsNone(json.loads(self.request("/api/review")[2])["asks"]["asks"][0]["replied_at"])
+        self.assertEqual(self.request("/api/ask-reply", {"id": 7, "text": "Neither: use Parquet."})[0], 200)
+        self.assertEqual(sent, [(7, "thread-a", "Neither: use Parquet.")])           # the conversation comes from the listing, not the page
+        self.assertEqual(self.request("/api/ask-reply", {"id": 8, "text": "No such ask"})[0], 400)
+        self.assertEqual(self.request("/api/ask-reply", {"id": 7})[0], 400)
+        for headers in ({"X-Status-Token": ""}, {"Origin": "https://elsewhere.invalid"}):
+            self.assertEqual(self.request("/api/ask-reply", {"id": 7, "text": "x"}, headers=headers)[0], 403)
+        relay = {"Host": "machine.example.ts.net", "Origin": "https://machine.example.ts.net"}
+        self.assertEqual(self.request("/api/ask-reply", {"id": 7, "text": "x"}, headers=relay)[0], 403)   # the tailnet page uses its pairing
+        self.assertEqual(len(sent), 1)
+        event = {"type": "ask_resolution", "view": "review", "item_kind": "ask", "item": "7", "action": "replied"}
+        self.assertEqual(self.request("/api/events", event)[0], 200)
+        review = json.loads(self.request("/api/review")[2])
+        self.assertTrue(review["asks"]["asks"][0]["replied_at"])                      # still listed, now marked
+        self.assertNotIn("Parquet", json.dumps(UsageEvents(self.root).read()))        # the mark holds no words
+        self.assertFalse((self.root / "asks").exists())
 
     def test_unavailable_asks_do_not_break_the_page(self):
         self.register(report("Operation"), agent="operator")

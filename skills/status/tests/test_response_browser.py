@@ -39,8 +39,13 @@ class ReviewPageBrowserTests(unittest.TestCase):
         self.resolutions.append((ask_id, body, snooze))
         return {"id": ask_id, "status": "resolved"}
 
+    def reply(self, ask, text):
+        """Stand in for Ribbon Field's message queue."""
+        self.replies.append((ask["id"], ask["session_id"], text))
+        return {"queued": True, "id": "queue-item"}
+
     def setUp(self):
-        self.resolutions, self.refuse_resolution = [], False
+        self.resolutions, self.refuse_resolution, self.replies = [], False, []
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
@@ -49,7 +54,7 @@ class ReviewPageBrowserTests(unittest.TestCase):
              "detail": "First paragraph.\n\nSecond paragraph with https://example.com/console and more.", "options": [],
              "resolutions": ["approved", "declined", "dismissed"],
              "unblocks": "Live payouts.", "created_at": "2026-11-22T09:00:00+00:00", "cwd": "/project", "thread_title": "Operator",
-             "thread_link": "agentcoord://thread/thread-a"}]}), ask_resolver=self.resolve)
+             "thread_link": "agentcoord://thread/thread-a"}]}), ask_resolver=self.resolve, ask_replier=self.reply)
         worker = threading.Thread(target=self.server.serve_forever, kwargs={"poll_interval": .01}, daemon=True)
         worker.start()
         self.addCleanup(worker.join, 2)
@@ -128,6 +133,26 @@ class ReviewPageBrowserTests(unittest.TestCase):
         self.assertEqual([(event["type"], event["item"], event["action"]) for event in UsageEvents(self.root).read() if event["type"] == "ask_resolution"],
                          [("ask_resolution", "7", "approved")])
         self.assertFalse((self.root / "asks").exists())
+        self.fits()
+        self.assertEqual(self.failures, [])
+
+    def test_reply_keeps_the_ask_open_and_marks_it_replied(self):
+        page, row = self.page, self.page.locator("#asks .row")
+        page.goto(self.origin + "/")
+        row.locator(".ask-toggle").click()
+        expect(row.get_by_role("link", name="Reply in conversation")).to_have_attribute("href", "agentcoord://thread/thread-a")
+        row.get_by_role("button", name="Reply", exact=True).click()
+        expect(row.locator(".ask-note")).to_be_focused()                 # nothing to send yet: the field takes the cursor
+        self.assertEqual(self.replies, [])
+        row.locator(".ask-note").fill("None of these: wait for the audit.")
+        row.get_by_role("button", name="Reply", exact=True).click()
+        expect(page.locator("#review-notice")).to_contain_text("Replied in the conversation")
+        self.assertEqual(self.replies, [(7, "thread-a", "None of these: wait for the audit.")])
+        self.assertEqual(self.resolutions, [])                           # a reply resolves nothing
+        expect(page.locator("#asks .row")).to_have_count(1)              # the ask stays open
+        expect(page.locator("#asks .row .row-meta")).to_contain_text("Replied")
+        self.assertEqual([(event["item"], event["action"]) for event in UsageEvents(self.root).read() if event["type"] == "ask_resolution"],
+                         [("7", "replied")])
         self.fits()
         self.assertEqual(self.failures, [])
 
@@ -502,7 +527,7 @@ document.getElementById("copy").onclick = () => navigator.clipboard.writeText("T
         temporary = tempfile.TemporaryDirectory()
         self.addCleanup(temporary.cleanup)
         self.root, self.ribbon_field_reads, self.unexpected, self.failures = Path(temporary.name), [], [], []
-        self.server = self.serve(make_server(self.root, 0, public_url=SHARED + "/status", ask_resolver=self.refuse_resolution,
+        self.server = self.serve(make_server(self.root, 0, public_url=SHARED + "/status", ask_resolver=self.refuse_resolution, ask_replier=lambda ask, text: self.refuse_resolution(ask["id"], text),
                                              ask_reader=AskReader(lambda: {"available": True, "reason": None, "asks": []})))
         relay = ThreadingHTTPServer(("127.0.0.1", 0), self.relay_handler())
         encryption = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)

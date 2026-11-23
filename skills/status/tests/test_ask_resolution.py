@@ -6,7 +6,7 @@ import urllib.error
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
-from ribbon_field_asks import resolve_ask  # noqa: E402
+from ribbon_field_asks import reply_message, reply_to_ask, resolve_ask  # noqa: E402
 
 ADDRESS = "http://127.0.0.1:57523/"
 
@@ -53,6 +53,31 @@ class ResolveAskTests(unittest.TestCase):
         failure = urllib.error.HTTPError(ADDRESS, 409, "Conflict", {}, io.BytesIO(b'{"error": "Ask 7 is already resolved."}'))
         with self.assertRaisesRegex(ValueError, "already resolved"):
             resolve_ask(7, {"resolution": "done"}, address=ADDRESS, opener=RecordingOpener(failure))
+
+
+class AskReplyTests(unittest.TestCase):
+    ASK = {"id": 7, "session_id": "thread a/1", "title": "Which export format?"}
+
+    def test_reply_is_queued_as_a_user_message_in_the_asking_conversation(self):
+        opener = RecordingOpener()
+        reply_to_ask(self.ASK, "  Neither: use Parquet.  ", address=ADDRESS, opener=opener)
+        request = opener.requests[-1]
+        self.assertTrue(request.full_url.endswith("api/browser/sessions/thread%20a%2F1/queue"))      # the conversation comes from the listing
+        self.assertEqual(request.get_header("X-agent-coord-token"), "csrf-token")
+        body = json.loads(request.data)
+        self.assertEqual(body["message"], reply_message(7, "Which export format?", "Neither: use Parquet."))
+        self.assertIn("ask #7", body["message"])
+        self.assertIn("Which export format?", body["message"])
+        self.assertIn("still open", body["message"])
+        self.assertTrue(body["requestId"].startswith("review-page-reply-"))
+        self.assertNotIn("asks/7", request.full_url)                 # a reply never resolves the ask
+
+    def test_empty_or_oversized_replies_are_refused_before_any_request(self):
+        for text in ("", "   ", None, "x" * 8001):
+            opener = RecordingOpener()
+            with self.subTest(text=str(text)[:10]), self.assertRaises(ValueError):
+                reply_to_ask(self.ASK, text, address=ADDRESS, opener=opener)
+            self.assertEqual(opener.requests, [])
 
 
 if __name__ == "__main__":

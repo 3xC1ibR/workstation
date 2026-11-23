@@ -167,6 +167,49 @@ def ribbon_field_address():
     return address
 
 
+REPLY_LIMIT = 8000
+
+
+def reply_message(ask_id, title, text):
+    """The user message a reply becomes. The page's script builds the same words on the tailnet address."""
+    return (f"Reply to ask #{ask_id} ({title}), sent from the review page without resolving it:\n\n{text}\n\n"
+            f"Ask #{ask_id} is still open. Resolve it, replace it or withdraw it once you have acted on this reply.")
+
+
+def reply_to_ask(ask, text, *, address=None, opener=None):
+    """Queue the user's words as a message in the asking conversation through Ribbon Field's loopback interface.
+
+    The ask is not resolved. Ribbon Field delivers a queued message when that conversation is idle, as it does for
+    its own composer. `ask` is the listing record, so the conversation and title come from Ribbon Field, not the page.
+    """
+    import urllib.error
+    import urllib.parse
+    import urllib.request
+    import uuid
+    if not isinstance(text, str) or not text.strip() or len(text) > REPLY_LIMIT:
+        raise ValueError(f"Write a reply of at most {REPLY_LIMIT} characters.")
+    address = address or ribbon_field_address()
+    opener = opener or urllib.request.urlopen
+    body = {"message": reply_message(ask["id"], ask["title"], text.strip()), "requestId": "review-page-reply-" + uuid.uuid4().hex}
+    try:
+        with opener(urllib.request.Request(address + "api/browser/config"), timeout=5) as response:
+            token = json.load(response)["token"]
+        request = urllib.request.Request(
+            address + "api/browser/sessions/" + urllib.parse.quote(str(ask["session_id"]), safe="") + "/queue",
+            data=json.dumps(body).encode(), method="POST",
+            headers={"Content-Type": "application/json", "X-Agent-Coord-Token": token})
+        with opener(request, timeout=15) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as error:
+        try:
+            message = json.load(error).get("error")
+        except (ValueError, AttributeError):
+            message = None
+        raise ValueError(message or "Ribbon Field cannot deliver a message to that conversation. Use Reply in conversation.") from error
+    except (urllib.error.URLError, TimeoutError, ConnectionError, KeyError, ValueError) as error:
+        raise ValueError("Could not reach Ribbon Field on this Mac. Your text is still here; try again.") from error
+
+
 def resolve_ask(ask_id, body, *, snooze=False, address=None, opener=None):
     """Send the user's resolution to Ribbon Field's loopback browser API.
 

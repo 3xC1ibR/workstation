@@ -2,7 +2,7 @@
 // Asks belong to Ribbon Field. This component shows one ask in full and, when this browser is paired with
 // Ribbon Field on the same address, sends the user's resolution straight to Ribbon Field. Nothing is stored here.
 (() => {
-  const {make, time, elapsed, listTitle, fitTitles, discussLink, addressText, createChoices, createLine, request, measure, destination} = window.StatusControls;
+  const {make, time, elapsed, listTitle, fitTitles, addressText, createChoices, createLine, request, measure, destination} = window.StatusControls;
   const LABELS = {answered: "Send", done: "Done", not_done: "Not done", approved: "Approve", declined: "Decline",
                   accepted: "Accept", changes_requested: "Request changes", granted: "Grant", dismissed: "Dismiss"};
   const OUTCOMES = {answered: "Answered", done: "Marked done", not_done: "Marked not done", approved: "Approved", declined: "Declined",
@@ -71,6 +71,9 @@
     }
     return block;
   }
+  // The same words the Status service sends on the local address (ribbon_field_asks.reply_message).
+  const replyMessage = (ask, text) => `Reply to ask #${ask.id} (${ask.title}), sent from the review page without resolving it:\n\n${text}\n\n` +
+    `Ask #${ask.id} is still open. Resolve it, replace it or withdraw it once you have acted on this reply.`;
   const snoozeChoices = () => {
     const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1); tomorrow.setHours(9, 0, 0, 0);
     return [["For 1 hour", Date.now() + 3600e3], ["For 3 hours", Date.now() + 3 * 3600e3], ["Until tomorrow, 9 AM", tomorrow.getTime()],
@@ -92,7 +95,8 @@
     // The line under the title has one order: state words, then what it costs him, then where it comes from.
     const meta = make("p", null, "row-meta"), cost = [kind, effort].filter(Boolean).join(", ");
     const parts = [ask.blocking && make("span", "Blocking", "flag-blocking"), ask.overdue && make("span", "Overdue", "flag-attention"),
-      ask.stale && make("span", ask.thread_closed ? "Thread closed" : "Agent inactive", "flag-attention"), cost && make("span", cost, "flag-needs"),
+      ask.stale && make("span", ask.thread_closed ? "Thread closed" : "Agent inactive", "flag-attention"),
+      ask.replied_at && make("span", "Replied", "flag-needs"), cost && make("span", cost, "flag-needs"),
       within !== "operation" && (ask.thread_title || ask.project_label)].filter(Boolean);
     parts.forEach((part, index) => { if (index) meta.append(" · "); meta.append(part); });
     meta.hidden = !parts.length;
@@ -145,6 +149,25 @@
         else add(buttons, LABELS[resolution] || resolution.replace(/_/g, " "), () => resolve({resolution, ...note()}, resolution), primary);
         primary = "";
       }
+      // A reply sends his own words to the asking conversation and leaves the ask open: for when no offered answer fits.
+      const reply = async () => {
+        const text = state.text.trim();
+        if (!text) { field.focus(); return; }
+        if (state.busy) return;
+        state.busy = true; state.error = ""; draw();
+        try {
+          if (connection && connection.state === "local") await request("/api/ask-reply", {id: ask.id, text});
+          else await send(`/api/browser/sessions/${encodeURIComponent(ask.session_id)}/queue`,
+            {message: replyMessage(ask, text), requestId: "review-page-reply-" + crypto.randomUUID()});
+          state.text = ""; state.option = undefined; state.busy = false;
+          await measure({type: "ask_resolution", view: "review", item_kind: "ask", item: String(ask.id), action: "replied"});
+          ask.replied_at = new Date().toISOString();
+          draw();
+          changed("Replied in the conversation. The ask stays open until the agent acts.", null);
+        } catch (error) { state.busy = false; state.error = error.message; draw(); }
+      };
+      const replyButton = add(buttons, "Reply", reply);
+      replyButton.title = "Send your words to the agent's conversation and keep the ask open";
       buttons.append(make("span", null, "spacer"));
       const later = make("details", null, "ask-snooze"), menu = make("div", null, "ask-snooze-choices");
       later.append(make("summary", "Snooze"), menu);
@@ -168,7 +191,12 @@
       }
       return line;
     }
-    const discuss = () => discussLink(ask.thread_link);
+    // The conversation itself is one step away for anything the controls here do not cover.
+    const discuss = () => {
+      const link = make("a", "Reply in conversation", "quiet-link"); link.href = ask.thread_link;
+      link.title = "Open this conversation in Ribbon Field";
+      return link;
+    };
     function unavailable() {
       const note = make("p", null, "ask-unavailable");
       if (connection.state === "unpaired") {
@@ -190,6 +218,7 @@
       // The response comes first, directly under the title; the whole question and its context follow.
       const content = [lead(), !connection ? make("p", "Checking Ribbon Field…", "note") : ["ready", "local"].includes(connection.state) ? controls() : unavailable()].filter(Boolean);
       if (state.error) { const alert = make("p", state.error, "failure"); alert.setAttribute("role", "alert"); content.push(alert); }
+      if (ask.replied_at) content.push(make("p", `You replied in the conversation ${elapsed(ask.replied_at)}. The ask stays open until the agent acts.`, "note ask-replied"));
       if (ask.detail) content.push(prose(ask.detail, "ask-text", publicUrl));
       if (ask.context) content.push(prose(ask.context, "ask-text ask-context", publicUrl));
       const focused = body.contains(document.activeElement) && document.activeElement.className;

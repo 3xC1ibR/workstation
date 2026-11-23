@@ -21,7 +21,7 @@ import interactive_documents
 from register_status import inbox_directory
 from response_access import response_key
 import review_pages
-from ribbon_field_asks import AskReader, for_operation, resolve_ask, shared_workspaces
+from ribbon_field_asks import AskReader, for_operation, reply_to_ask, resolve_ask, shared_workspaces
 from status_store import REPORT_CSP, ResponseConflict, StatusError, StatusReports
 from usage_events import INTERACTIVE_OPEN, UsageEvents
 
@@ -42,7 +42,8 @@ POSTS = {"/api/dismiss": ({"id", "dismissed"}, set(), 4096),
          "/api/delivery-response": ({"id", "action"}, {"choice", "note"}, 16 * 1024),
          "/api/document-state": ({"kind", "id", "state"}, set(), 80 * 1024),
          "/api/events": ({"type"}, {"view", "item_kind", "item", "action", "narrow"}, 4096),
-         "/api/ask-resolution": ({"id", "body"}, {"snooze"}, 16 * 1024)}
+         "/api/ask-resolution": ({"id", "body"}, {"snooze"}, 16 * 1024),
+         "/api/ask-reply": ({"id", "text"}, set(), 32 * 1024)}
 
 
 def page_policy(public):
@@ -62,7 +63,7 @@ def public_address(value):
     return f"https://{address.netloc}", address.netloc, address.path.rstrip("/")
 
 
-def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, ask_resolver=resolve_ask):
+def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, ask_resolver=resolve_ask, ask_replier=reply_to_ask):
     root = Path(root).resolve()
     reports, deliveries, usage, states = StatusReports(root), Deliveries(root), UsageEvents(root), DocumentStates(root)
     asks = ask_reader or AskReader()
@@ -165,8 +166,18 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, as
             """Agent-built HTML: always under the sandbox policy, so it never has this origin, in a frame or in a tab."""
             self.send(200, content.encode("utf-8"), "text/html", policy=interactive_documents.DOCUMENT_POLICY, framing="SAMEORIGIN")
 
+        def with_replies(self, listing):
+            """Mark asks the user replied to from this page: the time of the last reply event, nothing about its words."""
+            if not listing["asks"]:
+                return listing
+            replied = {}
+            for event in usage.read():
+                if event["type"] == "ask_resolution" and event.get("action") == "replied":
+                    replied[str(event.get("item"))] = event["at"]
+            return {**listing, "asks": [{**ask, "replied_at": replied.get(str(ask["id"]))} for ask in listing["asks"]]}
+
         def review(self):
-            operations, delivered, listing = reports.operations(), deliveries.list(), asks.current()
+            operations, delivered, listing = reports.operations(), deliveries.list(), self.with_replies(asks.current())
             for delivery in delivered["deliveries"]:
                 delivery.pop("document_state")       # the list needs no document data; agents read it with read_responses.py
             shared = shared_workspaces(operations["operations"])
@@ -314,7 +325,7 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, as
                 elif path.startswith("/api/operations/"):
                     if "fresh=asks" in urlsplit(self.path).query:
                         asks.invalidate()
-                    operation, listing = reports.operation(path.removeprefix("/api/operations/")), asks.current()
+                    operation, listing = reports.operation(path.removeprefix("/api/operations/")), self.with_replies(asks.current())
                     shared = shared_workspaces(reports.operations()["operations"])
                     self.send(200, {"operation": operation, "asks": {**listing, "asks": for_operation(listing["asks"], operation, shared)},
                                     "public_url": self.public_url()})
@@ -387,6 +398,13 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, as
                     self.send(200, reports.save_responses(identifier if cors else body["id"], body["values"], body["revision"]), cors=cors)
                 elif path == "/api/dismiss":
                     self.send(200, reports.dismiss(body["id"], body["dismissed"]))
+                elif path == "/api/ask-reply":
+                    if self.remote():
+                        raise PermissionError("On the tailnet address, replies go through Ribbon Field's paired-device sign-in.")
+                    ask = next((entry for entry in asks.current()["asks"] if entry["id"] == body["id"]), None)
+                    if ask is None:
+                        raise ValueError("This ask is no longer open. Refresh the page.")
+                    self.send(200, ask_replier(ask, body["text"]))
                 elif path == "/api/ask-resolution":
                     if self.remote():
                         raise PermissionError("On the tailnet address, answers go through Ribbon Field's paired-device sign-in.")
