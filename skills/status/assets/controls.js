@@ -99,6 +99,51 @@
     return date.toLocaleDateString(undefined, {month: "short", day: "numeric",
       ...(date.getFullYear() === new Date(now).getFullYear() ? {} : {year: "numeric"})});
   }
+  // A list title is set without its closing full stop; question marks and ellipses stay.
+  const listTitle = text => String(text).replace(/([^.])\.\s*$/, "$1");
+  // A title too long for its lines ends at a whole word, never inside a figure; the full title stays in its tooltip and name.
+  function fitTitles(root = document) {
+    for (const node of root.querySelectorAll(".row-title")) {
+      const full = node.dataset.full || node.textContent, named = node.closest("a, button");
+      node.dataset.full = full; node.textContent = full; node.removeAttribute("title");
+      if (named && named.dataset.fitted) { named.removeAttribute("aria-label"); delete named.dataset.fitted; }
+      if (node.scrollHeight <= node.clientHeight + 1) continue;
+      const words = full.split(" "); let low = 1, high = words.length - 1;
+      const cut = count => words.slice(0, count).join(" ").replace(/[\s,;:.(\-–—]+$/, "") + "…";
+      while (low < high) {
+        const middle = Math.ceil((low + high) / 2); node.textContent = cut(middle);
+        if (node.scrollHeight <= node.clientHeight + 1) low = middle; else high = middle - 1;
+      }
+      node.textContent = cut(low); node.title = full;
+      if (named && !named.hasAttribute("aria-label")) { named.setAttribute("aria-label", full); named.dataset.fitted = "true"; }
+    }
+  }
+  let fitting = 0;
+  addEventListener("resize", () => { cancelAnimationFrame(fitting); fitting = requestAnimationFrame(() => fitTitles()); });
+  // Choices as rows: one is chosen, then sent with the panel's solid button. Choosing the chosen row again clears it.
+  // `choices` holds {value, label, tag}; `change(value)` receives the chosen value, or null when cleared.
+  function createChoices(name, label, choices, chosen, disabled, change) {
+    const group = make("div", null, "choices"); group.setAttribute("role", "radiogroup"); group.setAttribute("aria-label", label);
+    for (const choice of choices) {
+      const row = make("label", null, "choice"), input = make("input"), text = make("span", choice.label, "choice-text");
+      input.type = "radio"; input.name = name; input.value = choice.value; input.checked = choice.value === chosen; input.disabled = disabled;
+      input.setAttribute("aria-label", choice.label);
+      input.onclick = () => { if (chosen === choice.value) { input.checked = false; chosen = null; } else chosen = choice.value; change(chosen); };
+      row.append(input, make("span", null, "choice-mark"), text);
+      if (choice.tag) row.append(make("span", choice.tag, "choice-tag"));
+      group.append(row);
+    }
+    return group;
+  }
+  // A single line for words that grows with what is written.
+  function createLine(className, value, placeholder, label, limit, input) {
+    const field = make("textarea", null, className + " line-field"); field.rows = 1; field.maxLength = limit; field.value = value;
+    field.placeholder = placeholder; field.setAttribute("aria-label", label);
+    const fit = () => { if (!CSS.supports("field-sizing", "content")) { field.style.height = "auto"; field.style.height = field.scrollHeight + field.offsetHeight - field.clientHeight + "px"; } };
+    field.oninput = () => { input(field.value); fit(); };
+    queueMicrotask(fit);
+    return field;
+  }
   // Requests to the Status service that served this page. Portable reports do not use these.
   const base = document.documentElement.dataset.base || "";
   let token;
@@ -126,5 +171,5 @@
   const localizeTimes = (root = document) => {
     for (const node of root.querySelectorAll("time[datetime]")) { node.textContent = moment(node.dateTime); node.title = time(node.dateTime); }
   };
-  window.StatusControls = {make, time, moment, elapsed, createPicker, pickers, base, request, measure, localizeTimes};
+  window.StatusControls = {make, time, moment, elapsed, listTitle, fitTitles, createChoices, createLine, createPicker, pickers, base, request, measure, localizeTimes};
 })();

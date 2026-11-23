@@ -29,7 +29,8 @@ code, pre { font: .92em/var(--line) var(--mono); overflow-wrap: anywhere; }
 .subject-details summary { display: block; min-height: 0; padding: 0; color: var(--ink-tertiary); font-size: var(--meta); font-weight: 400; letter-spacing: 0; }
 .subject-details summary::after { content: none; }
 .assessment { line-height: var(--line-reading); padding: var(--space-5) 0; max-width: var(--measure); }
-.notice { margin-top: var(--space-4); padding-inline-start: var(--space-4); border-inline-start: var(--accent-edge) solid var(--attention); max-width: var(--measure); line-height: var(--line-reading); }
+/* A notice is a paragraph with a strong first line; its place under the assessment is its emphasis. */
+.notice { margin-top: var(--space-4); max-width: var(--measure); line-height: var(--line-reading); }
 .notice h2 { font-size: var(--reading); line-height: inherit; font-weight: var(--weight-strong); letter-spacing: 0; }
 .assessment + .notice { margin-top: 0; }
 .notice:has(+ :not(.notice)) { margin-bottom: var(--space-5); }
@@ -58,6 +59,7 @@ th, td { padding: var(--space-2) var(--space-4) var(--space-2) 0; border-bottom:
 th:last-child, td:last-child { padding-inline-end: 0; }
 tbody tr:last-child td { border-bottom: 0; }
 th { font-weight: var(--weight-strong); color: var(--ink-secondary); border-bottom-color: var(--rule-strong); }
+.phrase-column { min-width: var(--phrase-cell-width); }
 .text-column { min-width: var(--text-cell-width); }
 .empty { color: var(--ink-secondary); padding: var(--space-3) 0; }
 .sheet details { margin-top: var(--space-7); border-top: var(--stroke) solid var(--rule); }
@@ -76,6 +78,18 @@ footer { margin-top: var(--space-5); }
 input, select, textarea, button { font: inherit; color: var(--ink); max-width: 100%; }
 input, select, textarea { width: 100%; background: var(--surface); border: var(--stroke) solid var(--rule-strong); border-radius: var(--radius-control); min-height: var(--control-height); padding: var(--space-1) var(--space-3); }
 textarea { display: block; resize: none; field-sizing: content; line-height: var(--line); }
+/* A line for words: ruled underneath, starting on the column edge. */
+.line-field { padding-inline: 0; background: none; border-width: 0 0 var(--stroke); border-radius: 0; }
+.line-field:focus-visible { outline: none; border-bottom-color: var(--accent); box-shadow: 0 var(--stroke) 0 var(--accent); border-radius: 0; }
+/* Choices are rows: choose one, then send it with the panel's one solid button. */
+.choices { display: grid; }
+.choice { position: relative; display: grid; grid-template-columns: var(--choice-mark) minmax(0, 1fr) auto; column-gap: var(--space-3); align-items: center; min-height: calc(var(--control-height) + var(--stroke)); padding-block: var(--space-1); cursor: pointer; overflow-wrap: anywhere; }
+.choice + .choice { border-top: var(--stroke) solid var(--rule); }
+.choice input { position: absolute; inset: 0; width: 100%; height: 100%; min-height: 0; margin: 0; padding: 0; opacity: 0; cursor: pointer; }
+.choice-mark { width: var(--choice-mark); height: var(--choice-mark); border: var(--glyph-stroke) solid var(--ink-tertiary); border-radius: var(--radius-round); }
+.choice input:checked + .choice-mark { border-color: var(--action); background: var(--action); box-shadow: inset 0 0 0 var(--accent-edge) var(--surface); }
+.choice input:focus-visible + .choice-mark { outline: var(--focus) solid var(--accent); outline-offset: var(--focus); }
+.choice-tag { color: var(--ink-tertiary); font-size: var(--meta); white-space: nowrap; }
 ::placeholder { color: var(--ink-tertiary); opacity: 1; }
 button { cursor: pointer; background: var(--surface); border: var(--stroke) solid var(--rule-strong); border-radius: var(--radius-control); min-height: var(--control-height); padding: 0 var(--space-3); font-size: var(--control-text); font-weight: var(--weight-medium); white-space: nowrap; transition: background var(--quick), border-color var(--quick), color var(--quick); }
 button:hover { background: var(--surface-quiet); }

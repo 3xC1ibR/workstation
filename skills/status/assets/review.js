@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  const {make, time, elapsed, base, request, measure} = window.StatusControls;
+  const {make, time, elapsed, listTitle, fitTitles, base, request, measure} = window.StatusControls;
   const element = id => document.getElementById(id);
   let review = null, signature = "", undo = null, noticeTimer = null, revision = 0, searched = "";
   const WEEK = 7 * 86400e3, olderOpen = {deliveries: false, operations: false};       // the reader's own choice for each Older group
@@ -23,7 +23,7 @@
   function row({key, state, closed, href, title, flags, excerpt, at, actions}) {
     const item = make("li", null, "row"); item.dataset.key = key; item.dataset.state = state; item.dataset.closed = String(Boolean(closed));
     item.dataset.kind = key.split("-")[0];
-    const main = make("div", null, "row-main"), link = make("a", title, "row-title");
+    const main = make("div", null, "row-main"), link = make("a", listTitle(title), "row-title");
     link.href = href;
     if (state === "unread") link.setAttribute("aria-label", "Unread: " + title);
     main.append(link);
@@ -76,7 +76,7 @@
     return row({
       key: "operation-" + operation.id, state: operation.unread && !dismissed ? "unread" : "read", closed: dismissed,
       href: `${base}/reports/${operation.latest}`, title: operation.title,
-      flags: [operation.ask_count ? flag(plural(operation.ask_count, "ask") + " open", "flag-needs") : null,
+      flags: dismissed ? [] : [operation.ask_count ? flag(plural(operation.ask_count, "ask") + " open", "flag-needs") : null,
               operation.response_field_count ? flag(plural(operation.response_field_count, "question") + " for you", "flag-needs") : null],
       excerpt: excerpt(operation.summary), at: operation.received_at,
       actions: [dismissed ? ["Restore", () => dismissOperation(operation, false), "quiet"] : ["Dismiss", () => dismissOperation(operation, true), "quiet"]]});
@@ -117,6 +117,7 @@
       matches(query, operation.title, operation.subject, operation.summary, operation.origin.agent, operation.origin.workspace));
     const shown = section("asks", asks, askRow, query) + section("deliveries", deliveries, deliveryRow, query) + section("operations", operations, operationRow, query);
     searched = query;
+    fitTitles();
     element("review-source").hidden = review.asks.available || show === "done";
     element("review-source").replaceChildren(...(review.asks.available ? [] : [make("strong", "Asks unavailable. "), review.asks.reason]));
     const awaiting = review.deliveries.filter(delivery => !delivery.response).length;

@@ -2,13 +2,13 @@
 // Asks belong to Ribbon Field. This component shows one ask in full and, when this browser is paired with
 // Ribbon Field on the same address, sends the user's resolution straight to Ribbon Field. Nothing is stored here.
 (() => {
-  const {make, time, elapsed, request, measure} = window.StatusControls;
+  const {make, time, elapsed, listTitle, fitTitles, createChoices, createLine, request, measure} = window.StatusControls;
   const LABELS = {answered: "Send answer", done: "Done", not_done: "Not done", approved: "Approve", declined: "Decline",
                   accepted: "Accept", changes_requested: "Request changes", granted: "Grant", dismissed: "Dismiss"};
   const OUTCOMES = {answered: "Answered", done: "Marked done", not_done: "Marked not done", approved: "Approved", declined: "Declined",
                     accepted: "Accepted", changes_requested: "Changes requested", granted: "Granted", dismissed: "Dismissed", snoozed: "Snoozed"};
-  const drafts = new Map();          // ask id -> {open, text, error, busy}; survives list refreshes
-  const draft = id => drafts.get(id) || drafts.set(id, {open: false, text: "", error: "", busy: false}).get(id);
+  const drafts = new Map();          // ask id -> {open, text, option, error, busy}; survives list refreshes
+  const draft = id => drafts.get(id) || drafts.set(id, {open: false, text: "", option: null, error: "", busy: false}).get(id);
   let connection = null;             // {state: "local"} | {state: "ready", token} | {state: "unpaired"} | {state: "elsewhere"}
   const LOCAL = ["127.0.0.1", "localhost", "[::1]"].includes(location.hostname);
 
@@ -78,15 +78,18 @@
     const marker = make("span", null, "marker"); marker.setAttribute("aria-hidden", "true");
     const main = make("div", null, "row-main"), toggle = make("button", null, "ask-toggle");
     const stamp = make("time", elapsed(ask.created_at)); stamp.dateTime = ask.created_at; stamp.title = time(ask.created_at);
-    toggle.type = "button"; toggle.append(make("span", ask.title, "row-title"), make("span", null, "row-aside"));       // the title and the chevron toggle together
+    const aside = make("span", null, "row-aside"); aside.append(stamp);
+    toggle.type = "button"; toggle.append(make("span", listTitle(ask.title), "row-title"), aside);       // the whole heading line toggles; the margin chevron shows it
     // A decision is the ordinary ask, so only the other kinds are named. Inside an operation's report its own name is left out.
     const kind = ask.kind && ask.kind !== "decision" ? ask.kind[0].toUpperCase() + ask.kind.slice(1) : "";
     const effort = ask.effort_minutes ? `${ask.effort_minutes} min` : "";
-    const meta = make("p", null, "row-meta");
-    const parts = [ask.blocking && make("span", "Blocking", "flag-blocking"), [kind, effort].filter(Boolean).join(", "),
-      within !== "operation" && (ask.thread_title || ask.project_label), ask.overdue && make("span", "Overdue", "flag-attention"),
-      ask.stale && make("span", ask.thread_closed ? "Thread closed" : "Agent inactive", "flag-attention"), stamp].filter(Boolean);
+    // The line under the title has one order: state words, then what it costs him, then where it comes from.
+    const meta = make("p", null, "row-meta"), cost = [kind, effort].filter(Boolean).join(", ");
+    const parts = [ask.blocking && make("span", "Blocking", "flag-blocking"), ask.overdue && make("span", "Overdue", "flag-attention"),
+      ask.stale && make("span", ask.thread_closed ? "Thread closed" : "Agent inactive", "flag-attention"), cost && make("span", cost, "flag-needs"),
+      within !== "operation" && (ask.thread_title || ask.project_label)].filter(Boolean);
     parts.forEach((part, index) => { if (index) meta.append(" · "); meta.append(part); });
+    meta.hidden = !parts.length;
     const body = make("div", null, "ask-detail"); body.id = `ask-${ask.id}-detail`;
     toggle.setAttribute("aria-controls", body.id);
     main.append(toggle, meta, body);
@@ -113,26 +116,24 @@
         const button = make("button", label, className || ""); button.type = "button"; button.disabled = state.busy; button.onclick = handler;
         parent.append(button); return button;
       };
-      const decision = (ask.resolutions || []).includes("answered");
-      if ((ask.options || []).length) {
-        const options = make("div", null, "ask-options"); options.setAttribute("role", "group"); options.setAttribute("aria-label", "Choices");
-        for (const option of ask.options) add(options, option, () => resolve({resolution: "answered", option, ...(state.text.trim() ? {note: state.text.trim()} : {})}, "answered"));
-        panel.append(options);
-      }
-      // One line that grows with what is written.
-      const field = make("textarea", null, "ask-note"); field.rows = 1; field.maxLength = 8000; field.value = state.text; field.disabled = state.busy;
-      field.placeholder = !decision ? "Note for the agent" : (ask.options || []).length ? "Or answer in your own words" : "Your answer";
-      field.setAttribute("aria-label", decision ? "Your answer or a note" : "Note for the agent");
-      const fit = () => { if (!CSS.supports("field-sizing", "content")) { field.style.height = "auto"; field.style.height = field.scrollHeight + field.offsetHeight - field.clientHeight + "px"; } };
-      field.oninput = () => { state.text = field.value; fit(); };
-      queueMicrotask(fit);
+      const decision = (ask.resolutions || []).includes("answered"), options = ask.options || [];
+      if (options.length) panel.append(createChoices(`ask-${ask.id}-choice`, "Choices", options.map(option => ({value: option, label: option})),
+        state.option, state.busy, option => { state.option = option; }));
+      const field = createLine("ask-note", state.text, !decision ? "Note for the agent" : options.length ? "Another answer, or a note to send with your choice" : "Your answer",
+        decision ? "Your answer or a note" : "Note for the agent", 8000, text => { state.text = text; });
+      field.disabled = state.busy;
       panel.append(field);
       const buttons = make("div", null, "ask-buttons"), note = () => (state.text.trim() ? {note: state.text.trim()} : {});
+      // "Send answer" sends the chosen row with the words as its note, or the words alone. With neither it leads to where an answer goes.
+      const answer = () => {
+        if (state.option) resolve({resolution: "answered", option: state.option, ...note()}, "answered");
+        else if (state.text.trim()) resolve({resolution: "answered", answer: state.text.trim()}, "answered");
+        else (panel.querySelector(".choice input") || field).focus();
+      };
       let primary = "primary";                 // the first resolution is the panel's one solid button
       for (const resolution of ask.resolutions || []) {
         if (resolution === "dismissed") continue;
-        // "Send answer" stays solid; with nothing written it leads to the field instead of looking unavailable.
-        if (resolution === "answered") add(buttons, LABELS.answered, () => { if (state.text.trim()) resolve({resolution, answer: state.text.trim()}, resolution); else field.focus(); }, primary);
+        if (resolution === "answered") add(buttons, LABELS.answered, answer, primary);
         else add(buttons, LABELS[resolution] || resolution.replace(/_/g, " "), () => resolve({resolution, ...note()}, resolution), primary);
         primary = "";
       }
@@ -159,7 +160,7 @@
       return line;
     }
     function links() {
-      const line = make("p", null, "ask-links"), thread = make("a", "Open the thread in Ribbon Field"); thread.href = ask.thread_link; line.append(thread);
+      const line = make("p", null, "ask-links"), thread = make("a", "Discuss in Ribbon Field"); thread.href = ask.thread_link; line.append(thread);
       return line;
     }
     function unavailable() {
@@ -178,6 +179,7 @@
     function draw() {
       item.dataset.open = String(state.open); toggle.setAttribute("aria-expanded", String(state.open));
       body.hidden = !state.open;
+      if (item.isConnected) fitTitles(item);             // an open ask shows its whole title
       if (!state.open) { body.replaceChildren(); return; }
       // The response comes first, directly under the title; the whole question and its context follow.
       const content = [lead(), !connection ? make("p", "Checking Ribbon Field…", "note") : ["ready", "local"].includes(connection.state) ? controls() : unavailable()].filter(Boolean);
@@ -187,7 +189,7 @@
       content.push(links());
       const focused = body.contains(document.activeElement) && document.activeElement.className;
       body.replaceChildren(...content);
-      if (focused === "ask-note") body.querySelector(".ask-note")?.focus();
+      if (focused && focused.includes("ask-note")) body.querySelector(".ask-note")?.focus();
     }
     toggle.onclick = async () => {
       state.open = !state.open; draw();

@@ -80,9 +80,9 @@ class ReviewPageBrowserTests(unittest.TestCase):
         expect(page.get_by_role("link", name="Discuss in Ribbon Field")).to_have_attribute("href", "agentcoord://thread/thread-a")
         page.wait_for_function("document.querySelector('time').textContent.includes(',')")
         self.assertTrue(deliveries.record(identifier)["read_at"])
-        page.get_by_role("button", name="Add a note", exact=True).click()
-        page.get_by_label("Note for the agent").fill("After Tuesday")
-        page.get_by_role("button", name="Hold for changes", exact=True).click()
+        page.get_by_label("Note for the agent").fill("After Tuesday")             # the note line is always present
+        page.get_by_role("radio", name="Hold for changes", exact=True).check()   # an option is chosen, then sent
+        page.get_by_role("button", name="Do it", exact=True).click()
         expect(page.locator(".response-outcome")).to_contain_text("Accepted")
         response = deliveries.record(identifier)["response"]
         self.assertEqual((response["type"], response["choice"], response["note"]), ("accepted", "Hold for changes", "After Tuesday"))

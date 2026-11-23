@@ -12,9 +12,9 @@
 /* Search is a glyph and a word until it is used. */
 .search { position: relative; display: block; width: var(--search-width); color: var(--ink-tertiary); transition: width var(--quick); }
 .search:focus-within, .search:has(input:not(:placeholder-shown)) { width: var(--search-width-active); }
-.search::before { content: ""; position: absolute; left: var(--space-3); top: 50%; width: var(--space-2); height: var(--space-2); margin-top: calc(-1 * var(--space-2) + var(--stroke)); border: var(--glyph-stroke) solid currentColor; border-radius: var(--radius-round); pointer-events: none; }
-.search::after { content: ""; position: absolute; left: calc(var(--space-5) - var(--focus)); top: 50%; width: var(--space-1); height: var(--glyph-stroke); margin-top: var(--space-1); background: currentColor; border-radius: var(--radius-round); transform: rotate(45deg); pointer-events: none; }
-.search input { height: var(--space-6); min-height: 0; padding-inline-start: calc(var(--space-6) + var(--space-1)); background: none; border-color: transparent; font-size: var(--control-text); transition: background var(--quick); }
+.search svg { position: absolute; left: var(--space-3); top: 50%; width: var(--space-4); height: var(--space-4); margin-top: calc(-1 * var(--space-2)); fill: none; stroke: currentColor; stroke-width: var(--glyph-stroke); stroke-linecap: round; pointer-events: none; }
+.search input { height: var(--space-6); min-height: 0; padding-inline: calc(var(--space-6) + var(--space-1)) 0; background: none; border-color: transparent; font-size: var(--control-text); transition: background var(--quick); }
+.search:focus-within input, .search input:not(:placeholder-shown) { padding-inline-end: var(--space-2); }
 .search input:hover, .search input:focus, .search input:not(:placeholder-shown) { background: var(--surface-quiet); }
 .search:focus-within, .search:has(input:not(:placeholder-shown)) { color: var(--ink-secondary); }
 .search input::-webkit-search-cancel-button { cursor: pointer; }
@@ -29,14 +29,15 @@
 .source-note strong { color: var(--attention); font-weight: var(--weight-strong); }
 .rows { list-style: none; margin: 0 calc(-1 * var(--row-bleed)); padding: 0; }
 .rows:empty { display: none; }
-.row { --row-surface: var(--surface); --row-pad: var(--space-2); position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-4); align-items: baseline; padding: var(--row-pad) var(--row-bleed); border-radius: var(--radius-control); background: var(--row-surface); }
+.row { --row-surface: var(--surface); --row-pad: var(--space-2); position: relative; display: grid; grid-template-columns: minmax(0, 1fr) minmax(var(--age-width), auto); column-gap: var(--space-4); align-items: baseline; padding: var(--row-pad) var(--row-bleed); border-radius: var(--radius-control); background: var(--row-surface); }
 .row-main { display: contents; }
-/* The state mark hangs in the margin, left of the text column that every page shares. */
-.marker { position: absolute; left: calc(var(--row-bleed) - 2 * var(--marker)); top: calc(var(--row-pad) + (var(--reading) * var(--line-snug) - var(--marker)) / 2); width: var(--marker); height: var(--marker); border-radius: var(--radius-round); }
+/* One mark hangs in the margin, left of the text column that every page shares: a dot for unread, a chevron for an ask that opens in place. */
+.marker { position: absolute; left: calc(var(--row-bleed) - var(--space-2) - var(--marker)); top: calc(var(--row-pad) + (var(--reading) * var(--line-snug) - var(--marker)) / 2); width: var(--marker); height: var(--marker); border-radius: var(--radius-round); }
 .row[data-state="unread"] .marker { background: var(--accent); }
-.row[data-state="blocking"] .marker { background: var(--critical); }
-/* Unread is the dot alone. Only a blocking ask is set heavier. */
-.row-title { grid-column: 1; grid-row: 1; color: var(--ink); font-size: var(--reading); line-height: var(--line-snug); font-weight: var(--weight-medium); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; }
+.row.ask .marker { width: calc(var(--marker) - var(--focus)); height: calc(var(--marker) - var(--focus)); margin: var(--stroke) 0 0 calc(-1 * var(--stroke)); border-radius: 0; border-right: var(--glyph-stroke) solid var(--ink-tertiary); border-bottom: var(--glyph-stroke) solid var(--ink-tertiary); transform: rotate(-45deg); transition: transform var(--quick); }
+.row.ask[data-open="true"] .marker { transform: translate(var(--stroke), calc(-1 * var(--stroke))) rotate(45deg); }
+/* Every row is a title on one line with its age at the right. Unread is the dot alone; only a blocking ask is set heavier. */
+.row-title { grid-column: 1; grid-row: 1; color: var(--ink); font-size: var(--reading); line-height: var(--line-snug); font-weight: var(--weight-medium); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
 .row[data-state="blocking"] .row-title { font-weight: var(--weight-strong); }
 a.row-title::after, .ask-toggle::after { content: ""; position: absolute; inset: 0; }             /* the whole row opens the item */
 a.row-title:hover { text-decoration: none; }
@@ -45,10 +46,9 @@ a.row-title:hover { text-decoration: none; }
 a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { outline: none; }
 @media (hover: hover) { .row:hover { --row-surface: var(--surface-quiet); } }
 /* The right column holds the age in the lists that are ordered by it. */
-.row-aside { grid-column: 2; grid-row: 1; color: var(--ink-tertiary); font-size: var(--meta); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.row-aside { grid-column: 2; grid-row: 1; color: var(--ink-tertiary); font-size: var(--meta); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
 .row-meta { grid-column: 1 / -1; font-size: var(--meta); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
 .row-meta { color: var(--ink-tertiary); }
-.row-meta time { white-space: nowrap; }
 .row-meta .outcome-accepted { color: var(--positive); font-weight: var(--weight-medium); }
 .row-meta .flag-blocking { color: var(--critical); font-weight: var(--weight-strong); }
 .row-meta .flag-attention { color: var(--attention); font-weight: var(--weight-medium); }
@@ -66,7 +66,7 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
 .older .count { margin: 0; }
 
 .empty-state { margin-top: var(--space-7); color: var(--ink-secondary); }
-.empty-state h2 { color: var(--ink); margin-bottom: var(--space-1); }
+.empty-state h2 { color: var(--ink); font-size: var(--reading); line-height: var(--line); font-weight: var(--weight-medium); letter-spacing: 0; }
 .empty-state p { max-width: 52ch; }
 .transient-notice { position: fixed; left: 50%; bottom: var(--space-5); transform: translateX(-50%); z-index: var(--layer-notice); display: flex; align-items: center; gap: var(--space-3); max-width: calc(100vw - 2 * var(--space-4)); padding: var(--space-2) var(--space-2) var(--space-2) var(--space-4); background: var(--ink); color: var(--canvas); border-radius: var(--radius); font-size: var(--meta); }
 .transient-notice[hidden] { display: none; }
@@ -74,10 +74,8 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
 .transient-notice button:hover { background: color-mix(in srgb, var(--canvas) 18%, transparent); color: var(--canvas); }
 
 /* Asks: answered in place, then read in full. Ribbon Field stores the answer. */
-.ask-toggle { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: var(--space-4); align-items: baseline; width: 100%; min-height: 0; padding: 0; background: none; border: 0; border-radius: 0; text-align: left; font: inherit; color: var(--ink); white-space: normal; cursor: pointer; }
+.ask-toggle { grid-column: 1 / -1; display: grid; grid-template-columns: minmax(0, 1fr) minmax(var(--age-width), auto); column-gap: var(--space-4); align-items: baseline; width: 100%; min-height: 0; padding: 0; background: none; border: 0; border-radius: 0; text-align: left; font: inherit; color: var(--ink); white-space: normal; cursor: pointer; }
 .ask-toggle:hover { background: none; }
-/* The chevron says the row opens in place; it stands where the other lists show an age. */
-.ask-toggle .row-aside::after { content: ""; display: inline-block; width: var(--space-2); height: var(--space-2); margin-inline: var(--focus); border-right: var(--glyph-stroke) solid currentColor; border-bottom: var(--glyph-stroke) solid currentColor; transform: translateY(-35%) rotate(45deg); }
 /* An open ask stays on the page's own ground, set off by space; its controls are the only outlines. */
 .row.ask[data-open="true"] { --row-surface: var(--surface); --row-pad: var(--space-3); padding-bottom: var(--space-5); }
 /* Once open, only the title and the line under it close the ask; a stray click in the text does not. */
@@ -85,7 +83,6 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
 .row.ask[data-open="true"] .ask-toggle::after { inset: calc(-1 * var(--row-pad)) 0 calc(-1 * var(--space-5)); }
 .row.ask[data-open="true"] .row-title { -webkit-line-clamp: none; font-weight: var(--weight-strong); }
 .row.ask[data-open="true"] .row-meta { -webkit-line-clamp: none; }
-.row.ask[data-open="true"] .row-aside::after { transform: translateY(10%) rotate(-135deg); }
 .ask-detail { grid-column: 1 / -1; position: relative; display: grid; gap: var(--space-4); margin-top: var(--space-1); }
 .ask-detail[hidden] { display: none; }
 .ask-lead { font-size: var(--meta); color: var(--ink-secondary); max-width: var(--measure); overflow-wrap: anywhere; }
@@ -96,8 +93,6 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
 .ask-text + .ask-text { margin-top: calc(-1 * var(--space-2)); }
 .ask-context { color: var(--ink-secondary); }
 .ask-response { display: grid; gap: var(--space-2); max-width: var(--measure); }
-.ask-options { display: flex; flex-wrap: wrap; gap: var(--space-2); }
-.ask-options button { justify-content: flex-start; padding-block: var(--space-1); text-align: left; white-space: normal; }
 .ask-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .ask-buttons .spacer { flex: 1; }
 .ask-snooze { position: relative; }
@@ -125,13 +120,15 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
 /* The delivery's response: the recommendation, then one solid button for it. */
 .sheet section.response-panel { margin-top: 0; max-width: var(--measure); }
 .recommendation { overflow-wrap: anywhere; }
-.decision-question { margin-top: var(--space-1); color: var(--ink-secondary); overflow-wrap: anywhere; }
+.decision-question { font-weight: var(--weight-medium); overflow-wrap: anywhere; }
+.recommendation:not([hidden]) + .decision-question { margin-top: var(--space-1); }
 .response-buttons { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); align-items: center; }
-.response-buttons button { padding-block: var(--space-1); text-align: left; white-space: normal; }
-/* Quiet actions follow the answers as words; their text starts on the column edge. */
-.response-quiet { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin-inline-start: calc(-1 * var(--space-3)); }
+.response-panel .choices { margin-top: var(--space-3); }
+/* Quiet actions follow the solid button as words. */
+.response-quiet { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); }
+.response-outcome .response-quiet { margin-inline-start: calc(-1 * var(--space-3)); }
 .response-quiet a { display: inline-flex; align-items: center; min-height: var(--control-height); padding: 0 var(--space-3); font-size: var(--control-text); font-weight: var(--weight-medium); }
-.response-note { margin-top: var(--space-2); }
+.response-note { margin-top: var(--space-3); }
 .response-outcome { display: grid; gap: var(--space-1); margin-top: var(--space-3); }
 .response-outcome .outcome-accepted { color: var(--positive); font-weight: var(--weight-strong); }
 .response-outcome .outcome-dismissed { font-weight: var(--weight-strong); }
@@ -163,16 +160,16 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
   .search { width: var(--control-height); }
   .search:focus-within, .search:has(input:not(:placeholder-shown)) { order: 1; flex: 1 0 100%; width: auto; }
   .search input { height: var(--control-height); }
+  .search:not(:focus-within):has(input:placeholder-shown) svg { left: auto; right: 0; }
   .search:not(:focus-within) input:placeholder-shown { color: transparent; }
   .search:not(:focus-within) input:placeholder-shown::placeholder { color: transparent; }
   .review-controls { flex: 1 1 auto; flex-wrap: wrap; justify-content: flex-end; }
   .review-section { margin-top: var(--space-5); }
   .review-section:not([hidden]) ~ .review-section { margin-top: var(--space-6); }
-  .marker { left: calc(var(--row-bleed) - var(--focus) - 2 * var(--marker)); }
+  .marker { left: calc(var(--row-bleed) - var(--page-inset) / 2 - var(--marker) / 2); }
+  .row-title { -webkit-line-clamp: 2; }
   .ask-snooze-choices { right: auto; left: 0; }
-  .ask-options button, .response-buttons > button { flex: 1 1 100%; }
   .ask-buttons button.quiet, .ask-snooze summary { padding-inline: var(--space-2); }
-  .row.ask .row-meta { -webkit-line-clamp: 2; }
   .version-history li { align-items: center; gap: var(--space-3); padding-block: 0; }
   .version-history a, .ask-links a { display: inline-flex; align-items: center; min-height: var(--touch-height); }
 }

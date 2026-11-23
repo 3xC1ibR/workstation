@@ -29,6 +29,7 @@
       for (const ask of asks.asks) list.append(window.StatusAsks.createAskRow(ask, {changed: () => showAsks(true), publicUrl: public_url, within: "operation"}));
       const heading = make("h2", "Needs you "); heading.append(make("span", String(asks.asks.length), "count"));
       section.replaceChildren(heading, list);
+      window.StatusControls.fitTitles(section);
     }).catch(() => {});
   }
   showAsks();

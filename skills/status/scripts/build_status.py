@@ -189,8 +189,10 @@ def render(document, connection=None, *, page=None):
             return '<p class="empty">No records available.</p>'
         # A table of two columns wraps at phone width; wider tables scroll sideways under their first column.
         pair = len(section["columns"]) <= 2
-        classes = [' class="text-column"' if index > 0 and not pair and any(len(row[index]) > 70 for row in section["rows"]) else ""
-                   for index in range(len(section["columns"]))]
+        # A column is given room for its longest cell, so a scrolling table never wraps to a word a line.
+        longest = [max(len(row[index]) for row in section["rows"]) for index in range(len(section["columns"]))]
+        classes = ["" if pair or index == 0 or length <= 20 else ' class="text-column"' if length > 70 else ' class="phrase-column"'
+                   for index, length in enumerate(longest)]
         heading = "".join(f'<th scope="col"{classes[index]}>{escape(column)}</th>' for index, column in enumerate(section["columns"]))
         rows = "".join("<tr>" + "".join(f"<td{classes[index]}>{escape(cell)}</td>" for index, cell in enumerate(row)) + "</tr>" for row in section["rows"])
         if pair:
@@ -206,7 +208,9 @@ def render(document, connection=None, *, page=None):
 
     assets = Path(__file__).resolve().parents[1] / "assets"
     # One quiet line under the title: the subject, then when the observations were assembled. A long subject folds away.
-    assembled = f'As of {escape(time_text(document["generated_at"]))}'
+    # A served page is rendered when it is read, so it can leave out the current year; a portable file states it.
+    current = bool(page) and generated.astimezone(zone).year == datetime.now(zone).year
+    assembled = f'As of {escape(time_text(document["generated_at"], full=not current))} {escape(generated.astimezone(zone).strftime("%Z")) if current else ""}'.rstrip()
     subject = f'<p class="sheet-meta"><span class="subject">{escape(document["subject"])}</span><span>{assembled}</span></p>'
     if len(document["subject"]) > 100:
         subject = (f'<details class="subject-details"><summary>{escape(document["subject"][:60])}… (show the full subject)</summary>'
