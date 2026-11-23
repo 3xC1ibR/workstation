@@ -131,7 +131,70 @@ class AskReader:
             self.value, self.generation = None, self.generation + 1
 
 
-def for_operation(asks, operation):
-    """Asks filed from the operation's conversations or from its workspace."""
+def shared_workspaces(operations):
+    """Workspaces that hold more than one operation, such as a shared projects root."""
+    seen, shared = set(), set()
+    for operation in operations:
+        workspace = operation.get("origin", {}).get("workspace")
+        if workspace:
+            (shared if workspace in seen else seen).add(workspace)
+    return shared
+
+
+def for_operation(asks, operation, shared=frozenset()):
+    """Asks filed from the operation's conversations, or from its workspace when no other operation shares it.
+
+    A workspace shared by several operations (for example a common projects root) says nothing about
+    which operation an ask belongs to, so only the conversation match applies there.
+    """
     threads, workspace = set(operation["threads"]), operation["origin"].get("workspace")
-    return [ask for ask in asks if ask["session_id"] in threads or (workspace and ask.get("cwd") == workspace)]
+    by_workspace = bool(workspace) and workspace not in shared
+    return [ask for ask in asks if ask["session_id"] in threads or (by_workspace and ask.get("cwd") == workspace)]
+
+RESOLUTION_FIELDS = {"resolution", "option", "answer", "note"}
+
+
+def ribbon_field_address():
+    """The loopback address of the running Ribbon Field runtime, from its discovery record."""
+    database = Path(os.environ.get("AGENT_COORD_DB") or Path.home() / ".local/state/agent-coord/state.sqlite3")
+    discovery = database.parent / f".{database.name}.runtime" / "discovery.json"
+    try:
+        address = json.loads(discovery.read_text()).get("url")
+    except (OSError, ValueError) as error:
+        raise ValueError("Ribbon Field is not running on this Mac. Open it and try again.") from error
+    if not isinstance(address, str) or not re.match(r"^http://(127\.0\.0\.1|localhost):\d+/$", address):
+        raise ValueError("Ribbon Field's local address could not be read. Answer in Ribbon Field.")
+    return address
+
+
+def resolve_ask(ask_id, body, *, snooze=False, address=None, opener=None):
+    """Send the user's resolution to Ribbon Field's loopback browser API.
+
+    Ribbon Field authorizes loopback requests itself; this adds no authority beyond what any
+    process on this Mac already has. The Status service calls it only for its own local page.
+    """
+    import urllib.error
+    import urllib.request
+    if not isinstance(ask_id, int) or isinstance(ask_id, bool) or ask_id <= 0:
+        raise ValueError("Choose an ask to answer.")
+    allowed = {"until"} if snooze else RESOLUTION_FIELDS
+    if not isinstance(body, dict) or not body or body.keys() - allowed:
+        raise ValueError("Provide a resolution, an option or an answer.")
+    address = address or ribbon_field_address()
+    opener = opener or urllib.request.urlopen
+    try:
+        with opener(urllib.request.Request(address + "api/browser/config"), timeout=5) as response:
+            token = json.load(response)["token"]
+        request = urllib.request.Request(
+            address + f"api/browser/asks/{ask_id}" + ("/snooze" if snooze else ""), data=json.dumps(body).encode(),
+            method="POST", headers={"Content-Type": "application/json", "X-Agent-Coord-Token": token})
+        with opener(request, timeout=10) as response:
+            return json.load(response)
+    except urllib.error.HTTPError as error:
+        try:
+            message = json.load(error).get("error")
+        except (ValueError, AttributeError):
+            message = None
+        raise ValueError(message or f"Ribbon Field did not accept this answer (HTTP {error.code}).") from error
+    except (urllib.error.URLError, TimeoutError, ConnectionError, KeyError, ValueError) as error:
+        raise ValueError("Could not reach Ribbon Field on this Mac. Your text is still here; try again.") from error

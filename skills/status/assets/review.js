@@ -104,11 +104,13 @@
     const asks = show === "done" ? [] : review.asks.asks.filter(ask => matches(query, ask.title, ask.detail, ask.context, ask.unblocks, ask.project_label, ask.thread_title));
     const deliveries = review.deliveries.filter(delivery => wanted(settled(delivery)) &&
       matches(query, delivery.title, delivery.summary, delivery.recommended_default, delivery.category, delivery.origin.agent, delivery.origin.workspace));
-    deliveries.sort((first, second) => second.unread - first.unread);
+    deliveries.sort((first, second) => (Date.parse(second.received_at) || 0) - (Date.parse(first.received_at) || 0));
     const operations = review.operations.filter(operation => wanted(Boolean(operation.dismissed_at)) &&
       matches(query, operation.title, operation.subject, operation.summary, operation.origin.agent, operation.origin.workspace));
-    const rank = operation => operation.dismissed_at ? 0 : (operation.ask_count ? 2 : 0) + (operation.unread ? 1 : 0);
-    operations.sort((first, second) => rank(second) - rank(first));          // open asks first, then unread, each newest first
+    // Newest version first in one list; unread dots and ask counts stay on the rows. Reports quiet for a week sink to the end.
+    const WEEK = 7 * 86400e3, at = operation => Date.parse(operation.received_at) || 0;
+    const quiet = operation => Date.now() - at(operation) > WEEK;
+    operations.sort((first, second) => (quiet(first) - quiet(second)) || (at(second) - at(first)));
     const shown = fill("asks", asks, askRow, asks.length) + fill("deliveries", deliveries, deliveryRow, deliveries.length) +
       fill("operations", operations, operationRow, operations.length);
     element("asks").hidden = !asks.length;

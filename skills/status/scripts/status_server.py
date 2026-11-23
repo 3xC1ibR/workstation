@@ -21,7 +21,7 @@ import interactive_documents
 from register_status import inbox_directory
 from response_access import response_key
 import review_pages
-from ribbon_field_asks import AskReader, for_operation
+from ribbon_field_asks import AskReader, for_operation, resolve_ask, shared_workspaces
 from status_store import REPORT_CSP, ResponseConflict, StatusError, StatusReports
 from usage_events import INTERACTIVE_OPEN, UsageEvents
 
@@ -41,7 +41,8 @@ POSTS = {"/api/dismiss": ({"id", "dismissed"}, set(), 4096),
          "/api/responses": ({"id", "revision", "values"}, set(), 4 * 1024 * 1024),
          "/api/delivery-response": ({"id", "action"}, {"choice", "note"}, 16 * 1024),
          "/api/document-state": ({"kind", "id", "state"}, set(), 80 * 1024),
-         "/api/events": ({"type"}, {"view", "item_kind", "item", "action", "narrow"}, 4096)}
+         "/api/events": ({"type"}, {"view", "item_kind", "item", "action", "narrow"}, 4096),
+         "/api/ask-resolution": ({"id", "body"}, {"snooze"}, 16 * 1024)}
 
 
 def page_policy(public):
@@ -165,8 +166,9 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
             operations, delivered, listing = reports.operations(), deliveries.list(), asks.current()
             for delivery in delivered["deliveries"]:
                 delivery.pop("document_state")       # the list needs no document data; agents read it with read_responses.py
+            shared = shared_workspaces(operations["operations"])
             for operation in operations["operations"]:
-                operation["ask_count"] = len(for_operation(listing["asks"], operation)) if listing["available"] else None
+                operation["ask_count"] = len(for_operation(listing["asks"], operation, shared)) if listing["available"] else None
                 operation["version_count"] = len(operation.pop("versions"))
             return {"operations": operations["operations"], "deliveries": delivered["deliveries"], "asks": listing,
                     "unreadable": operations["unreadable"] + delivered["unreadable"], "public_url": self.public_url()}
@@ -283,7 +285,8 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
                     if "fresh=asks" in urlsplit(self.path).query:
                         asks.invalidate()
                     operation, listing = reports.operation(path.removeprefix("/api/operations/")), asks.current()
-                    self.send(200, {"operation": operation, "asks": {**listing, "asks": for_operation(listing["asks"], operation)},
+                    shared = shared_workspaces(reports.operations()["operations"])
+                    self.send(200, {"operation": operation, "asks": {**listing, "asks": for_operation(listing["asks"], operation, shared)},
                                     "public_url": self.public_url()})
                 elif path.startswith("/api/document-state/"):
                     kind, _, identifier = path.removeprefix("/api/document-state/").partition("/")
@@ -354,6 +357,12 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
                     self.send(200, reports.save_responses(identifier if cors else body["id"], body["values"], body["revision"]), cors=cors)
                 elif path == "/api/dismiss":
                     self.send(200, reports.dismiss(body["id"], body["dismissed"]))
+                elif path == "/api/ask-resolution":
+                    if self.remote():
+                        raise PermissionError("On the tailnet address, answers go through Ribbon Field's paired-device sign-in.")
+                    result = resolve_ask(body["id"], body["body"], snooze=body.get("snooze") is True)
+                    asks.invalidate()
+                    self.send(200, result)
                 elif path == "/api/delivery-response":
                     record = deliveries.respond(body["id"], body["action"], choice=body.get("choice"), note=body.get("note"))
                     if body["action"] != "read":
@@ -379,6 +388,8 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None):
                     self.send(200, {"recorded": True, "opened": opened})
             except ResponseConflict as error:
                 self.send(409, {"error": str(error)}, cors=cors)
+            except PermissionError as error:
+                self.send(403, {"error": str(error)}, cors=cors)
             except (ValueError, UnicodeError) as error:
                 self.send(400, {"error": str(error)}, cors=cors)
             except OSError:
