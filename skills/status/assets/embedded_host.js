@@ -4,14 +4,12 @@
 // decides what each one does. A message is accepted only from the item's own frame, as a plain object with a known
 // type and sizes within limits; everything else is ignored without a reply.
 (() => {
-  const {base, request, measure} = window.StatusControls;
+  const {request, measure, destination} = window.StatusControls;
   const frame = document.getElementById("embedded-document");
   if (!frame) return;
   const {kind, item, latest, public_url: publicUrl} = JSON.parse(document.getElementById("status-configuration").textContent).embedded;
-  const HEIGHT_MINIMUM = 120, HEIGHT_MAXIMUM = 20000, STATE_LIMIT = 64 * 1024, ADDRESS_LIMIT = 2000, CHOICE_LIMIT = 300, NOTE_LIMIT = 4000;
-  const SAVE_INTERVAL = 1000, PROPOSAL_INTERVAL = 1000;
-  const PAGE_ROUTE = /^\/(?:(?:reports|operations)\/[a-f0-9]{64}|deliveries\/[a-f0-9]{64}(?:\/attachments\/[0-9]{1,2})?)?$/;
-  const APPLICATION_ADDRESS = /^(?:\/[A-Za-z0-9._~-]+)+\/?$/;
+  const HEIGHT_MINIMUM = 120, HEIGHT_MAXIMUM = 20000, STATE_LIMIT = 64 * 1024, CHOICE_LIMIT = 300, NOTE_LIMIT = 4000;
+  const SAVE_INTERVAL = 1000, PROPOSAL_INTERVAL = 1000, OPEN_INTERVAL = 500;
   const view = kind === "delivery" ? "delivery" : "operation";
   // The frame's origin is opaque, so a reply cannot name it; the reply goes to whatever the item's frame now holds.
   const reply = message => { try { frame.contentWindow.postMessage(message, "*"); } catch { /* the frame is gone */ } };
@@ -20,7 +18,7 @@
   if (item) frame.addEventListener("load", () => measure({type: "item_open", view, item_kind: view, item, action: "interactive_document"}), {once: true});
 
   // Saves are sent at most once a second; a newer state replaces one that has not been sent yet.
-  let unsent = null, timer = null, sentAt = 0, proposedAt = 0;
+  let unsent = null, timer = null, sentAt = 0, proposedAt = 0, openedAt = 0;
   function sendState() {
     clearTimeout(timer); timer = null;
     if (!unsent) return;
@@ -33,25 +31,14 @@
   addEventListener("pagehide", sendState);
   document.addEventListener("visibilitychange", () => { if (document.hidden) sendState(); });
 
+  // The document asks; this page decides. Pages of the review page, other applications on this host (framed by the
+  // embedded view) and Ribbon Field links replace this tab; another website opens a new one. Anything else is ignored.
   function open(href) {
-    if (typeof href !== "string" || !href || href.length > ADDRESS_LIMIT) return;
-    if (/^agentcoord:\/\/[^\s]+$/.test(href)) { location.assign(href); return; }        // opens Ribbon Field; it authenticates the user itself
-    if (!/^(?:https?:\/\/|\/(?!\/))/.test(href)) return;                                // javascript:, data:, and every other scheme
-    let target;
-    try { target = new URL(href, location.origin); } catch { return; }
-    if (target.username || target.password) return;
-    const shared = publicUrl ? new URL(publicUrl) : null;
-    const here = target.origin === location.origin, onSharedHost = Boolean(shared) && target.origin === shared.origin;
-    if (!here && !onSharedHost) { window.open(target.href, "_blank", "noopener,noreferrer"); return; }     // another website
-    const prefix = onSharedHost ? shared.pathname.replace(/\/$/, "") : base, path = target.pathname;
-    const route = !prefix || path === prefix || path.startsWith(prefix + "/") ? path.slice(prefix.length) || "/" : path;
-    if (PAGE_ROUTE.test(route) && !(route === "/" && route === path && prefix)) {       // another page of the review page: this tab
-      if (!target.search) location.assign(base + route + target.hash);
-      return;
-    }
-    if (route !== path || !prefix) return;                                              // an address of the review page that is not a page
-    if (!target.search && !target.hash && APPLICATION_ADDRESS.test(path))               // another application on this host: the embedded view
-      location.assign(`${base}/embedded?address=${path}` + (item ? `&from=${item}` : ""));
+    const target = destination(href, publicUrl, item);
+    if (!target || Date.now() - openedAt < OPEN_INTERVAL) return;
+    openedAt = Date.now();
+    if (target.kind === "website") window.open(target.href, "_blank", "noopener,noreferrer");
+    else location.assign(target.href);
   }
 
   const handlers = {

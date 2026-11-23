@@ -73,6 +73,15 @@ class Addresses:
             return None
         return f"{self.base}/embedded?address={path}" + (f"&from={item}" if item else "")
 
+    def on_this_host(self, target):
+        """True for a full address on the public host or on this machine's own address."""
+        try:
+            address = urlsplit(target)
+        except ValueError:
+            return False
+        origin = f"{address.scheme}://{address.netloc}"
+        return origin in self.local_origins or bool(self.public) and origin == self.public[0]
+
 
 def escape(value):
     return html.escape(str(value), quote=True)
@@ -160,8 +169,9 @@ def link_item(link, addresses, delivery):
     internal = addresses.internal(target, delivery["id"])
     if internal:                                           # another page here or another application on this host: the same tab
         return f'<li><a href="{escape(internal)}">{label}</a></li>'
-    if WEB_LINK.match(target):
-        return f'<li><a href="{escape(target)}" target="_blank" rel="noreferrer noopener">{label}</a></li>'
+    if WEB_LINK.match(target):                             # only another website opens a new tab
+        opening = "" if addresses.on_this_host(target) else ' target="_blank"'
+        return f'<li><a href="{escape(target)}"{opening} rel="noreferrer noopener">{label}</a></li>'
     if RIBBON_FIELD_LINK.match(target):
         return f'<li><a href="{escape(target)}">{label}</a> <span class="secondary">opens Ribbon Field</span></li>'
     return (f'<li>{label} <code class="local-path">{escape(target)}</code> '

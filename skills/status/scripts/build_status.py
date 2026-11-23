@@ -112,8 +112,11 @@ def render(document, connection=None, *, page=None):
     Without `page` the result is a portable file with its style and response
     editor embedded. The Status service passes `page` (base path, navigation
     markup, markup to place under the header, and a configuration object) to
-    serve the same sheet with shared assets and its own navigation; its
-    `after_summary` markup holds the sandboxed frame of an interactive document.
+    serve the same sheet with shared assets and its own navigation. Its
+    `after_responses` markup holds the sandboxed frame of an interactive
+    document, placed after the assessment, notices, metrics and response
+    fields; its `resolve` function keeps source addresses on this host inside
+    the page.
     """
     validate(document)
     generated = timestamp(document["generated_at"])
@@ -165,7 +168,8 @@ def render(document, connection=None, *, page=None):
     def source_link(location):
         address = urlsplit(location)
         if address.scheme in {"http", "https"} and address.netloc:
-            return f'<a href="{escape(location)}" rel="noreferrer">{escape(location)}</a>'
+            destination = page["resolve"](location) if page and page.get("resolve") else None
+            return f'<a href="{escape(destination or location)}" rel="noreferrer">{escape(location)}</a>'
         return f"<code>{escape(location)}</code>"
 
     assets = Path(__file__).resolve().parents[1] / "assets"
@@ -190,8 +194,6 @@ def render(document, connection=None, *, page=None):
               f'This report does not refresh them.</p></header>',
               page.get("after_header", "") if page else ""]
     output.append(f'<p class="assessment text">{escape(document["summary"])}</p>')
-    if page and page.get("after_summary"):
-        output.append(page["after_summary"])
     for notice in document.get("notices", []):
         output.append(f'<aside class="notice"><h2>{escape(notice["title"])}</h2><p class="text">{escape(notice["text"])}</p></aside>')
     if document.get("metrics"):
@@ -210,6 +212,8 @@ def render(document, connection=None, *, page=None):
             if field["type"] == "choice":
                 output.append(f'<dd class="text">Choices: {escape(" / ".join(field["options"]))}</dd>')
         output.append('</dl></noscript></section>')
+    if page and page.get("after_responses"):
+        output.append(page["after_responses"])
     if document.get("actions"):
         output.append('<section><h2 class="section-heading">Next actions</h2><ol class="actions">')
         for action in document["actions"]:

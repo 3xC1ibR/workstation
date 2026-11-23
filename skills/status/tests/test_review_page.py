@@ -512,6 +512,12 @@ class InteractiveDocumentTests(Workspace):
         self.assertLess(page.index("<iframe"), page.index("Still here."))                     # before the write-up
         served = self.request(f"/reports/{report_id}")[2].decode()
         self.assertLess(served.index('class="assessment text"'), served.index("<iframe"))
+        asked = report("Asked", metrics=[{"label": "Guests", "value": "9"}], actions=[{"action": "Book the turkey", "owner": "operator"}],
+                       response_fields=[{"id": "proceed", "label": "Proceed?", "type": "boolean"}])
+        asked_id = register(asked, render(asked), root=self.root, workspace="/work/asked", agent="planner", interactive_document=INTERACTIVE)
+        served = self.request(f"/reports/{asked_id}")[2].decode()
+        positions = [served.index(mark) for mark in ('class="assessment text"', 'class="metrics"', 'id="status-response-fields"', "<iframe", "Next actions")]
+        self.assertEqual(positions, sorted(positions))                           # after the summary and the response fields, before the detail
         configuration = json.loads(page.split('id="status-configuration">')[1].split("</script>")[0])
         self.assertEqual(configuration["embedded"], {"kind": "delivery", "item": identifier, "latest": True, "public_url": PUBLIC})
         self.assertEqual(configuration["delivery"]["interactive"], {"kind": "document", "address": None})
@@ -623,6 +629,12 @@ class InteractiveDocumentTests(Workspace):
                         {"kind": "delivery", "id": first}, {**body, "extra": 1}):
             self.assertIn(self.request("/api/document-state", invalid)[0], (400, 404))
         self.assertEqual(self.request("/api/document-state", {**body, "state": "x" * (90 * 1024)})[0], 400)
+        nested = '{"kind": "delivery", "id": "%s", "state": %s1%s}' % (first, "[" * 30000, "]" * 30000)      # deeper than the parser accepts
+        connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        self.addCleanup(connection.close)
+        connection.request("POST", "/api/document-state", body=nested, headers={
+            "Origin": f"http://127.0.0.1:{self.port}", "X-Status-Token": self.token, "Content-Type": "application/json"})
+        self.assertEqual(connection.getresponse().status, 400)
         self.assertEqual(DocumentStates(self.root).read(series)["revision"], 2)
         self.assertIsNone(self.deliveries.record(first)["response"])                  # saved state is never a response
         second = self.publish(delivery(summary="Second."), key="plan", interactive_document=INTERACTIVE)
@@ -753,6 +765,10 @@ class LinkTests(Workspace):
                         if link.startswith(f'href="{internal}'):
                             self.assertNotIn("target=", link.split(">")[0])                              # internal targets never open a new tab
         self.assertIn('target="_blank" rel="noreferrer noopener">Website', listing)
+        for label in ("Query", "Ribbon Field root"):                               # on this host but not embeddable: this tab, never a new one
+            link = next(link for link in listing.split("<a ")[1:] if f">{label}</a>" in link)
+            self.assertTrue(link.startswith('href="https://machine.example.ts.net/'))
+            self.assertNotIn("target=", link.split(">")[0])
         self.assertIn(f'data-path="{existing}"', listing)                           # a file of this machine stays a path to copy
         self.assertIn('data-path="/work/REPORT.md"', listing)
         self.assertIn(f"<code>{existing}</code>", written)
@@ -765,6 +781,21 @@ class LinkTests(Workspace):
         self.assertIn(f'<a href="/embedded?address=/thanksgiving/&amp;from={identifier}"', local)
         linked = self.publish({**delivery(title="Local link"), "links": [{"label": "Local", "target": f"http://127.0.0.1:{port}/deliveries/{other}"}]})
         self.assertIn(f'<li><a href="/status/deliveries/{other}">Local</a></li>', self.request("/status/deliveries/" + linked, headers=RELAY)[2].decode())
+
+    def test_report_sources_on_this_host_stay_inside_the_page(self):
+        other = self.publish(delivery(title="Other"))
+        sourced = report("Sourced", sources=[{"label": "Application", "location": "https://machine.example.ts.net/thanksgiving/"},
+                                             {"label": "Delivery", "location": f"{PUBLIC}/deliveries/{other}"},
+                                             {"label": "Website", "location": "https://example.com/pull/3"},
+                                             {"label": "File", "location": "/work/REPORT.md"}])
+        report_id = self.register(sourced, agent="operator")
+        self.serve(public_url=PUBLIC)
+        page = self.request("/status/reports/" + report_id, headers=RELAY)[2].decode()
+        self.assertIn(f'<a href="/status/embedded?address=/thanksgiving/&amp;from={report_id}" rel="noreferrer">https://machine.example.ts.net/thanksgiving/</a>', page)
+        self.assertIn(f'<a href="/status/deliveries/{other}" rel="noreferrer">', page)
+        self.assertIn('<a href="https://example.com/pull/3" rel="noreferrer">', page)
+        self.assertIn("<code>/work/REPORT.md</code>", page)
+        self.assertIn('<a href="https://machine.example.ts.net/thanksgiving/" rel="noreferrer">', render(sourced))      # the portable file keeps the address
 
     def test_without_a_public_address_a_bare_path_is_not_an_application(self):
         identifier = self.publish({**delivery(), "links": [{"label": "App", "target": "/thanksgiving/"}]}, body="[App](/thanksgiving/)")

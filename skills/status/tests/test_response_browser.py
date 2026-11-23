@@ -1,12 +1,17 @@
 """Optional real-browser regression test; run with Playwright and Chromium installed."""
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
+import http.client
 import json
 import os
+import shutil
+import ssl
 import subprocess
 import sys
 import tempfile
 import threading
 import unittest
+from urllib.parse import urlsplit
 
 try:
     from playwright.sync_api import expect, sync_playwright
@@ -341,6 +346,238 @@ document.getElementById("grow").onclick = () => {{ document.getElementById("cont
         self.assertEqual((record["response"]["version"], record["unread"]), (second, False))
         page.get_by_role("link", name="Review", exact=True).click()
         expect(page.locator("#deliveries")).to_be_hidden()                           # answered and read: it leaves Open
+        self.assertEqual(self.failures, [])
+
+    def test_a_report_document_saves_state_for_its_operation_and_cannot_propose_a_response(self):
+        content = f"""<!doctype html><html><head><meta charset="utf-8"><title>Explorer</title>
+<script src="{self.origin}/document_bridge.js"></script></head><body><div style="height: 600px">Explorer</div><p id="state">waiting</p>
+<button id="save">Save</button><button id="propose">Propose</button>
+<script>
+const show = text => {{ document.getElementById("state").textContent = text; }};
+StatusDocument.loadState().then(({{state}}) => show("loaded " + JSON.stringify(state)), () => show("unavailable"));
+document.getElementById("save").onclick = () => StatusDocument.saveState({{row: 3}}).then(() => show("saved"), () => show("refused"));
+document.getElementById("propose").onclick = () => {{ StatusDocument.propose({{action: "dismiss"}}); show("proposed"); }};
+</script></body></html>"""
+        def build(summary):
+            report = {"title": "Bridge explorer", "subject": "operator", "generated_at": "2026-11-22T10:00:00Z", "summary": summary}
+            return register(report, render(report), root=self.root, workspace="/project", agent="operator", interactive_document=content)
+        first = build("First version")
+        page, reports, states = self.page, StatusReports(self.root), DocumentStates(self.root)
+        operation = reports.operations()["operations"][0]["id"]
+        page.goto(f"{self.origin}/reports/{first}")
+        expect(page.locator("#embedded-document")).to_have_attribute("sandbox", "allow-scripts allow-forms allow-modals allow-popups allow-downloads")
+        document = page.frame_locator("#embedded-document")
+        expect(document.locator("#state")).to_have_text("loaded null")
+        page.wait_for_function("document.getElementById('embedded-document').offsetHeight >= 600")
+        self.fits()
+        document.locator("#save").click()
+        expect(document.locator("#state")).to_have_text("saved")
+        saved = states.read(operation)
+        self.assertEqual((saved["state"], saved["version"]), ({"row": 3}, first))    # kept for the operation, naming the version that saved
+        document.locator("#propose").click()                                          # a report has no delivery response to propose
+        expect(document.locator("#state")).to_have_text("proposed")
+        page.wait_for_timeout(300)
+        expect(page.locator(".response-proposal")).to_have_count(0)
+        build("Second version")
+        page.goto(f"{self.origin}/reports/{first}")                                   # now an earlier version
+        document = page.frame_locator("#embedded-document")
+        expect(document.locator("#state")).to_have_text('loaded {"row":3}')         # it still reads the operation's state
+        document.locator("#save").click()
+        expect(document.locator("#state")).to_have_text("refused")                   # and never overwrites it
+        self.assertEqual(states.read(operation)["revision"], 1)
+        self.assertEqual(self.failures, [])
+
+
+HOST = "machine.example.ts.net"
+SHARED = "https://" + HOST
+
+
+@unittest.skipUnless(sync_playwright, "Install Playwright and Chromium to run the browser regression")
+class SharedHostBrowserTests(unittest.TestCase):
+    """The tailnet host, where this page shares its origin with Ribbon Field (at /) and other applications.
+
+    A stand-in for the Tailscale relay answers that host over HTTPS: /status goes to the Status service without
+    its prefix, /api/browser/config is Ribbon Field's token for a paired browser, and /thanksgiving/ is an
+    application another agent built. The browser reaches it by name, so origins, cookies and cross-origin rules
+    are the browser's own; nothing is intercepted.
+    """
+    APPLICATION = f"""<!doctype html><html><head><meta charset="utf-8"><title>Thanksgiving</title>
+<script src="/status/document_bridge.js"></script></head><body><div style="height: 700px">Menu</div><p id="attempts">running</p>
+<a id="inside" href="/thanksgiving/menu.html">Menu page</a><a id="report" href="/status/deliveries/OTHER">Other delivery</a>
+<a id="ribbon" href="/api/browser/asks/7?resolution=approved">Ribbon Field address</a>
+<script>
+(async () => {{
+  const results = [], attempt = async (name, action) => {{ try {{ results.push(name + ":" + await action()); }} catch {{ results.push(name + ":blocked"); }} }};
+  await attempt("ribbon-field", async () => (await (await fetch("/api/browser/config", {{credentials: "include"}})).json()).token);
+  await attempt("status", async () => (await (await fetch("/status/api/config", {{credentials: "include"}})).json()).token);
+  await attempt("cookie", async () => document.cookie);
+  await attempt("page", async () => parent.document.title);
+  document.getElementById("attempts").textContent = location.pathname + " " + results.join(" ");
+}})();
+</script></body></html>"""
+
+    @staticmethod
+    def refuse_resolution(ask_id, body, *, snooze=False):
+        raise StatusError("Tests do not resolve asks in Ribbon Field.")
+
+    def relay_handler(self):
+        test = self
+
+        class Relay(BaseHTTPRequestHandler):
+            def log_message(self, *arguments):
+                pass
+
+            def answer(self, status, content_type, body, headers=()):
+                self.send_response(status)
+                for name, value in (("Content-Type", content_type), ("Content-Length", str(len(body))), *headers):
+                    self.send_header(name, value)
+                self.end_headers()
+                self.wfile.write(body)
+
+            def do_GET(self):
+                address = urlsplit(self.path)
+                if address.path == "/status" or address.path.startswith("/status/"):
+                    length = int(self.headers.get("Content-Length", "0"))
+                    connection = http.client.HTTPConnection("127.0.0.1", test.server.server_port, timeout=5)
+                    try:
+                        headers = {name: self.headers[name] for name in ("Content-Type", "Origin", "X-Status-Token") if self.headers.get(name)}
+                        connection.request(self.command, (address.path[len("/status"):] or "/") + ("?" + address.query if address.query else ""),
+                                           body=self.rfile.read(length) if length else None, headers={**headers, "Host": HOST})
+                        response = connection.getresponse()
+                        body = response.read()
+                        self.send_response(response.status)
+                        for name, value in response.getheaders():
+                            if name.lower() not in {"server", "date", "connection", "transfer-encoding"}:
+                                self.send_header(name, value)
+                        self.end_headers()
+                        self.wfile.write(body)
+                    finally:
+                        connection.close()
+                elif address.path == "/api/browser/config":             # Ribbon Field: no cross-origin access, as on the real host
+                    test.ribbon_field_reads.append((self.headers.get("Origin"), "ribbon_field_session=paired" in self.headers.get("Cookie", "")))
+                    self.answer(200, "application/json", json.dumps({"token": "ribbon-field-token", "askKinds": {}}).encode())
+                elif address.path.startswith("/thanksgiving/"):
+                    self.answer(200, "text/html; charset=utf-8", test.APPLICATION.replace("OTHER", test.other).encode())
+                else:
+                    test.unexpected.append(self.path)
+                    self.answer(404, "text/plain", b"Not found")
+
+            do_POST = do_GET
+
+            def handle(self):
+                try:
+                    super().handle()
+                except OSError:
+                    pass                                                # the browser abandoned a request while leaving a page
+
+        return Relay
+
+    @classmethod
+    def setUpClass(cls):
+        openssl = shutil.which("openssl")
+        if not openssl:
+            raise unittest.SkipTest("openssl is required to give the stand-in tailnet host a certificate")
+        directory = tempfile.TemporaryDirectory()
+        cls.addClassCleanup(directory.cleanup)
+        cls.certificate, cls.key = Path(directory.name) / "certificate.pem", Path(directory.name) / "key.pem"
+        subprocess.run([openssl, "req", "-x509", "-newkey", "ec", "-pkeyopt", "ec_paramgen_curve:prime256v1", "-nodes", "-days", "2",
+                        "-keyout", str(cls.key), "-out", str(cls.certificate), "-subj", "/CN=" + HOST,
+                        "-addext", "subjectAltName=DNS:" + HOST], check=True, capture_output=True, timeout=30)
+
+    def serve(self, server):
+        worker = threading.Thread(target=server.serve_forever, kwargs={"poll_interval": .01}, daemon=True)
+        worker.start()
+        self.addCleanup(worker.join, 2)
+        self.addCleanup(server.server_close)
+        self.addCleanup(server.shutdown)
+        return server
+
+    def setUp(self):
+        temporary = tempfile.TemporaryDirectory()
+        self.addCleanup(temporary.cleanup)
+        self.root, self.ribbon_field_reads, self.unexpected, self.failures = Path(temporary.name), [], [], []
+        self.server = self.serve(make_server(self.root, 0, public_url=SHARED + "/status", ask_resolver=self.refuse_resolution,
+                                             ask_reader=AskReader(lambda: {"available": True, "reason": None, "asks": []})))
+        relay = ThreadingHTTPServer(("127.0.0.1", 0), self.relay_handler())
+        encryption = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        encryption.load_cert_chain(self.certificate, self.key)
+        relay.socket = encryption.wrap_socket(relay.socket, server_side=True)
+        self.serve(relay)
+        driver = sync_playwright().start()
+        self.addCleanup(driver.stop)
+        browser = driver.chromium.launch(args=[f"--host-resolver-rules=MAP {HOST}:443 127.0.0.1:{relay.server_port}"])
+        self.addCleanup(browser.close)
+        context = browser.new_context(viewport={"width": 390, "height": 844}, ignore_https_errors=True)
+        context.add_cookies([{"name": "ribbon_field_session", "value": "paired", "domain": HOST, "path": "/",
+                              "httpOnly": True, "secure": True, "sameSite": "Strict"}])
+        self.page = context.new_page()
+        self.page.on("pageerror", lambda error: self.failures.append(str(error)))
+        self.other = publish_delivery({"title": "Other delivery", "summary": "Linked from the application."}, workspace="/project", root=self.root)
+
+    def test_agent_content_cannot_reach_ribbon_field_and_applications_stay_inside_the_page(self):
+        document = f"""<!doctype html><html><head><meta charset="utf-8"><title>Plan</title>
+<script src="{SHARED}/status/document_bridge.js"></script></head><body><div style="height: 500px">Plan</div><p id="attempts">running</p>
+<a id="application" href="/thanksgiving/">Open the menu</a><a id="ribbon" href="{SHARED}/api/browser/asks/7?resolution=approved">Ribbon Field address</a>
+<script>
+(async () => {{
+  const results = [], attempt = async (name, action) => {{ try {{ results.push(name + ":" + await action()); }} catch {{ results.push(name + ":blocked"); }} }};
+  await attempt("ribbon-field", async () => (await (await fetch("{SHARED}/api/browser/config", {{credentials: "include"}})).json()).token);
+  await attempt("status", async () => (await (await fetch("{SHARED}/status/api/config", {{credentials: "include"}})).json()).token);
+  await attempt("cookie", async () => document.cookie);
+  await attempt("page", async () => parent.document.title);
+  document.getElementById("attempts").textContent = results.join(" ");
+}})();
+</script></body></html>"""
+        retained = publish_delivery({"title": "Thanksgiving plan", "summary": "Pick a menu."}, workspace="/project",
+                                    body="The [menu application](/thanksgiving/) and [another delivery](/status/deliveries/%s)." % self.other,
+                                    interactive_document=document, root=self.root)
+        embedding = publish_delivery({"title": "Thanksgiving menu", "summary": "The application itself."}, workspace="/project",
+                                     embed="/thanksgiving/", public_prefix="/status", root=self.root)
+        page, refused = self.page, "ribbon-field:blocked status:blocked cookie:blocked page:blocked"
+        page.goto(f"{SHARED}/status/deliveries/{retained}")
+        # The page's own script is on Ribbon Field's origin and reads its token; that is how it resolves asks.
+        self.assertEqual(page.evaluate("fetch('/api/browser/config').then(response => response.json()).then(body => body.token)"), "ribbon-field-token")
+        self.assertEqual(self.ribbon_field_reads.count((None, True)), 1)             # same origin, with the pairing cookie
+        frame = page.frame_locator("#embedded-document")
+        expect(frame.locator("#attempts")).to_have_text(refused)                     # the retained document is not
+        page.wait_for_function("document.getElementById('embedded-document').offsetHeight >= 500")
+        frame.locator("#ribbon").click()                                             # the page never opens a Ribbon Field address for a document
+        page.wait_for_timeout(700)
+        self.assertEqual(page.url, f"{SHARED}/status/deliveries/{retained}")
+        frame.locator("#application").click()                                        # another application: framed inside the page, same tab
+        page.wait_for_url(f"{SHARED}/status/embedded?address=/thanksgiving/&from={retained}")
+        self.assertEqual(len(page.context.pages), 1)
+        host = page.locator("#embedded-document")
+        expect(host).to_have_attribute("src", SHARED + "/thanksgiving/")
+        expect(host).to_have_attribute("sandbox", "allow-scripts allow-forms allow-modals allow-popups allow-downloads")
+        application = page.frame_locator("#embedded-document")
+        expect(application.locator("#attempts")).to_have_text("/thanksgiving/ " + refused)      # the application, framed, has no origin either
+        page.wait_for_function("document.getElementById('embedded-document').offsetHeight >= 700")
+        expect(page.get_by_role("link", name="Open on its own")).to_have_attribute("href", SHARED + "/thanksgiving/")
+        page.get_by_role("link", name="Thanksgiving plan", exact=True).click()       # the way back
+        page.wait_for_url(f"{SHARED}/status/deliveries/{retained}")
+        written = page.locator(".document")
+        expect(written.get_by_role("link", name="menu application")).to_have_attribute(
+            "href", f"/status/embedded?address=/thanksgiving/&from={retained}")
+        written.get_by_role("link", name="another delivery").click()
+        page.wait_for_url(f"{SHARED}/status/deliveries/{self.other}")
+        self.assertEqual(len(page.context.pages), 1)
+        page.goto(f"{SHARED}/status/deliveries/{embedding}")                         # a delivery whose interactive document is the application
+        application = page.frame_locator("#embedded-document")
+        expect(application.locator("#attempts")).to_have_text("/thanksgiving/ " + refused)
+        application.locator("#ribbon").click()
+        page.wait_for_timeout(700)
+        self.assertEqual(page.url, f"{SHARED}/status/deliveries/{embedding}")
+        application.locator("#inside").click()                                       # the application's own pages stay in its frame
+        expect(application.locator("#attempts")).to_have_text("/thanksgiving/menu.html " + refused)
+        self.assertEqual(page.url, f"{SHARED}/status/deliveries/{embedding}")
+        application.locator("#report").click()                                       # a page of the review page replaces this tab
+        page.wait_for_url(f"{SHARED}/status/deliveries/{self.other}")
+        self.assertEqual(len(page.context.pages), 1)
+        agent_reads = [read for read in self.ribbon_field_reads if read != (None, True)]
+        self.assertGreaterEqual(len(agent_reads), 4)
+        self.assertEqual(set(agent_reads), {("null", False)})                        # agent content: an opaque origin, and never the pairing cookie
+        self.assertEqual(self.unexpected, [])
         self.assertEqual(self.failures, [])
 
 

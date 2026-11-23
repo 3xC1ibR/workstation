@@ -123,5 +123,31 @@
   const localizeTimes = (root = document) => {
     for (const node of root.querySelectorAll("time[datetime]")) { node.textContent = time(node.dateTime); }
   };
-  window.StatusControls = {make, time, elapsed, createPicker, pickers, base, request, measure, localizeTimes};
+  // Where an address leads from this page, so that everything on this host stays in this tab. `publicUrl` is the
+  // review page's address on the shared host, when one is configured; `item` is the report or delivery to return to.
+  // Result: {kind, href}. "page" is a page of the review page under the address in use; "application" is another
+  // application on the shared host, shown framed by /embedded; "website" is any other host; "ribbon-field" is an
+  // agentcoord:// link. null means the address is none of these and must not be opened on a document's request.
+  const PAGE_ROUTE = /^\/(?:(?:reports|operations)\/[a-f0-9]{64}|deliveries\/[a-f0-9]{64}(?:\/attachments\/[0-9]{1,2})?)?$/;
+  const APPLICATION_ADDRESS = /^(?:\/[A-Za-z0-9._~-]+)+\/?$/;
+  function destination(href, publicUrl, item) {
+    if (typeof href !== "string" || !href || href.length > 2000) return null;
+    if (/^agentcoord:\/\/[^\s]+$/.test(href)) return {kind: "ribbon-field", href};
+    if (!/^(?:https?:\/\/|\/(?!\/))/.test(href)) return null;                           // javascript:, data:, and every other scheme
+    let target, shared = null;
+    try { target = new URL(href, location.origin); if (publicUrl) shared = new URL(publicUrl); } catch { return null; }
+    if (target.username || target.password) return null;
+    const onSharedHost = Boolean(shared) && target.origin === shared.origin;
+    if (!onSharedHost && target.origin !== location.origin) return {kind: "website", href: target.href};
+    const prefix = shared ? shared.pathname.replace(/\/$/, "") : "", path = target.pathname;
+    const page = route => PAGE_ROUTE.test(route) && !target.search ? {kind: "page", href: base + route + target.hash} : null;
+    const within = path === prefix || path.startsWith(prefix + "/");
+    if (!onSharedHost) {                                                                // this machine's own address: every path is the review page's
+      if (PAGE_ROUTE.test(path) || !shared || !prefix || within) return page(path);
+    } else if (!prefix || within) return page(path.slice(prefix.length) || "/");        // the review page on the shared host
+    else if (path !== "/" && PAGE_ROUTE.test(path)) return page(path);                   // a page route written without the prefix
+    if (target.search || target.hash || !APPLICATION_ADDRESS.test(path)) return null;
+    return {kind: "application", href: `${base}/embedded?address=${path}` + (item ? `&from=${item}` : "")};
+  }
+  window.StatusControls = {make, time, elapsed, createPicker, pickers, base, request, measure, localizeTimes, destination};
 })();

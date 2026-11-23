@@ -43,11 +43,14 @@
   addEventListener("load", () => resize());
   resize();
 
-  // The sandbox cannot navigate the page, so a link click asks the page to open the address. Links inside the document still work.
+  // The sandbox cannot navigate the page, so a link click asks the page to open the address. A link within the
+  // document, or to another page under the document's own directory (an embedded application's pages), stays in the frame.
+  const directory = location.origin + location.pathname.slice(0, location.pathname.lastIndexOf("/") + 1);
   document.addEventListener("click", event => {
     const anchor = event.target instanceof Element ? event.target.closest("a[href]") : null;
     if (!page || !anchor || event.defaultPrevented || event.button !== 0 || anchor.hasAttribute("download")) return;
     if (anchor.getAttribute("href").startsWith("#") || !/^(?:https?|agentcoord):/.test(anchor.href)) return;
+    if (anchor.href.startsWith(directory) && !anchor.target) return;
     event.preventDefault();
     send({type: "status:open", href: anchor.href});
   });

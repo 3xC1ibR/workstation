@@ -29,7 +29,7 @@ ASSETS = Path(__file__).resolve().parents[1] / "assets"
 SERVICE = "workstation-status"
 LABEL = "com.workstation.status"
 DEFAULT_PORT = 8766
-VERSION = 4
+VERSION = 5
 PAGE_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src data:; "
             "base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 FILES = {"/tokens.css": "text/css", "/style.css": "text/css", "/review.css": "text/css", "/controls.js": "text/javascript",
@@ -103,9 +103,12 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, as
                 self.send_header("Vary", "Origin")
                 self.send_header("Access-Control-Allow-Methods", "GET, POST")
                 self.send_header("Access-Control-Allow-Headers", "Content-Type, X-Status-Report-Token")
-            self.end_headers()
-            if self.command != "HEAD":
-                self.wfile.write(content)
+            try:
+                self.end_headers()
+                if self.command != "HEAD":
+                    self.wfile.write(content)
+            except ConnectionError:
+                self.close_connection = True         # the reader left before the answer; nothing remains to send
 
         def local_hosts(self):
             return {f"127.0.0.1:{self.server.server_port}", f"localhost:{self.server.server_port}"}
@@ -198,7 +201,8 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, as
                        + (("embedded_host.js",) if interactive else ()))
             return render(document, page={"base": base, "scripts": scripts, "configuration": configuration,
                                           "navigation": review_pages.report_navigation(base, operation, identifier),
-                                          "after_header": review_pages.OPERATION_ASKS, "after_summary": embedded}), policy
+                                          "after_header": review_pages.OPERATION_ASKS, "after_responses": embedded,
+                                          "resolve": lambda target: self.addresses().internal(target, identifier)}), policy
 
         def delivery_page(self, record):
             interactive, embedded = record["interactive"], ""
@@ -390,6 +394,8 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, as
                 self.send(409, {"error": str(error)}, cors=cors)
             except PermissionError as error:
                 self.send(403, {"error": str(error)}, cors=cors)
+            except RecursionError:
+                self.send(400, {"error": "The request is nested too deeply."}, cors=cors)
             except (ValueError, UnicodeError) as error:
                 self.send(400, {"error": str(error)}, cors=cors)
             except OSError:
@@ -411,7 +417,7 @@ def inspect_service(root, port):
     if value.get("service") != SERVICE or value.get("inbox") != str(root):
         raise ValueError(f"Port {port} belongs to another service or inbox; select a different --port.")
     if value.get("version", 1) < VERSION:
-        raise ValueError("The running Status service predates the review page. Run install for its login service, or restart its serve process.")
+        raise ValueError("The running Status service is an earlier version. Run install for its login service, or restart its serve process.")
     return True
 
 
