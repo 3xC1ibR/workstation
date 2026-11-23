@@ -34,7 +34,9 @@
   function message(selection, note) {
     const quoted = selection.text.length > QUOTE_LIMIT ? selection.text.slice(0, QUOTE_LIMIT) + "…" : selection.text;
     return [`Question from the review page about ${item.label}` + (selection.heading ? `, under "${selection.heading}"` : "") + ":",
-      "", ...quoted.split("\n").map(line => "> " + line), "", note || EXPLAIN, "",
+      "", ...quoted.split("\n").map(line => "> " + line), "",
+      ...(selection.context ? ["The passage it comes from:", "", ...selection.context.split("\n").map(line => "> " + line), ""] : []),
+      note || EXPLAIN, "",
       "Use your judgment: answer here in the conversation, or publish a new version if the item itself should change " +
       "(it was unclear, wrong, or missing something). Do both when both help. An open report page switches to a new version by itself.",
       item.publish, `Page: ${item.address}`].join("\n");
@@ -53,6 +55,14 @@
       }
     }
     return "";
+  }
+
+  // A short selection, often a fragment of a word or phrase, travels with the passage it was taken from.
+  function contextOf(range, text) {
+    const start = range.startContainer.nodeType === Node.ELEMENT_NODE ? range.startContainer : range.startContainer.parentElement;
+    const block = start?.closest("p, li, td, dd, dt, h1, h2, h3, summary, figure, .event-body, .ws-head");
+    const passage = block && scope.contains(block) ? block.textContent.replace(/[ \t]+/g, " ").trim() : "";
+    return passage && passage !== text && passage.length <= 1200 && passage.includes(text.replace(/\s+/g, " ").slice(0, 40)) ? passage : "";
   }
 
   const panel = make("div", null, "selection-panel");
@@ -151,7 +161,7 @@
     if (!scope.contains(range.commonAncestorContainer) || start?.closest("input, textarea, button, .response-editor, #delivery-response, .embedded")) {
       hide(); return;
     }
-    selection = {text, heading: headingOf(range.startContainer)};
+    selection = {text, heading: headingOf(range.startContainer), context: contextOf(range, text)};
     showActions();
     panel.hidden = false;
     const rects = range.getClientRects();
