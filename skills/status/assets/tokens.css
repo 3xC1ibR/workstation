@@ -17,8 +17,8 @@
   --tracking-title: -.022em; --tracking-heading: -.012em;
   --stroke: 1px; --focus: 2px; --glyph-stroke: 1.5px; --marker: 8px; --accent-edge: 3px;
   --radius: 10px; --radius-control: 8px; --radius-small: 4px; --radius-round: 999px;
-  --page-width: 720px; --page-inset: 32px; --page-top: 56px; --row-bleed: 20px; --measure: 68ch;
-  --metric-width: 190px; --search-width: 108px; --search-width-active: 176px; --cell-width: 96px; --record-width: 150px; --text-cell-width: 300px;
+  --page-width: 1120px; --page-inset: 32px; --page-top: 56px; --row-bleed: 20px; --measure: 68ch;
+  --metric-width: 190px; --search-width: 108px; --search-width-active: 176px; --cell-width: 120px; --record-width: 180px; --text-cell-width: 280px;
   --control-height: 32px; --control-text: var(--meta); --touch-height: 44px;
   --layer-row-action: 1; --layer-menu: 2; --layer-notice: 3;
   --quick: 120ms;
