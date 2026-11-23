@@ -126,8 +126,134 @@ button.quiet:hover { background: var(--surface-quiet); color: var(--ink); }
 .response-editor [role="status"] { margin-top: var(--space-3); }
 .response-editor > [role="status"]:empty { display: none; }
 
+/* Report blocks. State is one coloured word; everything else is ink, hairlines, and position. */
+.sheet .count { color: var(--ink-tertiary); font-weight: 400; font-variant-numeric: tabular-nums; margin-inline-start: var(--space-1); }
+.state-word { font-weight: var(--weight-strong); }
+.sheet-state { line-height: var(--line-snug); margin-bottom: var(--space-1); max-width: var(--measure); }
+.sheet-state .state-label { margin-inline-start: var(--space-1); }
+/* Blocks of the opening share its main column; their headings are text size on a hairline, as in the review list. */
+.sheet .sheet-lead > section { margin: var(--space-5) 0 0; max-width: var(--measure); }
+.sheet .sheet-lead > .assessment + section { margin-top: 0; }
+.sheet .sheet-lead > section:last-child { margin-bottom: var(--space-5); }
+.block-heading { font-size: var(--reading); line-height: var(--line-snug); font-weight: var(--weight-strong); padding-bottom: var(--space-2); border-bottom: var(--stroke) solid var(--rule); }
+.todo, .changes, .phases, .events, .workstreams, .bars, .chart-legend { margin: 0; padding: 0; list-style: none; }
+/* For you to do: numbered, each a strong line with what it costs and when beneath. */
+.todo { counter-reset: todo; }
+.todo li { counter-increment: todo; display: grid; grid-template-columns: var(--space-5) minmax(0, 1fr); padding: var(--space-2) 0; border-bottom: var(--stroke) solid var(--rule); }
+.todo li::before { content: counter(todo); grid-row: 1 / span 4; color: var(--ink-tertiary); font-variant-numeric: tabular-nums; }
+.todo li > * { grid-column: 2; overflow-wrap: anywhere; }
+.todo li:last-child { border-bottom: 0; }
+.todo-title { font-weight: var(--weight-medium); }
+.todo-meta, .todo-unblocks, .todo-link { font-size: var(--meta); color: var(--ink-secondary); }
+.todo-due { color: var(--ink); font-weight: var(--weight-medium); }
+/* Since the last version: a mark for the direction of each change, then the change. */
+.changes { padding-top: var(--space-2); display: grid; gap: var(--space-1); }
+.changes li { display: grid; grid-template-columns: var(--space-5) minmax(0, 1fr); overflow-wrap: anywhere; }
+.change-mark { color: var(--ink-tertiary); }
+.changes [data-direction="better"] .change-mark, .changes [data-direction="resolved"] .change-mark { color: var(--positive); }
+.changes [data-direction="worse"] .change-mark { color: var(--critical); }
+.changes [data-direction="new"] .change-mark { color: var(--ink); font-weight: var(--weight-strong); }
+/* Phases: steps in a row joined by a rule; a column past five steps and at phone width. */
+.phases { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); column-gap: var(--space-4); }
+.phases li { position: relative; display: grid; align-content: start; padding-top: var(--space-5); overflow-wrap: anywhere; }
+.phases li::after { content: ""; position: absolute; top: calc(var(--phase-mark) / 2); left: calc(var(--phase-mark) + var(--space-2)); right: calc(var(--space-2) - var(--space-4)); border-top: var(--stroke) solid var(--rule-strong); }
+.phases li:last-child::after { content: none; }
+.phase-mark { position: absolute; top: 0; left: 0; width: var(--phase-mark); height: var(--phase-mark); border-radius: var(--radius-round); border: var(--glyph-stroke) solid var(--ink-tertiary); background: var(--surface); }
+.phases [data-state="done"] .phase-mark { background: var(--ink-secondary); border-color: var(--ink-secondary); }
+.phases [data-state="active"] .phase-mark { background: var(--ink); border-color: var(--ink); box-shadow: inset 0 0 0 var(--stroke) var(--surface); }
+.phases [data-state="blocked"] .phase-mark { background: var(--critical); border-color: var(--critical); }
+.phase-name { font-weight: var(--weight-strong); }
+.phases :is([data-state="upcoming"], [data-state="skipped"], [data-state="done"]) .phase-name { font-weight: 400; color: var(--ink-secondary); }
+.phases [data-state="skipped"] .phase-name { text-decoration: line-through; }
+.phase-state, .phase-dates, .phase-detail { font-size: var(--meta); color: var(--ink-tertiary); }
+.phase-detail { color: var(--ink-secondary); }
+.phases [data-state="active"] .phase-state { color: var(--ink); font-weight: var(--weight-strong); }
+.phases [data-state="blocked"] .phase-state { color: var(--critical); font-weight: var(--weight-strong); }
+.phases-long { grid-auto-flow: row; row-gap: var(--space-3); }
+.phases-long li { padding: 0 0 0 calc(var(--phase-mark) + var(--space-3)); }
+.phases-long .phase-mark { top: var(--space-1); }
+.phases-long li::after { top: calc(var(--phase-mark) + var(--space-2)); bottom: calc(var(--space-1) - var(--space-3)); left: calc(var(--phase-mark) / 2); right: auto; border-top: 0; border-left: var(--stroke) solid var(--rule-strong); }
+/* Timeline: an axis with the present marked, then the events, earlier ones grey, a rule at the present. */
+.axis { display: block; overflow: visible; margin: var(--space-2) 0 var(--space-3); }
+.axis-track { fill: var(--rule); }
+.axis-elapsed { fill: var(--ink-tertiary); }
+.axis-mark { stroke-width: var(--glyph-stroke); }
+.axis-past { fill: var(--ink-secondary); stroke: var(--surface); }
+.axis-future { fill: var(--surface); stroke: var(--ink); }
+.axis-deadline { stroke: var(--attention); stroke-width: var(--chart-stroke); }
+.axis-now { stroke: var(--ink); stroke-width: var(--chart-stroke); }
+.axis-now-label { fill: var(--ink); font-size: var(--meta); font-weight: var(--weight-strong); }
+.axis-label, .tick { fill: var(--ink-tertiary); font-size: var(--meta); font-variant-numeric: tabular-nums; }
+.events > li { display: grid; grid-template-columns: var(--event-time-width) minmax(0, 1fr); column-gap: var(--space-4); padding: var(--space-2) 0; border-bottom: var(--stroke) solid var(--rule); font-size: var(--table); }
+.event-time { color: var(--ink-secondary); }
+.event-body { display: grid; min-width: 0; overflow-wrap: anywhere; }
+.event-title { font-weight: var(--weight-medium); }
+.events [data-tense="past"] :is(.event-title, .event-time) { color: var(--ink-secondary); font-weight: 400; }
+.event-owner, .event-detail { font-size: var(--meta); color: var(--ink-secondary); }
+.event-owner { color: var(--ink-tertiary); }
+.events > .event-now { padding: 0; border-bottom: var(--chart-stroke) solid var(--ink); }
+.event-now .event-time { color: var(--ink); font-size: var(--meta); font-weight: var(--weight-strong); }
+.events > .event-day { display: block; padding: var(--space-4) 0 var(--space-1); font-size: var(--meta); font-weight: var(--weight-strong); color: var(--ink-secondary); }
+.events > .event-day:first-child { padding-top: 0; }
+.point-label { fill: var(--ink); font-size: var(--meta); font-weight: var(--weight-strong); font-variant-numeric: tabular-nums; }
+.events > .event-earlier { display: block; padding: 0; }
+.sheet .events details, .sheet .chart-data { margin: 0; border: 0; padding: 0; }
+.events summary, .chart-data > summary { justify-content: flex-start; font-size: var(--meta); font-weight: 400; letter-spacing: 0; color: var(--ink-secondary); }
+/* Workstreams: one entry per lane, its state word at the right of its name. */
+.workstreams { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, var(--workstream-width)), 1fr)); column-gap: var(--space-6); }
+.workstreams li { display: grid; align-content: start; gap: var(--space-1); padding: var(--space-3) 0; border-bottom: var(--stroke) solid var(--rule); font-size: var(--table); overflow-wrap: anywhere; }
+.ws-head { display: flex; justify-content: space-between; align-items: baseline; gap: var(--space-3); }
+.ws-name { font-size: var(--reading); font-weight: var(--weight-strong); }
+.ws-head .state-word { font-size: var(--meta); white-space: nowrap; }
+.ws-owner { font-size: var(--meta); color: var(--ink-tertiary); }
+.ws-lead { color: var(--ink-tertiary); margin-inline-end: var(--space-1); }
+.ws-blocker .ws-lead { color: var(--critical); font-weight: var(--weight-medium); }
+/* Charts: ink lines told apart by dashes, a dashed target, hover text on each point, the data behind a disclosure. */
+.chart { margin: 0; }
+.plot, .bar, .sparkline, .meter { display: block; overflow: visible; }
+.grid { stroke: var(--rule); stroke-width: var(--stroke); }
+.target { stroke: var(--ink-secondary); stroke-width: var(--stroke); stroke-dasharray: var(--dash-target); }
+line.series { stroke: var(--ink); stroke-width: var(--chart-stroke); stroke-linecap: round; }
+line.series-1 { stroke-dasharray: var(--dash-second); }
+line.series-2 { stroke: var(--ink-secondary); stroke-dasharray: var(--dash-third); }
+line.series-3 { stroke: var(--ink-tertiary); }
+.point { fill: var(--surface); stroke: var(--ink); stroke-width: var(--glyph-stroke); }
+.point.series-2 { stroke: var(--ink-secondary); }
+.point.series-3 { stroke: var(--ink-tertiary); }
+.chart-legend { display: flex; flex-wrap: wrap; gap: var(--space-1) var(--space-4); margin-bottom: var(--space-2); font-size: var(--meta); color: var(--ink-secondary); }
+.chart-legend li { display: inline-flex; align-items: center; gap: var(--space-2); }
+.chart-note { font-size: var(--meta); color: var(--ink-secondary); margin-bottom: var(--space-2); max-width: var(--measure); }
+.bars { display: grid; gap: var(--space-2); max-width: var(--main-width); }
+.bars li { display: grid; grid-template-columns: minmax(0, var(--bar-label-width)) minmax(0, 1fr); column-gap: var(--space-4); align-items: center; font-size: var(--table); }
+.bar-label { overflow-wrap: anywhere; }
+.bar-group { display: grid; gap: var(--space-1); }
+.bar-line { display: grid; grid-template-columns: minmax(0, 1fr) var(--bar-value-width); column-gap: var(--space-2); align-items: center; }
+.bar-value { font-size: var(--meta); color: var(--ink-secondary); }
+.bar-track, .meter-track { fill: var(--surface-quiet); }
+.bar-fill, .meter-fill { fill: var(--ink); }
+.bar-fill.series-1 { fill: var(--ink-secondary); }
+.bar-fill.series-2 { fill: var(--ink-tertiary); }
+.bar-fill.series-3 { fill: var(--rule-strong); }
+/* A measure's trend: a bar toward its target, its earlier values, and its value in the last version. */
+.metric-visual { display: grid; gap: var(--space-1); margin: var(--space-1) 0; }
+.spark { stroke: var(--ink-secondary); stroke-width: var(--glyph-stroke); stroke-linecap: round; }
+.spark-point { fill: var(--ink-tertiary); }
+.spark-point.spark-last { fill: var(--ink); }
+.metric-change { font-size: var(--meta); color: var(--ink-tertiary); }
+.tone-positive, .metric-change.tone-positive { color: var(--positive); }
+.tone-attention, .metric-change.tone-attention { color: var(--attention); }
+.tone-critical { color: var(--critical); }
+.tone-quiet { color: var(--ink-tertiary); }
 @media (max-width: 640px) {
-  .metrics { grid-template-columns: 1fr 1fr; gap: var(--space-4); }
+  .phases-short { grid-auto-flow: row; row-gap: var(--space-3); }
+  .phases-short li { padding: 0 0 0 calc(var(--phase-mark) + var(--space-3)); }
+  .phases-short .phase-mark { top: var(--space-1); }
+  .phases-short li::after { top: calc(var(--phase-mark) + var(--space-2)); bottom: calc(var(--space-1) - var(--space-3)); left: calc(var(--phase-mark) / 2); right: auto; border-top: 0; border-left: var(--stroke) solid var(--rule-strong); }
+  .bars li { grid-template-columns: minmax(0, 1fr); row-gap: var(--space-1); }
+}
+
+@media (max-width: 640px) {
+  .metrics { grid-template-columns: minmax(0, 1fr); gap: var(--space-4); }
   /* A wide table scrolls under its first column; a table of two columns wraps instead. */
   table:not(.table-pair) :is(th, td):first-child { position: sticky; left: 0; background: var(--surface); min-width: var(--record-width); border-right: var(--stroke) solid var(--rule); }
   .table-pair :is(th, td) { min-width: 0; }

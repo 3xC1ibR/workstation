@@ -11,15 +11,17 @@ import json
 import os
 from pathlib import Path
 import re
+import sys
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
 from status_fields import validate_fields
+from report_blocks import Blocks, METRIC_NUMBERS, TOP_LEVEL, validate_blocks, validate_metric_numbers
 
 
 FIELDS = {
     "notices": ({"title", "text"}, set()),
-    "metrics": ({"label", "value"}, {"detail", "source", "observed_at", "freshness_minutes"}),
+    "metrics": ({"label", "value"}, {"detail", "source", "observed_at", "freshness_minutes"} | METRIC_NUMBERS),
     "actions": ({"action", "owner"}, {"reason", "status", "source"}),
     "sections": ({"title"}, {"text", "columns", "rows", "source", "observed_at", "freshness_minutes", "collapsed"}),
     "sources": ({"label", "location"}, {"observed_at"}),
@@ -45,7 +47,7 @@ def check_fields(record, required, optional, location):
 
 def validate(document):
     required = {"title", "subject", "generated_at", "summary"}
-    check_fields(document, required, set(FIELDS) | {"timezone", "response_fields"}, "report")
+    check_fields(document, required, set(FIELDS) | TOP_LEVEL | {"timezone", "response_fields"}, "report")
     validate_fields(document.get("response_fields", []))
     for key in required | ({"timezone"} & document.keys()):
         if not isinstance(document[key], str) or not document[key].strip():
@@ -60,7 +62,7 @@ def validate(document):
             location = f"{collection}[{index}]"
             check_fields(record, required_fields, optional, location)
             for key, value in record.items():
-                if key in {"columns", "rows", "collapsed", "freshness_minutes"}:
+                if key in {"columns", "rows", "collapsed", "freshness_minutes"} | METRIC_NUMBERS:
                     continue
                 if key == "value" and value is None:
                     continue
@@ -86,6 +88,9 @@ def validate(document):
                     raise ValueError(f"{location}.rows must match the columns and contain text cells")
             if collection == "sections" and not record.get("text") and "columns" not in record:
                 raise ValueError(f"{location} requires text or a table")
+            if collection == "metrics":
+                validate_metric_numbers(record, location)
+    validate_blocks(document)
 
 
 def escape(value):
@@ -141,7 +146,7 @@ def response_policy(document, connection):
             f"connect-src {origin}; base-uri 'none'; form-action 'none'; frame-ancestors 'none'")
 
 
-def render(document, connection=None, *, page=None):
+def render(document, connection=None, *, page=None, previous=None):
     """Build the report sheet.
 
     Without `page` the result is a portable file with its style and response
@@ -151,7 +156,8 @@ def render(document, connection=None, *, page=None):
     `after_responses` markup holds the sandboxed frame of an interactive
     document, placed after the assessment, notices, metrics and response
     fields; its `resolve` function keeps source addresses on this host inside
-    the page.
+    the page. `previous` lists earlier versions of the same operation, newest
+    first; measures use them for their trend and their value last time.
     """
     validate(document)
     generated = timestamp(document["generated_at"])
@@ -212,6 +218,14 @@ def render(document, connection=None, *, page=None):
             return f'<a href="{escape(destination or location)}" rel="noreferrer">{escape(location)}</a>'
         return f"<code>{escape(location)}</code>"
 
+    def link(location):
+        """A link the author gave: web and Ribbon Field addresses open; a local path is shown to copy."""
+        if location.startswith("agentcoord://"):
+            return f'<a href="{escape(location)}">{escape(location)}</a>'
+        return source_link(location)
+
+    blocks = Blocks(document, escape=escape, prose=prose, time_text=time_text, provenance=provenance, link=link,
+                    generated=generated, zone=zone, previous=previous)
     assets = Path(__file__).resolve().parents[1] / "assets"
     # One quiet line under the title: the subject, then when the observations were assembled. A long subject folds away.
     # A served page is rendered when it is read, so it can leave out the current year; a portable file states it.
@@ -233,11 +247,14 @@ def render(document, connection=None, *, page=None):
               f'<meta name="viewport" content="width=device-width, initial-scale=1">'
               f'<title>{escape(document["title"])}</title>{head}</head><body><main>',
               page["navigation"] if page else "",
-              f'<article class="sheet"><header class="sheet-header"><h1>{escape(document["title"])}</h1>{subject}</header>',
+              f'<article class="sheet"><header class="sheet-header"><h1>{escape(document["title"])}</h1>{blocks.state()}{subject}</header>',
               # The opening: what needs the reader and the assessment lead; on a wide page the measures stand beside them.
               '<div class="sheet-opening"><div class="sheet-lead">',
               page.get("after_header", "") if page else ""]
     output.append(f'<p class="assessment text">{prose(document["summary"])}</p>')
+    # Where things stand, then what the reader must do, then what moved since the last version, then the exceptions.
+    output.append(blocks.needs_you())
+    output.append(blocks.changes())
     for notice in document.get("notices", []):
         output.append(f'<aside class="notice"><h2>{escape(notice["title"])}</h2><p class="text">{prose(notice["text"])}</p></aside>')
     output.append('</div>')
@@ -246,9 +263,12 @@ def render(document, connection=None, *, page=None):
         for metric in document["metrics"]:
             detail = f'<dd class="detail text">{escape(metric["detail"])}</dd>' if metric.get("detail") else ""
             source = f'<dd>{provenance(metric)}</dd>' if provenance(metric) else ""
-            output.append(f'<div class="metric"><dt>{escape(metric["label"])}</dt><dd class="value">{escape(metric["value"])}</dd>{detail}{source}</div>')
+            output.append(f'<div class="metric"><dt>{escape(metric["label"])}</dt><dd class="value">{escape(metric["value"])}</dd>'
+                          f'{blocks.metric_extras(metric)}{detail}{source}</div>')
         output.append('</dl>')
     output.append('</div>')
+    # The shape of the work: its phases, its calendar, its parallel lanes, and its numbers over time.
+    output.extend([blocks.phases(), blocks.timeline(), blocks.workstreams(), blocks.charts()])
     if document.get("response_fields"):
         output.append('<section id="status-response-fields"><h2 class="section-heading">Your responses</h2>'
                       '<noscript><p>Enable JavaScript to edit and save responses in this page.</p><dl class="response-questions">')
@@ -296,6 +316,29 @@ def render(document, connection=None, *, page=None):
     return "\n".join(output)
 
 
+def previous_versions(document, *, workspace, agent=None, thread_id=None, operation=None, root=None, limit=20):
+    """Earlier versions of the operation this document will join, newest first, as validated documents."""
+    from status_store import StatusError, StatusReports, operation_identity
+    origin = {"workspace": str(workspace), "agent": agent or None, "thread_id": thread_id or None}
+    if operation:
+        origin["operation"] = operation
+    identity = operation_identity({"origin": origin, "title": document["title"]})
+    reports = StatusReports(root)
+    try:
+        versions = next((o["versions"] for o in reports.operations()["operations"] if o["id"] == identity), [])
+    except (StatusError, OSError):
+        return []
+    documents = []
+    for version in versions[:limit]:
+        try:
+            earlier = reports.document(version["id"])
+        except (StatusError, OSError, ValueError):
+            continue
+        if earlier is not None:
+            documents.append(earlier)
+    return documents
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("document", type=Path)
@@ -315,9 +358,18 @@ def main():
         parser.error("--interactive and --embed belong to the registered report; they have no effect with --no-register.")
     try:
         document = json.loads(args.document.read_text(encoding="utf-8"))
-        result = render(document)
+        validate(document)
+        previous = [] if args.no_register else previous_versions(
+            document, workspace=args.workspace, agent=args.agent, thread_id=args.thread_id, operation=args.operation)
+        result = render(document, previous=previous)
     except (ValueError, KeyError, OSError) as error:
         parser.error(str(error))
+    from report_checks import check
+    advice = check(document, operation=bool(args.operation or previous))
+    if advice:
+        print("Report checks (advisory; see references/briefing.md):", file=sys.stderr)
+        for line in advice:
+            print(f"- {line}", file=sys.stderr)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(result, encoding="utf-8")
     print(args.output.resolve())
@@ -330,7 +382,7 @@ def main():
             parser.error(str(error))
         if document.get("response_fields"):
             from response_access import connection
-            result = render(document, connection(inbox_directory(), identifier, args.viewer_url))
+            result = render(document, connection(inbox_directory(), identifier, args.viewer_url), previous=previous)
             args.output.write_text(result, encoding="utf-8")
         print(f"Status inbox receipt: {identifier}")
         # Lead with the address that opens on every device; the address on this Mac is the fallback.

@@ -55,6 +55,11 @@ def register(document, html, *, workspace, agent=None, provider=None, thread_id=
                 "summary": document["summary"], "generated_at": document["generated_at"],
                 "received_at": datetime.now(timezone.utc).isoformat(), "origin": origin,
                 "response_field_count": len(document.get("response_fields", []))}
+    # The review list shows how an operation stands and what it asks of the reader; a report without them keeps its record shape.
+    if document.get("state"):
+        manifest["state"] = document["state"]["level"]
+    if document.get("needs_you"):
+        manifest["needs_you_count"] = len(document["needs_you"])
     if interactive:
         manifest["interactive"] = interactive
     if len(json.dumps(manifest, ensure_ascii=False).encode()) > 256 * 1024:

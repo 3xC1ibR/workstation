@@ -54,6 +54,7 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
 .row-meta .outcome-accepted { color: var(--positive); font-weight: var(--weight-medium); }
 .row-meta .flag-blocking { color: var(--critical); font-weight: var(--weight-strong); }
 .row-meta .flag-attention { color: var(--attention); font-weight: var(--weight-medium); }
+.row-meta .flag-state { font-weight: var(--weight-medium); }
 .row-excerpt strong { font-weight: 400; }
 /* Row actions appear on hover or keyboard focus; touch users respond on the item's own page. */
 .row-actions { position: absolute; z-index: var(--layer-row-action); top: var(--space-1); right: calc(var(--row-bleed) - var(--space-2)); display: flex; gap: var(--space-1); align-items: center; padding-inline-start: var(--space-3); background: var(--row-surface); opacity: 0; pointer-events: none; }

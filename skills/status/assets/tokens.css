@@ -20,6 +20,9 @@
   /* A wide page is a main column and a rail: 640 + 64 + 416 = 1120. Text keeps the measure inside either. */
   --page-width: 1120px; --main-width: 640px; --rail-width: 416px; --gutter: 64px; --page-inset: 32px; --page-top: 56px; --row-bleed: 20px; --measure: 640px;
   --metric-width: 190px; --search-width: 94px; --search-width-active: 176px; --age-width: 48px; --choice-mark: 16px; --cell-width: 120px; --phrase-cell-width: 240px; --record-width: 180px; --text-cell-width: 320px;
+  /* Report blocks: the time column of a timeline, a workstream's least width, a bar's label and value, and chart strokes. */
+  --event-time-width: 132px; --workstream-width: 300px; --bar-label-width: 200px; --bar-value-width: 72px; --phase-mark: 12px;
+  --chart-stroke: 2px; --dash-target: 4 3; --dash-second: 6 4; --dash-third: 1.5 3;
   --control-height: 32px; --control-text: var(--meta); --touch-height: 44px;
   --embedded-height: 480px; --embedded-application-height: 80vh;
   --layer-row-action: 1; --layer-menu: 2; --layer-notice: 3;
@@ -42,5 +45,5 @@
 }
 /* Phone width: the page inset shrinks, the title steps down, and controls grow to touch size. */
 @media (max-width: 640px) {
-  :root { --title: 26px; --page-inset: 24px; --page-top: 20px; --row-bleed: 12px; --control-height: 44px; --control-text: var(--reading); }
+  :root { --event-time-width: 88px; --bar-label-width: 112px; --title: 26px; --page-inset: 24px; --page-top: 20px; --row-bleed: 12px; --control-height: 44px; --control-text: var(--reading); }
 }

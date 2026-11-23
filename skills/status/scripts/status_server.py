@@ -210,7 +210,11 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, as
                     f"{self.public_url()}/reports/{identifier}" if public else None, "report")
             scripts = (("controls.js",) + (("responses.js", "report.js") if fields else ()) + ("asks.js", "report_page.js")
                        + (("embedded_host.js",) if interactive else ()))
-            return render(document, page={"base": base, "scripts": scripts, "configuration": configuration,
+            # Earlier versions, newest first, give the measures their trend and their value last time.
+            later = [version["id"] for version in operation["versions"]]
+            previous = [earlier for earlier in (reports.document(version) for version in later[later.index(identifier) + 1:][:20])
+                        if earlier is not None]
+            return render(document, previous=previous, page={"base": base, "scripts": scripts, "configuration": configuration,
                                           "navigation": review_pages.report_navigation(base, operation, identifier),
                                           "after_header": review_pages.OPERATION_ASKS, "after_responses": embedded,
                                           "resolve": lambda target: self.addresses().internal(target, identifier)}), policy

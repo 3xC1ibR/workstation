@@ -45,6 +45,9 @@
   }
   const stamp = value => { const node = make("time", elapsed(value)); node.dateTime = value; node.title = time(value); return node; };
   const flag = (text, className) => make("span", text, className);
+  // How an operation stands, from its latest version: the same words and tones as the report header (report_blocks.STATE_LEVELS).
+  const STATE_WORDS = {on_track: "On track", at_risk: "At risk", off_track: "Off track", blocked: "Blocked", paused: "Paused", done: "Done"};
+  const STATE_TONES = {on_track: "positive", at_risk: "attention", off_track: "critical", blocked: "critical", paused: "quiet", done: "positive"};
   function excerpt(text, lead) {
     if (!text) return null;
     const node = make("span", null, "row-excerpt");
@@ -82,7 +85,9 @@
     return row({
       key: "operation-" + operation.id, state: operation.unread && !dismissed ? "unread" : "read", closed: dismissed,
       href: `${base}/reports/${operation.latest}`, title: operation.title,
-      flags: dismissed ? [] : [operation.ask_count ? flag(plural(operation.ask_count, "ask") + " open", "flag-needs") : null,
+      flags: dismissed ? [] : [STATE_WORDS[operation.state] ? flag(STATE_WORDS[operation.state], "flag-state tone-" + STATE_TONES[operation.state]) : null,
+              operation.ask_count ? flag(plural(operation.ask_count, "ask") + " open", "flag-needs") : null,
+              operation.needs_you_count ? flag(operation.needs_you_count + " for you to do", "flag-needs") : null,
               operation.response_field_count ? flag(plural(operation.response_field_count, "question") + " for you", "flag-needs") : null],
       excerpt: excerpt(operation.summary), at: operation.received_at,
       actions: [dismissed ? ["Restore", () => dismissOperation(operation, false), "quiet"] : ["Dismiss", () => dismissOperation(operation, true), "quiet"]]});

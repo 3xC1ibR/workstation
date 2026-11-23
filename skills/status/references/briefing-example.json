@@ -1,0 +1,298 @@
+{
+  "title": "Move the billing service to the new region",
+  "subject": "billing-migration / move billing to us-west-2 with no lost invoices",
+  "generated_at": "2026-11-23T07:30:00-06:00",
+  "timezone": "America/Chicago",
+  "state": {
+    "level": "at_risk",
+    "label": "Cutover waits on your approval; lag broke its limit overnight"
+  },
+  "summary": "Shadow traffic ran clean for 36 hours and every invoice matched. Replication lag broke its 5 s limit overnight because of the nightly invoice batch; moving the batch to 4:00 PM keeps it under 3 s in the replay. Cutover is ready for 2:00 PM.",
+  "needs_you": [
+    {
+      "action": "Approve or postpone the 2:00 PM cutover",
+      "effort": "2 min",
+      "due": "2026-11-23T12:30:00-06:00",
+      "ask": "71",
+      "unblocks": "The cutover runbook; without it the window moves to Thursday"
+    },
+    {
+      "action": "Renew the payment processor's IP allowlist for the new region",
+      "effort": "10 min, needs your processor login",
+      "due": "2026-11-23T13:00:00-06:00",
+      "link": "https://dashboard.example.com/settings/allowlist"
+    }
+  ],
+  "changes": [
+    {
+      "direction": "better",
+      "text": "Shadow error rate 0.4% → 0.02% after the connection-pool fix"
+    },
+    {
+      "direction": "worse",
+      "text": "Peak replication lag 4 s → 9 s, during the nightly batch"
+    },
+    {
+      "direction": "resolved",
+      "text": "Load balancer certificate issued and verified"
+    },
+    {
+      "direction": "new",
+      "text": "The processor's allowlist must be renewed before cutover"
+    }
+  ],
+  "metrics": [
+    {
+      "label": "Invoices verified in shadow",
+      "value": "48,210 of 50,000",
+      "current": 48210,
+      "target": 50000,
+      "better": "higher",
+      "series": [
+        [
+          "2026-11-20T08:00:00-06:00",
+          0
+        ],
+        [
+          "2026-11-21T08:00:00-06:00",
+          12400
+        ],
+        [
+          "2026-11-22T08:00:00-06:00",
+          31800
+        ],
+        [
+          "2026-11-23T07:00:00-06:00",
+          48210
+        ]
+      ],
+      "detail": "Mismatches: 0",
+      "source": "shadow comparator",
+      "observed_at": "2026-11-23T07:20:00-06:00",
+      "freshness_minutes": 60
+    },
+    {
+      "label": "Peak replication lag",
+      "value": "9 s (limit 5 s)",
+      "current": 9,
+      "better": "lower",
+      "detail": "Back under 2 s since 4:00 AM",
+      "source": "replica metrics",
+      "observed_at": "2026-11-23T07:20:00-06:00",
+      "freshness_minutes": 60
+    },
+    {
+      "label": "Spend this month",
+      "value": "$1,840 of $2,500",
+      "current": 1840,
+      "target": 2500,
+      "better": "lower",
+      "detail": "Both regions run until decommission",
+      "source": "billing export",
+      "observed_at": "2026-11-23T06:00:00-06:00",
+      "freshness_minutes": 1440
+    }
+  ],
+  "phases": [
+    {
+      "name": "Plan",
+      "state": "done",
+      "start": "2026-11-09T09:00:00-06:00",
+      "end": "2026-11-13T17:00:00-06:00"
+    },
+    {
+      "name": "Build region",
+      "state": "done",
+      "start": "2026-11-14T09:00:00-06:00",
+      "end": "2026-11-19T17:00:00-06:00"
+    },
+    {
+      "name": "Shadow traffic",
+      "state": "active",
+      "start": "2026-11-20T08:00:00-06:00",
+      "detail": "96% of invoices verified"
+    },
+    {
+      "name": "Cutover",
+      "state": "upcoming",
+      "start": "2026-11-23T14:00:00-06:00"
+    },
+    {
+      "name": "Decommission",
+      "state": "upcoming",
+      "start": "2026-11-30T09:00:00-06:00"
+    }
+  ],
+  "timeline_window": {
+    "start": "2026-11-22T18:00:00-06:00",
+    "end": "2026-11-23T18:00:00-06:00",
+    "label": "the 24 hours around cutover"
+  },
+  "timeline": [
+    {
+      "at": "2026-11-22T20:00:00-06:00",
+      "title": "Connection-pool fix deployed",
+      "owner": "platform agent"
+    },
+    {
+      "at": "2026-11-23T03:10:00-06:00",
+      "end": "2026-11-23T04:00:00-06:00",
+      "title": "Lag above limit during invoice batch"
+    },
+    {
+      "at": "2026-11-23T12:00:00-06:00",
+      "title": "Lag check",
+      "kind": "scheduled",
+      "owner": "migration lead",
+      "detail": "Go if peak lag since 8:00 AM is under 5 s"
+    },
+    {
+      "at": "2026-11-23T12:30:00-06:00",
+      "title": "Your approval needed",
+      "kind": "deadline"
+    },
+    {
+      "at": "2026-11-23T14:00:00-06:00",
+      "end": "2026-11-23T15:00:00-06:00",
+      "title": "Cutover window",
+      "kind": "milestone",
+      "owner": "migration lead"
+    },
+    {
+      "at": "2026-11-23T16:00:00-06:00",
+      "title": "Invoice batch in its new slot",
+      "kind": "scheduled"
+    }
+  ],
+  "workstreams": [
+    {
+      "name": "Data replication",
+      "state": "at_risk",
+      "owner": "database agent",
+      "now": "Replaying the batch at 4:00 PM to confirm lag stays under 3 s",
+      "next": "Report at the noon check"
+    },
+    {
+      "name": "Traffic and DNS",
+      "state": "on_track",
+      "owner": "platform agent",
+      "now": "Weighted records staged at 0%",
+      "next": "Shift to 100% at 2:05 PM"
+    },
+    {
+      "name": "Payment processor",
+      "state": "blocked",
+      "owner": "integration agent",
+      "now": "New-region calls rejected by the allowlist",
+      "blocker": "Allowlist renewal needs your login"
+    },
+    {
+      "name": "Customer notice",
+      "state": "done",
+      "owner": "support agent",
+      "now": "Maintenance notice sent to 312 accounts"
+    }
+  ],
+  "charts": [
+    {
+      "title": "Peak replication lag by hour",
+      "kind": "line",
+      "unit": "s",
+      "target": 5,
+      "target_label": "Limit 5 s",
+      "note": "The spike is the nightly invoice batch; it moves to 4:00 PM today.",
+      "series": [
+        {
+          "name": "Peak lag",
+          "points": [
+            [
+              "2026-11-22T18:00:00-06:00",
+              1.2
+            ],
+            [
+              "2026-11-22T21:00:00-06:00",
+              1.4
+            ],
+            [
+              "2026-11-23T00:00:00-06:00",
+              1.1
+            ],
+            [
+              "2026-11-23T02:00:00-06:00",
+              3.8
+            ],
+            [
+              "2026-11-23T03:00:00-06:00",
+              9.0
+            ],
+            [
+              "2026-11-23T04:00:00-06:00",
+              2.2
+            ],
+            [
+              "2026-11-23T06:00:00-06:00",
+              1.3
+            ],
+            [
+              "2026-11-23T07:00:00-06:00",
+              1.2
+            ]
+          ]
+        }
+      ],
+      "source": "replica metrics",
+      "observed_at": "2026-11-23T07:20:00-06:00",
+      "freshness_minutes": 60
+    },
+    {
+      "title": "Lag at the 3:10 AM peak, by table",
+      "kind": "bar",
+      "unit": "s",
+      "target": 5,
+      "target_label": "Limit 5 s",
+      "series": [
+        {
+          "name": "Lag",
+          "points": [
+            [
+              "invoices",
+              9.0
+            ],
+            [
+              "invoice_lines",
+              7.4
+            ],
+            [
+              "customers",
+              1.1
+            ],
+            [
+              "payments",
+              0.8
+            ]
+          ]
+        }
+      ]
+    }
+  ],
+  "actions": [
+    {
+      "action": "Draft the decommission checklist for the old region",
+      "owner": "platform agent",
+      "status": "planned, due Nov 27"
+    }
+  ],
+  "sections": [
+    {
+      "title": "Rollback plan",
+      "collapsed": true,
+      "text": "DNS weights return to the old region in under 2 minutes. Writes made in the new region replay to the old one from the change log; the replay was tested twice."
+    }
+  ],
+  "sources": [
+    {
+      "label": "Cutover runbook",
+      "location": "https://wiki.example.com/billing/cutover"
+    }
+  ]
+}

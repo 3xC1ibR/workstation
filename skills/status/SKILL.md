@@ -90,13 +90,40 @@ For Open Kernel Challenge, read [references/okc.md](references/okc.md). Its loca
 collector provides a starting snapshot, **not a complete editorial assessment**.
 Review relevant recent decisions and the active conversation before delivering it.
 
+## Write a briefing, not a wall of text
+
+**Read [references/briefing.md](references/briefing.md) before writing a report.**
+The reader runs several operations at once and gives each report under a minute,
+often on a phone. A report answers four questions, in order, each in its own block:
+
+1. **Where does it stand?** `state` (on track, at risk, off track, blocked,
+   paused, done, with a short reason) and a `summary` of at most 60 words.
+2. **What changed since I last looked?** `changes`, marked better or worse.
+3. **What must I do, by when?** `needs_you`: one item per action, with effort,
+   deadline, and what it unblocks.
+4. **What happens next, and when?** `timeline` (scheduled checks, deadlines,
+   windows) and `actions`.
+
+Then use the block that fits each fact's shape: a metric with `current` and
+`target` for progress, `phases` for stages, `workstreams` for parallel lanes,
+`charts` for numbers over time or across categories, prose only for judgment.
+Say each fact once. No raw identifiers in prose. Keep metric labels stable so
+the page can show each measure's trend and last value. Start from
+[references/briefing-example.json](references/briefing-example.json).
+
+The build prints **Report checks**; fix them or have a reason. For an
+operation's first report, and whenever its structure changes, capture it with
+`scripts/capture_report.py` and have a fresh-context subagent judge the images
+alone (briefing.md has the prompt). Do not grade your own report.
+
 ## Present and verify
 
 Default to portable HTML plus a concise chat briefing; honor text-only requests.
 Read [DESIGN.md](DESIGN.md) for the shared appearance and
 [references/report-format.md](references/report-format.md) when authoring JSON.
-Arbitrary narrative sections, tables, metrics, notices, and actions are supported;
-the format does not prescribe subject matter or restrict additional reporting.
+Arbitrary narrative sections, tables, metrics, notices, and actions are supported
+beside the visual blocks; the format does not prescribe subject matter or
+restrict additional reporting.
 
 Store generated JSON, HTML, and screenshots outside the repository, for example
 `~/.local/state/agent-status/<workspace>/<agent-or-project>/`. Build with:

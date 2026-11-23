@@ -75,10 +75,16 @@ Colour carries state, never decoration. Most of every screen is ink on paper.
 - **Ink** is also the action colour: the one solid button of a panel is ink on
   paper (paper on ink in the dark theme), not the accent.
 - **Accent** marks unread items, links in text, and keyboard focus. Nothing else.
-- **Critical** marks the word "Blocking" and a failed request. Nothing else is red.
+- **Critical** marks the word "Blocking", a failed request, and the state words
+  "Off track" and "Blocked" with a worse change's mark. Nothing else is red.
 - **Attention** marks stale or overdue asks, an inactive agent, stale
   observations, an unavailable source, and the notice on an earlier version.
-- **Positive** marks an accepted delivery. Dismissed is neutral, not red.
+- **Positive** marks an accepted delivery, the state words "On track" and
+  "Done", and a better or resolved change. Dismissed is neutral, not red.
+- **Attention** also marks "At risk", an overdue item for the reader, a
+  deadline in a timeline, and a measure that moved the wrong way.
+- **Charts are ink.** Series are told apart by dashes and a legend, never by
+  hue, because hue on this page means state.
 - A tint appears only behind the text whose state it marks (failure, earlier
   version). The quiet surface is the ground of a hovered row, the chosen view,
   the search field in use, and code.
@@ -174,7 +180,9 @@ are drawn with two borders; the search glyph is the page's one drawn icon.
 | Older group | - | Items with nothing new for seven days, as a native disclosure with a count | Hiding asks |
 | Report sheet | portable, served | A status report and a delivery's detail | Lists |
 | Notice | - | A material exception in a report: a strong first line and a paragraph directly under the assessment | Routine information |
-| Measure | tile, rail row | A metric with its provenance | Prose |
+| Measure | tile, rail row; with a bar toward its target, a trend line, and its last value | A metric with its provenance | Prose |
+| State word | on track, at risk, off track, blocked, paused, done | How an operation or a lane stands: under a report's title, on its review row, beside a workstream | Decoration, or anything that is not a state |
+| Report blocks | for you to do, since the last version, phases, timeline (axis for a fixed window, list by day with a Now rule), workstreams, line chart, bar chart | The four questions of a briefing and the shape of the work; drawn without script, positions in SVG percentages | Content that only one report needs: that is an interactive document |
 | Response panel | awaiting, accepted, dismissed, earlier version | The owner's response to a delivery | Report response fields |
 | Response editor | - | Agent-defined questions inside a report, with "Save responses" as its primary | Delivery responses |
 | Version history | - | Earlier versions of an operation report or of a delivery | Anything else |
@@ -263,6 +271,28 @@ ask chevron. Nothing moves on load.
 5. The margin mark: an accent disc for unread, a chevron for an ask.
 
 ## Decision record
+
+- 2026-11-23: **Reports become briefings.** The owner found reports "a giant
+  wall of text": the format accepted only prose, tables, and metric tiles, so
+  no instruction could produce a timeline or a chart. The report now has
+  visual blocks in a fixed order that answers the reader's four questions
+  (where it stands, what changed, what I must do by when, what happens next):
+  a state word under the title and on the review row, "For you to do" with
+  the deadline first, "Since the last version", phases, a timeline, workstreams,
+  line and bar charts, and measures with a target bar, a trend across versions,
+  and their previous value. Everything is drawn server-side as HTML and SVG
+  with percentage coordinates, so neither page's content policy changes and
+  the portable file needs no script. A blind critic scored a real report of
+  the old format 3/10 and the example in the new one 7/10; its fixes were
+  applied (timeline axis only for a fixed window with only deadlines and
+  milestones marked, day headings in the list, change marks that say good or
+  bad rather than up or down, bars without empty tracks, even clock ticks,
+  labelled peak and latest values, one column of measures on phones).
+  Declined: 24-hour times (the page writes "2:00 PM" everywhere), removing
+  sparklines (they need three versions to appear, and they are the only
+  cross-version trend), and removing per-measure provenance. The builder
+  prints advisory checks (summary length, prose walls, raw identifiers, dates
+  without a timeline) because guidance alone did not change what agents wrote.
 
 - 2026-11-23: An ask takes a reply as well as a resolution. The owner said the
   offered answers are often not what he wants to say. The free-text line is
