@@ -116,6 +116,27 @@ operation's first report, and whenever its structure changes, capture it with
 `scripts/capture_report.py` and have a fresh-context subagent judge the images
 alone (briefing.md has the prompt). Do not grade your own report.
 
+## Messages from the review page
+
+The owner can select any text on a report or delivery and send it to the
+conversation that published it, with "Explain" or a question of his own. The
+message starts `Question from the review page about your report "<title>"`,
+quotes the selection, names the section, and says how to publish a new version.
+Use your judgment, and do both when both help:
+
+- **Answer in the conversation** when the question is his alone: context, a
+  reason, a definition, your recommendation.
+- **Publish a new version** when the report itself fell short: the passage was
+  unclear, wrong, stale, or missing something any reader would need. Rebuild
+  with the same operation identity the message names (`--operation <key>`, or
+  the same workspace and agent); for a delivery, `--key` or `--replaces`. Add a
+  `changes` entry saying what you clarified. His open page switches to the new
+  version within seconds, at the same place.
+
+Answering is not authority to act beyond the answer: a question is not an
+approval. If he asks you to do something, do it within your existing
+authorization and say so.
+
 ## Present and verify
 
 Default to portable HTML plus a concise chat briefing; honor text-only requests.

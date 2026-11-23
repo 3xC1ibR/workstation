@@ -126,7 +126,7 @@ class VersionTests(unittest.TestCase):
             output = render(latest, previous=previous)
             self.assertIn('<span class="metric-change tone-positive">Was $150</span>', output)
             self.assertIn('<svg class="sparkline"', output)
-            self.assertIn("since Nov 23, 10:00 AM", output)
+            self.assertIn(">Since Nov 23, 10:00 AM</h2>", output)
             self.assertEqual(previous_versions(latest, workspace="/work", agent="lead", operation="other", root=directory), [])
 
     def test_the_review_list_receives_state_and_actions_for_the_reader(self):

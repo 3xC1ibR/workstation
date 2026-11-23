@@ -188,6 +188,7 @@ are drawn with two borders; the search glyph is the page's one drawn icon.
 | Version history | - | Earlier versions of an operation report or of a delivery | Anything else |
 | Embedded document | retained document, application; unavailable on this address | Content an agent built, in a sandboxed frame inside an item's page or the embedded view. Its outline is the trust boundary: the one outlined region | Anything the page itself renders; agent markup is never written into a page |
 | Response proposal | - | A response the embedded document proposes, inside the response panel with Confirm and Ignore | Recording a response without the owner's Confirm |
+| Selection panel | actions (Explain, Question…), composer, sent, failed | Text the owner selected on a report or delivery, sent to the publishing agent's conversation; a menu under the selection | Text on the review list, or inside an embedded document (its frame is sealed) |
 | Transient notice | with Undo | Confirming a change that removed a row from view | States the page already shows |
 
 ## Do's and Don'ts
@@ -240,6 +241,7 @@ are drawn with two borders; the search glyph is the page's one drawn icon.
 | Ask | Something an agent needs from the owner, kept in Ribbon Field | decision, question, task |
 | Dismiss | Remove from Open without acting | archive, delete |
 | Do it | Accept the recommended default or a listed option | approve, submit |
+| Selection message | Selected text sent to the agent behind an item, with Explain or the owner's own words | comment, ask, feedback |
 
 ## Motion
 
@@ -271,6 +273,26 @@ ask chevron. Nothing moves on load.
 5. The margin mark: an accent disc for unread, a chevron for an ask.
 
 ## Decision record
+
+- 2026-11-23: **Select to ask the agent, and reports that follow new
+  versions.** The owner asked to highlight anything on a page and send it to
+  the agent that wrote it, with a default request or his own words, and for
+  the agent to choose between answering in the conversation and revising the
+  report, which should then update in real time. A settled selection inside a
+  report or delivery shows a menu under it: **Explain** (the one solid
+  button) sends at once; **Question…** opens a field whose button reads
+  Explain until he writes. The message goes through the same path as an ask's
+  reply (the local service to Ribbon Field's loopback queue; on the tailnet
+  the paired browser), to the conversation of the operation's latest version,
+  or the delivery's thread; the page names only the item, and the service
+  resolves the conversation. It quotes the text, the section, the version, and
+  the exact identity for publishing a new version. Explain sends on one tap
+  because a request for an explanation commits him to nothing, unlike an
+  ask's resolution. An open report checks for a new version every 5 seconds
+  and switches to it at the same scroll position, saying so; while he is
+  writing, it offers the new version instead. Usage records explain or
+  question, never the words. Not covered: text inside an interactive document
+  (its sandbox cannot be read) and the review list.
 
 - 2026-11-23: **Reports become briefings.** The owner found reports "a giant
   wall of text": the format accepted only prose, tables, and metric tiles, so

@@ -236,5 +236,6 @@
   }
   // True while the user is part-way through an answer, so a list refresh must not disturb it.
   const editing = () => [...drafts.values()].some(state => state.busy) || Boolean(document.activeElement?.closest?.(".ask-detail"));
-  window.StatusAsks = {createAskRow, editing};
+  // The same way to Ribbon Field serves messages about a selection (selection_messages.js).
+  window.StatusAsks = {createAskRow, editing, ribbonField: {connect, send, local: LOCAL}};
 })();

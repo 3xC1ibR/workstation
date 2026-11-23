@@ -182,20 +182,34 @@ def reply_to_ask(ask, text, *, address=None, opener=None):
     The ask is not resolved. Ribbon Field delivers a queued message when that conversation is idle, as it does for
     its own composer. `ask` is the listing record, so the conversation and title come from Ribbon Field, not the page.
     """
+    if not isinstance(text, str) or not text.strip() or len(text) > REPLY_LIMIT:
+        raise ValueError(f"Write a reply of at most {REPLY_LIMIT} characters.")
+    return queue_message(ask["session_id"], reply_message(ask["id"], ask["title"], text.strip()), "review-page-reply-",
+                         address=address, opener=opener)
+
+
+MESSAGE_LIMIT = 16000
+SESSION = re.compile(r"[^\x00-\x1f]{1,200}\Z")        # any conversation id Ribbon Field issues; the address quotes it
+
+
+def queue_message(session_id, message, prefix="review-page-message-", *, address=None, opener=None):
+    """Queue a user message in one Ribbon Field conversation, delivered when that conversation is idle."""
     import urllib.error
     import urllib.parse
     import urllib.request
     import uuid
-    if not isinstance(text, str) or not text.strip() or len(text) > REPLY_LIMIT:
-        raise ValueError(f"Write a reply of at most {REPLY_LIMIT} characters.")
+    if not isinstance(session_id, str) or not SESSION.match(session_id):
+        raise ValueError("This item has no Ribbon Field conversation to send to.")
+    if not isinstance(message, str) or not message.strip() or len(message) > MESSAGE_LIMIT:
+        raise ValueError(f"Write a message of at most {MESSAGE_LIMIT} characters.")
     address = address or ribbon_field_address()
     opener = opener or urllib.request.urlopen
-    body = {"message": reply_message(ask["id"], ask["title"], text.strip()), "requestId": "review-page-reply-" + uuid.uuid4().hex}
+    body = {"message": message, "requestId": prefix + uuid.uuid4().hex}
     try:
         with opener(urllib.request.Request(address + "api/browser/config"), timeout=5) as response:
             token = json.load(response)["token"]
         request = urllib.request.Request(
-            address + "api/browser/sessions/" + urllib.parse.quote(str(ask["session_id"]), safe="") + "/queue",
+            address + "api/browser/sessions/" + urllib.parse.quote(session_id, safe="") + "/queue",
             data=json.dumps(body).encode(), method="POST",
             headers={"Content-Type": "application/json", "X-Agent-Coord-Token": token})
         with opener(request, timeout=15) as response:

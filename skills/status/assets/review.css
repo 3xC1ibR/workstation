@@ -219,3 +219,14 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
 @media print {
   .review-controls, .row-actions, .transient-notice, .response-panel .response-buttons { display: none; }
 }
+
+/* Selected text, sent to the agent's conversation: a menu under the selection, outlined and flat like every menu. */
+.selection-panel { position: absolute; z-index: var(--layer-menu); width: min(var(--selection-panel-width), calc(100vw - 2 * var(--space-2)));
+  display: grid; gap: var(--space-2); padding: var(--space-2); background: var(--surface); border: var(--stroke) solid var(--rule-strong); border-radius: var(--radius-control); }
+.selection-panel[hidden] { display: none; }
+.selection-actions { display: flex; gap: var(--space-2); }
+.selection-quote { color: var(--ink-secondary); font-size: var(--meta); overflow-wrap: anywhere; }
+.selection-status { font-size: var(--meta); color: var(--ink-secondary); overflow-wrap: anywhere; }
+.selection-status.failure-text { color: var(--critical); }
+/* A report that switched to a newer version while open says so once, under its navigation. */
+.version-arrived { margin-bottom: var(--space-3); font-size: var(--meta); color: var(--ink-secondary); }

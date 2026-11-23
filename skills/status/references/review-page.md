@@ -295,3 +295,19 @@ state through the page: `POST /api/document-state` with `{kind, id, state}`
 (`kind` is `delivery` or `report`, `id` the latest version) under the same
 Origin and token rules as every other write, and `GET /api/document-state/<kind>/<id>`.
 Requests from the sandbox itself carry an opaque origin and are refused.
+
+## Messages about a selection and live versions
+
+On a report or delivery page, selecting text shows **Explain** and
+**Question…**. The message goes to the conversation of the agent behind the
+item: for a report, the conversation of its operation's latest version; for a
+delivery, its `thread`. On this Mac the page posts `{kind, id, message}` to
+`/api/item-message` and the service queues it in Ribbon Field (the same
+loopback path as an ask's reply); on the tailnet address a paired browser
+queues it in Ribbon Field directly, and an unpaired one says so. The service
+resolves the conversation from the item; the page cannot choose another.
+Usage events record `item_message` with the action `explain` or `question`.
+
+An open report polls `GET /api/operations/<operation>/latest` every 5 seconds
+while visible and switches to a newer version at the same scroll position. If
+he is writing, it shows "A newer version arrived" with **Show it** instead.

@@ -1164,3 +1164,53 @@ class MarkdownTests(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class SelectionMessageTests(Workspace):
+    """Selected text goes to the conversation of the agent behind the item, and an open report follows new versions."""
+
+    def serve_recording(self):
+        self.sent = []
+        self.serve(message_sender=lambda session, message: self.sent.append((session, message)) or {"queued": True})
+
+    def test_a_report_message_goes_to_the_latest_publisher_of_its_operation(self):
+        first = self.register(report("First"), operation="holdco-bridge", thread_id="thread-old")
+        self.register(report("Second"), operation="holdco-bridge", thread_id="thread-new")
+        self.serve_recording()
+        status, _, body = self.request("/api/item-message", {"kind": "report", "id": first, "message": "> text\n\nExplain this."})
+        self.assertEqual((status, json.loads(body)), (200, {"queued": True}))
+        self.assertEqual(self.sent, [("thread-new", "> text\n\nExplain this.")])
+
+    def test_a_delivery_message_goes_to_its_thread(self):
+        identifier = self.publish(thread_id="thread-delivery")
+        self.serve_recording()
+        self.assertEqual(self.request("/api/item-message", {"kind": "delivery", "id": identifier, "message": "Explain."})[0], 200)
+        self.assertEqual(self.sent, [("thread-delivery", "Explain.")])
+
+    def test_items_without_a_conversation_and_relayed_requests_send_nothing(self):
+        orphan = self.register(report("No thread"))
+        self.serve_recording()
+        self.assertEqual(self.request("/api/item-message", {"kind": "report", "id": orphan, "message": "Explain."})[0], 400)
+        relayed = self.register(report("Relayed"), thread_id="thread-a")
+        self.assertNotEqual(self.request("/api/item-message", {"kind": "report", "id": relayed, "message": "x"}, headers=RELAY)[0], 200)
+        self.assertEqual(self.sent, [])
+
+    def test_the_report_page_carries_its_conversation_and_the_selection_script(self):
+        identifier = self.register(report("First"), operation="holdco-bridge", thread_id="thread-a", agent="lead")
+        self.serve_recording()
+        page = self.request(f"/reports/{identifier}")[2].decode()
+        self.assertIn("selection_messages.js", page)
+        configuration = json.loads(page.split('id="status-configuration">')[1].split("</script>")[0])
+        conversation = configuration["conversation"]
+        self.assertEqual((conversation["session"], conversation["operation_key"], conversation["agent"], conversation["version"]),
+                         ("thread-a", "holdco-bridge", "lead", 1))
+        self.assertTrue(conversation["document"].endswith(f"{identifier}/report.json"))
+        self.assertEqual(self.request("/selection_messages.js")[0], 200)
+
+    def test_an_open_report_can_ask_for_its_latest_version_cheaply(self):
+        first = self.register(report("First"), operation="holdco-bridge", thread_id="thread-a")
+        self.serve_recording()
+        operation = self.reports.operations()["operations"][0]["id"]
+        self.assertEqual(json.loads(self.request(f"/api/operations/{operation}/latest")[2]), {"latest": first, "version_count": 1})
+        second = self.register(report("Second"), operation="holdco-bridge", thread_id="thread-a")
+        self.assertEqual(json.loads(self.request(f"/api/operations/{operation}/latest")[2])["latest"], second)

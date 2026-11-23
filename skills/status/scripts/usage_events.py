@@ -17,7 +17,7 @@ import statistics
 
 from status_store import IDENTIFIER, StatusError, moment
 
-EVENT_TYPES = {"page_open", "item_open", "response", "ask_resolution"}
+EVENT_TYPES = {"page_open", "item_open", "response", "ask_resolution", "item_message"}
 VIEWS = {"review", "operation", "delivery"}
 KINDS = {"operation", "delivery", "ask"}
 ASK_IDENTIFIER = re.compile(r"[1-9][0-9]{0,17}\Z")         # Ribbon Field's own ask number; nothing about its content

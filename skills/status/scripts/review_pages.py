@@ -244,7 +244,8 @@ def delivery_page(addresses, delivery, body, embedded="", public_url=None):
     if delivery["interactive"]:
         configuration["embedded"] = {"kind": "delivery", "item": delivery["id"], "latest": delivery["latest"], "public_url": public_url}
     return document(delivery["title"], base, content,
-                    ("controls.js", "delivery.js") + (("embedded_host.js",) if delivery["interactive"] else ()), configuration)
+                    ("controls.js", "delivery.js", "asks.js", "selection_messages.js") + (("embedded_host.js",) if delivery["interactive"] else ()),
+                    configuration)
 
 
 def attachment_page(addresses, delivery, name, content):

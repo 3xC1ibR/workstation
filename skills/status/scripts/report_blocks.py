@@ -248,16 +248,16 @@ class Blocks:
         items = self.document.get("changes", [])
         if not items:
             return ""
-        since = ""
+        heading = CHANGED_SINCE
         if self.previous:
-            since = f' <span class="count">since {self.escape(self.time_text(self.previous[0]["generated_at"], full=False))}</span>'
+            heading = f'Since {self.escape(self.time_text(self.previous[0]["generated_at"], full=False))}'
         rows = []
         for item in items:
             direction = item.get("direction", "new")
             mark, word = CHANGE_DIRECTIONS[direction]
             rows.append(f'<li data-direction="{direction}"><span class="change-mark" role="img" aria-label="{word}">{mark}</span>'
                         f'<span>{self.escape(item["text"])}</span></li>')
-        return (f'<section class="block-changes"><h2 class="block-heading">{CHANGED_SINCE}{since}</h2>'
+        return (f'<section class="block-changes"><h2 class="block-heading">{heading}</h2>'
                 f'<ul class="changes">{"".join(rows)}</ul></section>')
 
     def _date(self, value):

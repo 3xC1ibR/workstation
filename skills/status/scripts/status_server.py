@@ -21,7 +21,7 @@ import interactive_documents
 from register_status import inbox_directory
 from response_access import response_key
 import review_pages
-from ribbon_field_asks import AskReader, for_operation, reply_to_ask, resolve_ask, shared_workspaces
+from ribbon_field_asks import AskReader, for_operation, queue_message, reply_to_ask, resolve_ask, shared_workspaces
 from status_store import REPORT_CSP, ResponseConflict, StatusError, StatusReports
 from usage_events import INTERACTIVE_OPEN, UsageEvents
 
@@ -35,7 +35,7 @@ PAGE_CSP = ("default-src 'none'; script-src 'self'; style-src 'self'; connect-sr
 FILES = {"/tokens.css": "text/css", "/style.css": "text/css", "/review.css": "text/css", "/controls.js": "text/javascript",
          "/responses.js": "text/javascript", "/report.js": "text/javascript", "/review.js": "text/javascript",
          "/report_page.js": "text/javascript", "/delivery.js": "text/javascript", "/asks.js": "text/javascript",
-         "/embedded_host.js": "text/javascript", "/document_bridge.js": "text/javascript"}
+         "/embedded_host.js": "text/javascript", "/document_bridge.js": "text/javascript", "/selection_messages.js": "text/javascript"}
 DOCUMENT_HELPER = "/document_bridge.js"            # loaded by sandboxed documents, whose origin is opaque
 POSTS = {"/api/dismiss": ({"id", "dismissed"}, set(), 4096),
          "/api/responses": ({"id", "revision", "values"}, set(), 4 * 1024 * 1024),
@@ -43,7 +43,8 @@ POSTS = {"/api/dismiss": ({"id", "dismissed"}, set(), 4096),
          "/api/document-state": ({"kind", "id", "state"}, set(), 80 * 1024),
          "/api/events": ({"type"}, {"view", "item_kind", "item", "action", "narrow"}, 4096),
          "/api/ask-resolution": ({"id", "body"}, {"snooze"}, 16 * 1024),
-         "/api/ask-reply": ({"id", "text"}, set(), 32 * 1024)}
+         "/api/ask-reply": ({"id", "text"}, set(), 32 * 1024),
+         "/api/item-message": ({"kind", "id", "message"}, set(), 64 * 1024)}
 
 
 def page_policy(public):
@@ -63,7 +64,8 @@ def public_address(value):
     return f"https://{address.netloc}", address.netloc, address.path.rstrip("/")
 
 
-def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, ask_resolver=resolve_ask, ask_replier=reply_to_ask):
+def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, ask_resolver=resolve_ask, ask_replier=reply_to_ask,
+                message_sender=queue_message):
     root = Path(root).resolve()
     reports, deliveries, usage, states = StatusReports(root), Deliveries(root), UsageEvents(root), DocumentStates(root)
     asks = ask_reader or AskReader()
@@ -187,6 +189,21 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, as
             return {"operations": operations["operations"], "deliveries": delivered["deliveries"], "asks": listing,
                     "unreadable": operations["unreadable"] + delivered["unreadable"], "public_url": self.public_url()}
 
+        def conversation(self, kind, identifier):
+            """The Ribbon Field conversation of the agent behind an item: an operation's latest publisher, a delivery's thread."""
+            if kind == "report":
+                manifest = reports._manifest(identifier)
+                latest = reports._manifest(reports.operation(manifest["operation_id"])["latest"])
+                session = latest["origin"].get("thread_id") or manifest["origin"].get("thread_id")
+            elif kind == "delivery":
+                thread = self.delivery_version(identifier).get("thread") or ""
+                session = thread.removeprefix("agentcoord://thread/") if thread.startswith("agentcoord://thread/") else None
+            else:
+                raise ValueError("Messages go to a report's or a delivery's conversation.")
+            if not session:
+                raise ValueError("This item has no Ribbon Field conversation to send to.")
+            return session
+
         def report_page(self, identifier):
             manifest = reports._manifest(identifier)
             document = reports.document(identifier)
@@ -198,6 +215,20 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, as
             latest = operation["latest"] == identifier
             configuration = {"report": identifier, "operation": operation["id"], "latest": latest,
                              "dismissed": bool(manifest["dismissed_at"])}
+            try:
+                session = self.conversation("report", identifier)
+            except ValueError:
+                session = None
+            if session:
+                # What a selection message needs: where it goes, and how the agent publishes a new version of this report.
+                origin = manifest["origin"]
+                number = len(operation["versions"]) - [v["id"] for v in operation["versions"]].index(identifier)
+                configuration["conversation"] = {
+                    "session": session, "link": "agentcoord://thread/" + session, "title": manifest["title"], "version": number,
+                    "generated_at": manifest["generated_at"], "operation_key": origin.get("operation"),
+                    "workspace": origin.get("workspace"), "agent": origin.get("agent"),
+                    "document": str(reports.root / "reports" / identifier / "report.json"),
+                    "address": (self.public_url() or f"http://127.0.0.1:{port}") + "/reports/" + identifier}
             if fields:
                 configuration["responses"] = {"fields": fields, "connection": {
                     "id": identifier, "url": f"{base}/api/report-responses/{identifier}",
@@ -208,7 +239,7 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, as
                 embedded = review_pages.interactive_section(
                     interactive, self.frame_source(interactive, "/reports/" + identifier), manifest["title"],
                     f"{self.public_url()}/reports/{identifier}" if public else None, "report")
-            scripts = (("controls.js",) + (("responses.js", "report.js") if fields else ()) + ("asks.js", "report_page.js")
+            scripts = (("controls.js",) + (("responses.js", "report.js") if fields else ()) + ("asks.js", "report_page.js", "selection_messages.js")
                        + (("embedded_host.js",) if interactive else ()))
             # Earlier versions, newest first, give the measures their trend and their value last time.
             later = [version["id"] for version in operation["versions"]]
@@ -326,6 +357,10 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, as
                     self.send(200, self.review())
                 elif path == "/api/reports":
                     self.send(200, reports.list())
+                elif path.startswith("/api/operations/") and path.endswith("/latest"):
+                    # What an open report polls to switch to a new version as soon as it is published.
+                    operation = reports.operation(path.removeprefix("/api/operations/").removesuffix("/latest"))
+                    self.send(200, {"latest": operation["latest"], "version_count": len(operation["versions"])})
                 elif path.startswith("/api/operations/"):
                     if "fresh=asks" in urlsplit(self.path).query:
                         asks.invalidate()
@@ -409,6 +444,10 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, as
                     if ask is None:
                         raise ValueError("This ask is no longer open. Refresh the page.")
                     self.send(200, ask_replier(ask, body["text"]))
+                elif path == "/api/item-message":
+                    if self.remote():
+                        raise PermissionError("On the tailnet address, messages go through Ribbon Field's paired-device sign-in.")
+                    self.send(200, message_sender(self.conversation(body["kind"], body["id"]), body["message"]))
                 elif path == "/api/ask-resolution":
                     if self.remote():
                         raise PermissionError("On the tailnet address, answers go through Ribbon Field's paired-device sign-in.")
@@ -429,8 +468,10 @@ def make_server(root, port=DEFAULT_PORT, *, public_url=None, ask_reader=None, as
                     self.send(200, {name: saved[name] for name in ("saved_at", "revision", "version")})
                 else:
                     opened = None
-                    if body["type"] not in {"page_open", "item_open", "ask_resolution"}:
-                        raise ValueError("Pages report page_open, item_open and ask_resolution events only.")
+                    if body["type"] not in {"page_open", "item_open", "ask_resolution", "item_message"}:
+                        raise ValueError("Pages report page_open, item_open, ask_resolution and item_message events only.")
+                    if body["type"] == "item_message" and body.get("action") not in ("explain", "question"):
+                        raise ValueError("A message about a selection is an explain or a question; its words are never recorded.")
                     if body["type"] == "item_open" and body.get("action") not in (None, INTERACTIVE_OPEN):
                         raise ValueError("An item is opened, or its interactive document is.")
                     if body["type"] == "item_open" and body.get("item_kind") == "operation" and not body.get("action"):
