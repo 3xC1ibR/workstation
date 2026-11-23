@@ -33,12 +33,15 @@
 .row-main { display: contents; }
 /* One mark hangs in the margin, left of the text column that every page shares: a dot for unread, a chevron for an ask that opens in place. */
 .marker { position: absolute; left: calc(var(--row-inset) - var(--space-2) - var(--marker)); top: calc(var(--row-pad) + (var(--reading) * var(--line-snug) - var(--marker)) / 2); width: var(--marker); height: var(--marker); border-radius: var(--radius-round); }
-.row[data-state="unread"] .marker { background: var(--accent); }
+/* The mark's shape is the kind of item: a square for delivered work, a circle for a living report. Filled means unread. */
+.row[data-kind="delivery"] .marker { border: var(--glyph-stroke) solid var(--ink-tertiary); border-radius: var(--focus); }
+.row[data-kind="operation"] .marker { border: var(--glyph-stroke) solid var(--ink-tertiary); }
+.row[data-state="unread"] .marker { border-color: var(--accent); background: var(--accent); }
 .row.ask .marker { width: calc(var(--marker) - var(--focus)); height: calc(var(--marker) - var(--focus)); margin: var(--stroke) 0 0 calc(-1 * var(--stroke)); border-radius: 0; border-right: var(--glyph-stroke) solid var(--ink-tertiary); border-bottom: var(--glyph-stroke) solid var(--ink-tertiary); transform: rotate(-45deg); transition: transform var(--quick); }
 .row.ask[data-open="true"] .marker { transform: translate(var(--stroke), calc(-1 * var(--stroke))) rotate(45deg); }
-/* Every row is a title on one line with its age at the right. Unread is the dot alone; only a blocking ask is set heavier. */
-.row-title { grid-column: 1; grid-row: 1; color: var(--ink); font-size: var(--reading); line-height: var(--line-snug); font-weight: var(--weight-medium); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
-.row[data-state="blocking"] .row-title { font-weight: var(--weight-strong); }
+/* Every row is a title on one line with its age at the right. An ask and an unread item are set at medium weight, a read one at regular. */
+.row-title { grid-column: 1; grid-row: 1; color: var(--ink); font-size: var(--reading); line-height: var(--line-snug); font-weight: 400; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
+.row.ask .row-title, .row[data-state="unread"] .row-title { font-weight: var(--weight-medium); }
 a.row-title::after, .ask-toggle::after { content: ""; position: absolute; inset: 0; }             /* the whole row opens the item */
 a.row-title:hover { text-decoration: none; }
 /* Keyboard focus rings the whole row, the same box that hover tints. */
@@ -52,13 +55,12 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
 .row-meta .outcome-accepted { color: var(--positive); font-weight: var(--weight-medium); }
 .row-meta .flag-blocking { color: var(--critical); font-weight: var(--weight-strong); }
 .row-meta .flag-attention { color: var(--attention); font-weight: var(--weight-medium); }
-.row-meta .flag-needs, .row-excerpt strong { color: var(--ink-secondary); font-weight: 400; }
+.row-excerpt strong { font-weight: 400; }
 /* Row actions appear on hover or keyboard focus; touch users respond on the item's own page. */
 .row-actions { position: absolute; z-index: var(--layer-row-action); top: var(--space-1); right: calc(var(--row-bleed) - var(--space-2)); display: flex; gap: var(--space-1); align-items: center; padding-inline-start: var(--space-3); background: var(--row-surface); opacity: 0; pointer-events: none; }
 .row-actions:empty { display: none; }
 .row:focus-within .row-actions { opacity: 1; pointer-events: auto; }
 @media (hover: hover) { .row:hover .row-actions { opacity: 1; pointer-events: auto; } }
-.row[data-closed="true"] .row-title { font-weight: 400; }
 /* Items with nothing new for a week wait in one closed group at the end of their section. */
 .older > summary { display: inline-flex; justify-content: flex-start; gap: var(--space-2); min-height: var(--control-height); margin-top: var(--space-2); padding: 0; font-size: var(--control-text); font-weight: var(--weight-medium); letter-spacing: 0; color: var(--ink-secondary); }
 .older > summary:hover { color: var(--ink); }
@@ -94,7 +96,6 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
 .ask-text p + p { margin-top: var(--space-2); }
 .ask-text .step + .step { margin-top: var(--space-1); }
 .ask-text + .ask-text { margin-top: calc(-1 * var(--space-2)); }
-.ask-context { color: var(--ink-secondary); }
 .ask-response { display: grid; gap: var(--space-2); max-width: var(--measure); }
 .ask-buttons { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .ask-buttons .spacer { flex: 1; }
@@ -107,6 +108,8 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
 /* Leaving for the conversation is a quiet word in the action line, not a blue link. */
 .quiet-link { display: inline-flex; align-items: center; min-height: var(--control-height); padding: 0 var(--space-3); border-radius: var(--radius-control); color: var(--ink-secondary); font-size: var(--control-text); font-weight: var(--weight-medium); }
 .quiet-link:hover { background: var(--surface-quiet); color: var(--ink); text-decoration: none; }
+/* The last word of an action line ends on the edge of the rule above it. */
+.ask-buttons > .quiet-link:last-child, .response-buttons .response-quiet > :last-child { margin-inline-end: calc(-1 * var(--space-3)); }
 .ask-unavailable { max-width: var(--measure); color: var(--ink-secondary); }
 
 /* Served report and delivery pages */
@@ -118,27 +121,24 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
 .version-history ol { position: absolute; right: 0; top: calc(100% + var(--space-1)); z-index: var(--layer-menu); width: max-content; max-width: calc(100vw - 2 * var(--space-4)); max-height: 60vh; overflow: auto; margin: 0; padding: var(--space-1); list-style: none; background: var(--surface); border: var(--stroke) solid var(--rule-strong); border-radius: var(--radius-control); }
 .version-history li { display: flex; justify-content: space-between; gap: var(--space-5); padding: var(--space-2) var(--space-3); border-radius: var(--radius-small); font-size: var(--meta); }
 .version-history li:has([aria-current]) { background: var(--surface-quiet); }
+.version-history a { color: var(--ink-secondary); }
 .version-history [aria-current] { color: var(--ink); font-weight: var(--weight-strong); }
 .version-notice { margin-bottom: var(--space-4); padding: var(--space-3) var(--space-4); background: var(--attention-tint); border-radius: var(--radius-control); font-size: var(--meta); }
 .sheet section.context-asks { margin-top: var(--space-5); }
 .sheet-opening + section.embedded { margin-top: 0; }
 
 /* The delivery's response: the recommendation, then one solid button for it. */
-.sheet section.response-panel { margin-top: 0; max-width: var(--measure); }
+.sheet section.response-panel { margin-top: 0; max-width: var(--measure); display: grid; gap: var(--space-3); align-content: start; }
+#delivery-response { display: grid; gap: var(--space-3); }
 .recommendation { overflow-wrap: anywhere; }
 .decision-question { font-weight: var(--weight-medium); overflow-wrap: anywhere; }
-.recommendation:not([hidden]) + .decision-question { margin-top: var(--space-1); }
-.response-buttons { display: flex; flex-wrap: wrap; gap: var(--space-2); margin-top: var(--space-3); align-items: center; }
-.response-panel .choices { margin-top: var(--space-3); }
+.response-buttons { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: center; }
 /* Quiet actions follow the solid button as words. */
 .response-quiet { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin-inline-start: auto; }
 .response-outcome .response-quiet { margin-inline-start: calc(-1 * var(--space-3)); }
-.response-note { margin-top: var(--space-3); }
-.response-outcome { display: grid; gap: var(--space-1); margin-top: var(--space-3); }
+.response-outcome { display: grid; gap: var(--space-1); }
 .response-outcome .outcome-accepted { color: var(--positive); font-weight: var(--weight-strong); }
 .response-outcome .outcome-dismissed { font-weight: var(--weight-strong); }
-.response-panel .note { margin-top: var(--space-2); }
-.response-panel .failure { margin-top: var(--space-3); }
 .response-version { color: var(--attention); font-size: var(--meta); font-weight: var(--weight-medium); }
 /* What the embedded document proposes follows the owner's own controls, set off by space like every group on the page. */
 .response-proposal { margin-top: var(--space-5); overflow-wrap: anywhere; }
@@ -186,27 +186,27 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
   .ask-snooze-choices { right: auto; left: 0; }
   .ask-buttons { gap: var(--space-1); }
   .ask-buttons button.quiet, .ask-snooze summary, .ask-buttons .quiet-link { padding-inline: var(--space-2); }
+  .ask-buttons > .quiet-link:last-child { margin-inline-end: calc(-1 * var(--space-2)); }
   .version-history li { align-items: center; gap: var(--space-3); padding-block: 0; }
   .version-history a, .ask-links a { display: inline-flex; align-items: center; min-height: var(--touch-height); }
 }
-/* A wide page is a main column and a rail. On the review page the first section takes the main column and the others the rail;
-   on a delivery the response stays in the rail beside the write-up. */
+/* A wide page is a main column and a rail. On the review page what asks for a decision (asks, then delivered work) takes the
+   main column and the living reports the rail, in every view; on a delivery the response stays in the rail beside the write-up. */
 @media (min-width: 1000px) {
   .review { display: flow-root; }
-  .review > .review-section { margin-inline-start: calc(var(--main-width) + var(--gutter)); }
-  .review > .review-section:not([hidden]) ~ .review-section { margin-top: var(--space-6); }
-  .review > .review-section:not([hidden]) ~ .review-section:not([hidden]) ~ .review-section { margin-top: var(--space-7); }
-  #asks:not([hidden]), #asks[hidden] + #deliveries:not([hidden]), #asks[hidden] + #deliveries[hidden] + #operations { float: left; width: var(--main-width); margin-inline-start: 0; }
+  .review > .review-section { float: left; clear: left; width: var(--main-width); }
+  .review > #operations { float: none; clear: none; width: auto; margin-top: var(--space-6); margin-inline-start: calc(var(--main-width) + var(--gutter)); }
+  #asks[hidden] + #deliveries[hidden] + #operations { margin-inline-start: 0; max-width: var(--main-width); }
   .review > .empty-state { clear: both; }
-  .review > .review-section .row-title { -webkit-line-clamp: 2; }                 /* the rail is narrow, so a title there may take two lines */
-  #asks:not([hidden]) .row-title, #asks[hidden] + #deliveries:not([hidden]) .row-title, #asks[hidden] + #deliveries[hidden] + #operations .row-title { -webkit-line-clamp: 1; }
   .delivery { display: grid; grid-template-columns: minmax(0, var(--main-width)) minmax(0, var(--rail-width)); grid-template-rows: auto auto 1fr; column-gap: var(--gutter); align-items: start; }
   .delivery > * { grid-column: 1 / -1; }
   .delivery > .assessment { grid-column: 1; grid-row: 2; }
   .delivery > .response-panel { grid-column: 2; grid-row: 2 / span 2; position: sticky; top: var(--space-5); padding-top: var(--space-5); }
   .delivery > .document { grid-column: 1; grid-row: 3; margin-top: 0; padding-top: 0; border-top: 0; }
-  .delivery:has(> .embedded) > .response-panel { grid-row: 2; position: static; padding-bottom: var(--space-5); }
+  /* An interactive document is read in the main column like the write-up; another application takes the page's width. */
+  .delivery > .embedded:not(.embedded-application) { grid-column: 1; grid-row: 3; margin-top: 0; }
   .delivery:has(> .embedded) > .document { grid-row: auto; margin-top: var(--space-6); }
+  .delivery:has(> .embedded-application) > .response-panel { grid-row: 2; position: static; padding-bottom: var(--space-5); }
 }
 @media print {
   .review-controls, .row-actions, .transient-notice, .response-panel .response-buttons { display: none; }

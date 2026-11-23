@@ -59,7 +59,7 @@ code, pre { font: .92em/var(--line) var(--mono); overflow-wrap: anywhere; }
               linear-gradient(to left, var(--surface) 30%, transparent) right / 24px 100% no-repeat local,
               radial-gradient(farthest-side at 0 50%, var(--rule-strong), transparent) left / 10px 100% no-repeat scroll,
               radial-gradient(farthest-side at 100% 50%, var(--rule-strong), transparent) right / 10px 100% no-repeat scroll; }
-table { width: 100%; border-collapse: collapse; font-size: var(--meta); font-variant-numeric: tabular-nums; }
+table { width: 100%; border-collapse: collapse; font-size: var(--table); font-variant-numeric: tabular-nums; }
 th, td { padding: var(--space-2) var(--space-4) var(--space-2) 0; border-bottom: var(--stroke) solid var(--rule); text-align: left; vertical-align: top; min-width: var(--cell-width); overflow-wrap: break-word; hyphens: auto; }
 th:last-child, td:last-child { padding-inline-end: 0; }
 tbody tr:last-child td { border-bottom: 0; }
@@ -140,8 +140,14 @@ button.quiet:hover { background: var(--surface-quiet); color: var(--ink); }
 /* A wide page: the opening's lead text in the main column, the measures in the rail beside it. Tables keep the full width. */
 @media (min-width: 1000px) {
   .sheet-opening { display: grid; grid-template-columns: minmax(0, var(--main-width)) minmax(0, var(--rail-width)); column-gap: var(--gutter); align-items: start; }
-  .sheet-opening > .metrics { grid-template-columns: 1fr 1fr; padding: var(--space-5) 0 0; border: 0; }
-  .sheet > :is(section, details):not(:has(table, iframe)), #status-response-fields { max-width: var(--main-width); }
+  /* In the rail a measure is one row: its label, its value at the right, then its particulars. */
+  .sheet-opening > .metrics { grid-template-columns: minmax(0, 1fr); gap: 0; padding: var(--space-4) 0 0; border: 0; }
+  .sheet-opening .metric { display: grid; grid-template-columns: minmax(0, auto) minmax(0, auto); justify-content: space-between; align-items: baseline; column-gap: var(--space-4); padding: var(--space-2) 0; }
+  .sheet-opening .metric + .metric { border-top: var(--stroke) solid var(--rule); }
+  .sheet-opening .metric dd { grid-column: 1 / -1; }
+  .sheet-opening .metric .value { grid-column: 2; grid-row: 1; margin: 0; font-size: var(--reading); line-height: var(--line); letter-spacing: 0; text-align: right; }
+  /* A table of up to three columns keeps the main column's width; wider tables take the page. */
+  .table-region-narrow, .response-editor { max-width: var(--main-width); }
 }
 @media print {
   main { max-width: none; padding: 0; }

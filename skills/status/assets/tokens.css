@@ -10,15 +10,15 @@
   --positive: #17693f;
   --space-1: 4px; --space-2: 8px; --space-3: 12px; --space-4: 16px;
   --space-5: 24px; --space-6: 32px; --space-7: 48px; --space-8: 72px;
-  /* Four sizes: metadata and controls, text, section headings, the page title. */
-  --meta: 13px; --reading: 16px; --heading: 20px; --title: 30px;
+  /* Sizes: metadata and controls, tables, text, section headings, the page title. */
+  --meta: 13px; --table: 15px; --reading: 16px; --heading: 20px; --title: 30px;
   --line-tight: 1.25; --line-snug: 1.35; --line: 1.5; --line-reading: 1.6;
   --weight-medium: 500; --weight-strong: 600; --weight-title: 700;
   --tracking-title: -.022em; --tracking-heading: -.012em;
-  --stroke: 1px; --focus: 2px; --glyph-stroke: 1.5px; --marker: 8px; --accent-edge: 3px;
+  --stroke: 1px; --focus: 2px; --glyph-stroke: 1.5px; --marker: 10px; --accent-edge: 3px;
   --radius: 10px; --radius-control: 8px; --radius-small: 4px; --radius-round: 999px;
   /* A wide page is a main column and a rail: 640 + 64 + 416 = 1120. Text keeps the measure inside either. */
-  --page-width: 1120px; --main-width: 640px; --rail-width: 416px; --gutter: 64px; --page-inset: 32px; --page-top: 56px; --row-bleed: 20px; --measure: 608px;
+  --page-width: 1120px; --main-width: 640px; --rail-width: 416px; --gutter: 64px; --page-inset: 32px; --page-top: 56px; --row-bleed: 20px; --measure: 640px;
   --metric-width: 190px; --search-width: 94px; --search-width-active: 176px; --age-width: 48px; --choice-mark: 16px; --cell-width: 120px; --phrase-cell-width: 176px; --record-width: 180px; --text-cell-width: 280px;
   --control-height: 32px; --control-text: var(--meta); --touch-height: 44px;
   --embedded-height: 480px; --embedded-application-height: 80vh;

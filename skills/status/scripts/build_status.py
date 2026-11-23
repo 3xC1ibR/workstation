@@ -201,8 +201,9 @@ def render(document, connection=None, *, page=None):
         heading = "".join(f'<th scope="col"{classes[index]}>{escape(column)}</th>' for index, column in enumerate(section["columns"]))
         rows = "".join("<tr>" + "".join(f"<td{classes[index]}>{escape(cell)}</td>" for index, cell in enumerate(row)) + "</tr>" for row in section["rows"])
         if pair:
-            return f'<div class="table-region"><table class="table-pair"><thead><tr>{heading}</tr></thead><tbody>{rows}</tbody></table></div>'
-        return (f'<div class="table-region" tabindex="0" role="region" aria-label="{escape(section["title"])}">'
+            return f'<div class="table-region table-region-narrow"><table class="table-pair"><thead><tr>{heading}</tr></thead><tbody>{rows}</tbody></table></div>'
+        narrow = " table-region-narrow" if len(section["columns"]) <= 3 else ""
+        return (f'<div class="table-region{narrow}" tabindex="0" role="region" aria-label="{escape(section["title"])}">'
                 f'<table><thead><tr>{heading}</tr></thead><tbody>{rows}</tbody></table></div>')
 
     def source_link(location):
