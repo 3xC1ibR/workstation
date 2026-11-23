@@ -20,13 +20,16 @@ agents ran; Codex crashed and work was lost.
     `~/.ramble/logs/*.log`, `~/Library/Logs/*.log`;
   - deletes regenerable files by age: `/tmp` top-level entries older than
     2 days; `~/.npm/_cacache`, `~/Library/Caches/pip` and `~/.cache/uv`
-    entries older than 30 days; `~/Library/Caches/ms-playwright` and
-    `~/.cache/huggingface` entries older than 60 days.
+    entries older than 30 days. `~/Library/Caches/ms-playwright` and
+    `~/.cache/huggingface` are never pruned: file age there is download
+    time, not last use, and they hold models and browsers still in use
+    (Ramble's Wespeaker and Whisper models, Canvas Browser's test browsers).
+    Their sizes appear in the top-consumer report.
 - Reports recommendations with exact commands, without acting, for idle
   Colima VM disks, inactive git worktrees under /opt/projects, runaway or
   oversized processes, and unlinked open files over 1 GiB.
 - Posts a macOS notification (osascript) when free disk is still under
-  15 GiB after cleanup or swap exceeds 90%, at most once per condition per
+  15 GiB after cleanup or kernel memory pressure is critical or swap use exceeds 16 GiB (macOS grows the swap total on demand, so a percentage would fire all day), at most once per condition per
   hour (state in `~/.local/state/mac-resource-guardian/alerts.json`).
   A Ribbon Field ask was considered and rejected: during a disk or swap
   crisis the agent substrate may itself be crashing, while osascript needs

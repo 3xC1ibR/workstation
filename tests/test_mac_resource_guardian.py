@@ -4,6 +4,8 @@ import importlib.util
 import json
 import os
 import sys
+
+import pytest
 from pathlib import Path
 
 SCRIPT = Path(__file__).resolve().parents[1] / "scripts" / "mac_resource_guardian.py"
@@ -15,6 +17,11 @@ spec.loader.exec_module(guardian)
 UTC = dt.timezone.utc
 NOW = dt.datetime(2026, 11, 23, 12, 0, 0, tzinfo=UTC)
 GIB = 1024 ** 3
+
+
+@pytest.fixture(autouse=True)
+def _normal_memory_pressure(monkeypatch):
+    monkeypatch.setattr(guardian, "memory_pressure_level", lambda: 1)
 
 
 def fake_metrics(free_bytes, swap_used=0, swap_total=10 * GIB, mem_pct=50.0):
@@ -225,7 +232,7 @@ def test_alert_rate_limiting():
 
 def test_run_sends_one_alert_per_condition_per_hour(tmp_path, monkeypatch):
     monkeypatch.setattr(
-        guardian, "measure", lambda now: fake_metrics(30 * GIB, swap_used=9.5 * GIB)
+        guardian, "measure", lambda now: fake_metrics(30 * GIB, swap_used=17 * GIB, swap_total=18 * GIB)
     )
     sent = []
     monkeypatch.setattr(guardian, "notify", lambda message: sent.append(message))
@@ -260,9 +267,14 @@ def test_run_writes_sample_and_rotates(tmp_path, monkeypatch):
 
 def test_evaluate_alert_conditions():
     config = make_config(Path("/nonexistent"))
-    conditions = guardian.evaluate_alert_conditions(10 * GIB, 9.5 * GIB, 10 * GIB, config)
+    conditions = guardian.evaluate_alert_conditions(10 * GIB, 17 * GIB, 18 * GIB, config)
     assert [name for name, _ in conditions] == ["disk", "swap"]
     assert guardian.evaluate_alert_conditions(20 * GIB, 1 * GIB, 10 * GIB, config) == []
+    # 95% of a small swap total is ordinary on macOS and must not alert.
+    assert guardian.evaluate_alert_conditions(20 * GIB, 9.5 * GIB, 10 * GIB, config) == []
+    # Critical kernel memory pressure alerts regardless of swap size.
+    critical = guardian.evaluate_alert_conditions(20 * GIB, 2 * GIB, 10 * GIB, config, 4)
+    assert [name for name, _ in critical] == ["swap"]
 
 
 def test_render_mentions_mode_and_reclaim(tmp_path, monkeypatch):
@@ -276,3 +288,35 @@ def test_render_mentions_mode_and_reclaim(tmp_path, monkeypatch):
     assert "DRY RUN" in text
     assert "would rotate-log" in text
     assert "free after cleanup" in text
+
+
+def test_tmp_pruning_skips_sockets_dotfiles_and_socket_dirs():
+    import shutil
+    import socket
+    import tempfile
+    import time
+
+    g = guardian
+    # A short root keeps the Unix socket path under the 104-byte limit.
+    tmp_path = Path(tempfile.mkdtemp(prefix="mrg", dir="/tmp"))
+
+    old = time.time() - 10 * 86400
+    plain = tmp_path / "old-artifact.txt"
+    plain.write_text("x")
+    dot = tmp_path / ".s.PGSQL.5432.lock"
+    dot.write_text("123")
+    tmux = tmp_path / "tmux-501"
+    tmux.mkdir()
+    sock_dir = tmp_path / "service-dir"
+    sock_dir.mkdir()
+    sock_path = sock_dir / "s"
+    server = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+    server.bind(str(sock_path))
+    try:
+        for p in (plain, dot, tmux, sock_dir):
+            os.utime(p, (old, old))
+        names = {p.name for p, _ in g._aged_entries(tmp_path, time.time() - 2 * 86400)}
+    finally:
+        server.close()
+        shutil.rmtree(tmp_path, ignore_errors=True)
+    assert names == {"old-artifact.txt"}

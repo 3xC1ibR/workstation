@@ -41,6 +41,7 @@ import glob
 import gzip
 import json
 import os
+import stat as statmod
 import re
 import shutil
 import subprocess
@@ -87,9 +88,13 @@ DEFAULT_CACHE_CLASSES = (
     CacheClass("npm-cache", Path.home() / ".npm" / "_cacache", dt.timedelta(days=30)),
     CacheClass("pip-cache", Path.home() / "Library" / "Caches" / "pip", dt.timedelta(days=30)),
     CacheClass("uv-cache", Path.home() / ".cache" / "uv", dt.timedelta(days=30)),
-    CacheClass("playwright-browsers", Path.home() / "Library" / "Caches" / "ms-playwright", dt.timedelta(days=60)),
-    CacheClass("huggingface-hub", Path.home() / ".cache" / "huggingface", dt.timedelta(days=60)),
 )
+
+# Report-only, never pruned automatically: file mtime is the download or install
+# time, not the last use, so age-based pruning would delete models and browsers
+# that are still in use (Ramble's Wespeaker and Whisper models live in the
+# Hugging Face cache; Canvas Browser tests need the Playwright browsers). Their
+# sizes still appear among the top consumers through WATCHED_PATHS.
 
 WATCHED_PATHS = (
     Path("/opt/homebrew/var/log/syncthing.log"),
@@ -386,10 +391,36 @@ def _aged_entries(root: Path, cutoff: float):
             continue
         if stat.st_mtime >= cutoff:
             continue
-        if is_forbidden(child):
+        if is_forbidden(child) or _is_live_tmp_entry(child, stat):
             continue
         targets.append((child, _entry_size(child)))
     return targets
+
+
+# Long-running services keep sockets and lock files in /tmp whose mtime stays
+# at their start time (for example PostgreSQL's .s.PGSQL.5432 and its .lock,
+# tmux-<uid>/ sockets, launchd and system entries). Deleting them breaks the
+# service, so they are never age-pruned.
+_PROTECTED_TMP_PREFIXES = (".", "tmux-", "com.apple", "launchd", "powerlog", "boost_interprocess")
+
+
+def _is_live_tmp_entry(path: Path, stat_result) -> bool:
+    if path.name.startswith(_PROTECTED_TMP_PREFIXES):
+        return True
+    mode = stat_result.st_mode
+    if statmod.S_ISSOCK(mode) or statmod.S_ISFIFO(mode):
+        return True
+    if stat_result.st_uid != os.getuid():
+        return True
+    if statmod.S_ISDIR(mode):
+        for dirpath, _dirnames, filenames in os.walk(path):
+            for name in filenames:
+                try:
+                    if statmod.S_ISSOCK((Path(dirpath) / name).lstat().st_mode):
+                        return True
+                except OSError:
+                    continue
+    return False
 
 
 def _entry_size(path: Path) -> int:
@@ -702,8 +733,17 @@ def notify(message: str, title="Mac resource guardian") -> None:
         pass
 
 
+def memory_pressure_level():
+    """Kernel memory pressure: 1 normal, 2 warning, 4 critical; None if unknown."""
+    output = run_command(["sysctl", "-n", "kern.memorystatus_vm_pressure_level"])
+    try:
+        return int(output.strip()) if output else None
+    except ValueError:
+        return None
+
+
 def evaluate_alert_conditions(
-    free_after_bytes, swap_used_bytes, swap_total_bytes, config
+    free_after_bytes, swap_used_bytes, swap_total_bytes, config, pressure_level=None
 ) -> list:
     conditions = []
     if free_after_bytes is not None and free_after_bytes < config.alert_free_bytes:
@@ -715,15 +755,18 @@ def evaluate_alert_conditions(
                 ),
             )
         )
-    if swap_used_bytes is not None and swap_total_bytes:
-        pct = 100.0 * swap_used_bytes / swap_total_bytes
-        if pct > config.swap_alert_pct:
-            conditions.append(
-                (
-                    "swap",
-                    "swap at {:.0f}% of {:.1f} GiB".format(pct, swap_total_bytes / GIB),
-                )
-            )
+    # macOS grows the swap total on demand, so swap stays above 90% of its
+    # current total during ordinary work; a percentage alert would fire all
+    # day. Alert on critical kernel memory pressure or on absolute swap use
+    # near the Nov 22 2026 outage level (18.7 GiB) instead.
+    swap_high = swap_used_bytes is not None and swap_used_bytes > config.swap_alert_bytes
+    if swap_high or pressure_level == 4:
+        detail = []
+        if pressure_level == 4:
+            detail.append("memory pressure critical")
+        if swap_used_bytes is not None:
+            detail.append("swap {:.1f} GiB used".format(swap_used_bytes / GIB))
+        conditions.append(("swap", "; ".join(detail)))
     return conditions
 
 
@@ -744,7 +787,8 @@ class Config:
     state_dir: Path = DEFAULT_STATE_DIR
     cleanup_free_bytes: int = 25 * GIB
     alert_free_bytes: int = 15 * GIB
-    swap_alert_pct: float = 90.0
+    swap_alert_pct: float = 90.0  # retained for the CLI; alerts use swap_alert_bytes
+    swap_alert_bytes: int = 16 * GIB
     alert_interval: dt.timedelta = dt.timedelta(hours=1)
     log_patterns: tuple = LOG_GLOBS
     log_size_limit: int = LOG_SIZE_LIMIT_BYTES
@@ -801,14 +845,18 @@ def run(config: Config, now=None) -> Report:
         swap_pct = 100.0 * metrics.swap_used_bytes / metrics.swap_total_bytes
 
     recommendations = []
-    if config.dry_run or gate_open or (swap_pct is not None and swap_pct > config.swap_alert_pct):
+    pressure = memory_pressure_level()
+    memory_tight = pressure == 4 or (
+        metrics.swap_used_bytes is not None and metrics.swap_used_bytes > config.swap_alert_bytes
+    )
+    if config.dry_run or gate_open or memory_tight:
         recommendations.extend(recommend_runaway_processes())
         recommendations.extend(recommend_unlinked_open_files())
         recommendations.extend(recommend_colima())
         recommendations.extend(recommend_worktrees(now=now))
 
     conditions = evaluate_alert_conditions(
-        free_after, metrics.swap_used_bytes, metrics.swap_total_bytes, config
+        free_after, metrics.swap_used_bytes, metrics.swap_total_bytes, config, pressure
     )
     alert_path = config.state_dir / ALERTS_NAME
     state = load_alert_state(alert_path)
