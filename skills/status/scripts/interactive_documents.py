@@ -14,6 +14,8 @@ import re
 # The frame may run scripts and forms, open dialogs and sandboxed windows, and download. It never gets
 # allow-same-origin, top navigation, or windows that escape the sandbox.
 SANDBOX = "allow-scripts allow-forms allow-modals allow-popups allow-downloads"
+# The one browser permission the frame is given: a document may write to the clipboard (its Copy control), never read it.
+PERMISSIONS = "clipboard-write"
 # Sent with every retained document, so it has an opaque origin even when its address is opened in a tab.
 DOCUMENT_POLICY = f"sandbox {SANDBOX}; frame-ancestors 'self'"
 DOCUMENT_LIMIT = 4 * 1024 * 1024

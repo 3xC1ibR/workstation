@@ -36,7 +36,7 @@ def main():
         identifier = publish(document, workspace=arguments.workspace, agent=arguments.agent, provider=arguments.provider,
                              thread_id=arguments.thread_id, body=body, attachments=arguments.attach, root=root,
                              key=arguments.key, replaces=arguments.replaces, **interactive_arguments(arguments, root))
-        record = Deliveries(root).record(identifier)
+        record = Deliveries(root).version(identifier)
     except (ValueError, KeyError, OSError) as error:
         parser.error(str(error))
     # `url` opens on every device and comes first when the service has a recorded tailnet address; `local_url` is the fallback on this Mac.

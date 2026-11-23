@@ -36,9 +36,11 @@ same tab with a way back:
   review page, such as `/thanksgiving/`, or a full address there) opens
   `<page>/embedded?address=/thanksgiving/&from=<item-id>`: the page's frame
   with a link back to the item and "Open on its own", around the application
-  in the same sandbox as an interactive document. On the local address, where
-  the application is not served, that view links to itself on the tailnet
-  address.
+  in the same sandbox as an interactive document. When `from` names the item
+  whose interactive document is that same address, the view keeps that item's
+  saved document state, as the item's page does; otherwise it keeps none. On
+  the local address, where the application is not served, that view links to
+  itself on the tailnet address.
 - An address on the tailnet host that cannot be framed (its root, or one with
   a query or fragment) is an ordinary link in the same tab.
 - A bare path is a file of the Mac, shown as text with Copy path, when it
@@ -271,7 +273,8 @@ Agent-built HTML is served by two routes only, `<page>/deliveries/<id>/interacti
 and `<page>/reports/<id>/interactive`, always with a `Content-Security-Policy`
 `sandbox` directive, and is shown in a sandboxed frame; it is never written
 into a page. `<page>/document_bridge.js` is the one file readable from the
-sandbox. The pages' own policy allows frames from this origin and the recorded
+sandbox. The frame is given one browser permission, `clipboard-write`. The
+pages' own policy allows frames from this origin and the recorded
 tailnet origin and is otherwise unchanged. An interactive document saves
 state through the page: `POST /api/document-state` with `{kind, id, state}`
 (`kind` is `delivery` or `report`, `id` the latest version) under the same
