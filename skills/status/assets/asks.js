@@ -2,7 +2,7 @@
 // Asks belong to Ribbon Field. This component shows one ask in full and, when this browser is paired with
 // Ribbon Field on the same address, sends the user's resolution straight to Ribbon Field. Nothing is stored here.
 (() => {
-  const {make, time, elapsed, listTitle, fitTitles, createChoices, createLine, request, measure} = window.StatusControls;
+  const {make, time, elapsed, listTitle, fitTitles, createChoices, createLine, request, measure, destination} = window.StatusControls;
   const LABELS = {answered: "Send answer", done: "Done", not_done: "Not done", approved: "Approve", declined: "Decline",
                   accepted: "Accept", changes_requested: "Request changes", granted: "Grant", dismissed: "Dismiss"};
   const OUTCOMES = {answered: "Answered", done: "Marked done", not_done: "Marked not done", approved: "Approved", declined: "Declined",
@@ -41,24 +41,30 @@
   }
 
   const LINK = /(https?:\/\/[^\s<>"')\]]+)/g;
-  function linked(node, text) {
+  // A page of the review page or another application on this host opens in this tab; any other address in a new one.
+  function linkTo(link, address, publicUrl) {
+    const target = destination(address, publicUrl);
+    if (target && (target.kind === "page" || target.kind === "application")) link.href = target.href;
+    else { link.href = address; link.target = "_blank"; link.rel = "noreferrer noopener"; }
+    return link;
+  }
+  function linked(node, text, publicUrl) {
     text.split(LINK).forEach((part, index) => {
       if (index % 2 === 0) { node.append(part); return; }
-      const address = part.replace(/[.,;:]+$/, ""), link = make("a", address);
-      link.href = address; link.target = "_blank"; link.rel = "noreferrer noopener";
-      node.append(link, part.slice(address.length));
+      const address = part.replace(/[.,;:]+$/, "");
+      node.append(linkTo(make("a", address), address, publicUrl), part.slice(address.length));
     });
     return node;
   }
   // The agent's text, with web addresses linked. A line that begins with a number becomes a step with a hanging indent.
-  function prose(text, className) {
+  function prose(text, className, publicUrl) {
     const block = make("div", null, className);
     for (const paragraph of text.split(/\n{2,}/)) {
       let plain = [];
-      const flush = () => { if (plain.length) block.append(linked(make("p"), plain.join("\n"))); plain = []; };
+      const flush = () => { if (plain.length) block.append(linked(make("p"), plain.join("\n"), publicUrl)); plain = []; };
       for (const line of paragraph.split("\n")) {
         const step = line.match(/^\s*(\d{1,2}[.)])\s+(.*)$/);
-        if (step) { flush(); const node = make("p", null, "step"); node.append(make("span", step[1]), linked(make("span"), step[2])); block.append(node); }
+        if (step) { flush(); const node = make("p", null, "step"); node.append(make("span", step[1]), linked(make("span"), step[2], publicUrl)); block.append(node); }
         else plain.push(line);
       }
       flush();
@@ -150,10 +156,10 @@
     function lead() {
       if (!ask.unblocks && !/^https?:\/\//.test(ask.link || "")) return null;
       const line = make("p", null, "ask-lead");
-      if (ask.unblocks) linked(line, "Unblocks: " + ask.unblocks);
+      if (ask.unblocks) linked(line, "Unblocks: " + ask.unblocks, publicUrl);
       if (/^https?:\/\//.test(ask.link || "")) {
         let host = ask.link; try { host = new URL(ask.link).hostname.replace(/^www\./, ""); } catch { /* keep the address as written */ }
-        const where = make("a", "Open " + host); where.href = ask.link; where.target = "_blank"; where.rel = "noreferrer noopener"; where.title = ask.link;
+        const where = linkTo(make("a", "Open " + host), ask.link, publicUrl); where.title = ask.link;
         if (ask.unblocks) line.append(" ");
         line.append(where);
       }
@@ -184,8 +190,8 @@
       // The response comes first, directly under the title; the whole question and its context follow.
       const content = [lead(), !connection ? make("p", "Checking Ribbon Field…", "note") : ["ready", "local"].includes(connection.state) ? controls() : unavailable()].filter(Boolean);
       if (state.error) { const alert = make("p", state.error, "failure"); alert.setAttribute("role", "alert"); content.push(alert); }
-      if (ask.detail) content.push(prose(ask.detail, "ask-text"));
-      if (ask.context) content.push(prose(ask.context, "ask-text ask-context"));
+      if (ask.detail) content.push(prose(ask.detail, "ask-text", publicUrl));
+      if (ask.context) content.push(prose(ask.context, "ask-text ask-context", publicUrl));
       content.push(links());
       const focused = body.contains(document.activeElement) && document.activeElement.className;
       body.replaceChildren(...content);

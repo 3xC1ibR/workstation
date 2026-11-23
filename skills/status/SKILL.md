@@ -11,7 +11,8 @@ agents. The profile defines the **expected coverage, never the limit of disclosu
 
 The user reviews two kinds of work on one standalone review page: **operations**,
 each with one living report, and **proactive deliveries**. Tasks stay in their
-conversation.
+conversation. The page is a host for what you build: a report or a delivery may
+carry an interactive document that runs inside its page.
 
 ## When to publish
 
@@ -23,6 +24,7 @@ Publish only what the review page is for. Most work publishes nothing.
 | An operation: a long-running effort you own, or one with a `.status/` profile | One living operation report; each build is a new version | `build_status.py --operation <key>` |
 | The user asks for status or a report | A report for that subject | `build_status.py` |
 | Finished work nobody requested (a proactive agent's result) | One delivery in the proactive feed | `publish_delivery.py` |
+| A revision of a delivery you already published | A new version of that delivery, not a second delivery | `publish_delivery.py --key <key>` or `--replaces <id>` |
 | Something only the user can decide, do, approve, or provide | An ask in Ribbon Field, not a report; he can answer it from the review page | `agent-coord ask` |
 
 Do not write a report to mark a task done, to summarize a conversation, or
@@ -131,6 +133,32 @@ URL (default `http://127.0.0.1:8766/`). On macOS, `install` keeps it available
 across login sessions. Do not add the page to another application or publish
 reports to a remote service unless the user requests that integration.
 
+## Interactive documents
+
+A report version or a delivery may carry **one interactive document**: one
+self-contained HTML file, or the path of an application you serve on the same
+tailnet host. The page does not limit what it contains or runs.
+
+```sh
+python3 -B <skill-directory>/scripts/publish_delivery.py delivery.json --interactive /absolute/path/plan.html ...
+python3 -B <skill-directory>/scripts/build_status.py status.json --output status.html --interactive /absolute/path/explorer.html ...
+python3 -B <skill-directory>/scripts/publish_delivery.py delivery.json --embed /thanksgiving/ ...
+```
+
+Choose one when the content benefits from interaction: a plan to adjust, a
+picker, a calculator, a timeline, data to explore. Use the structured report
+or the Markdown write-up for simple content, and always keep the title,
+summary, recommended default, and decision complete without the document.
+
+The document runs in a sandbox without the page's origin: no cookies, no
+storage, no access to the page or to Ribbon Field. Through a small bridge it
+can size itself, save and load its state, open links in the page, and
+**propose** a response that is recorded only when the user confirms it in the
+page's own controls. Saved state is the document's data, never an approval.
+Read [references/interactive-documents.md](references/interactive-documents.md)
+before building one: the bridge, an example, the isolation rules, and how to
+make an application embeddable.
+
 ## Proactive deliveries
 
 When you finish work the user did not request, publish it to the proactive feed
@@ -158,6 +186,13 @@ An acceptance is his approval of exactly the recommended default or option he
 chose; it does not extend to anything else. A dismissal with a reason is input
 for what you propose next. See [references/deliveries.md](references/deliveries.md)
 for the JSON shape, retained documents, and the response record.
+
+When work you delivered changes (a correction, new information, a revised
+plan), publish a **new version of the same delivery** with `--key <stable-key>`
+on every version, or `--replaces <delivery-id>` for a delivery published
+without a key. The page keeps one row, marks it unread again, and keeps his
+response with the version he gave it on; his acceptance of an earlier version
+does not cover the new one. Different work is a new delivery.
 
 Use the bundled renderer so content can change without design drift. It produces
 an observation snapshot; reloading does not refresh project observations. Response

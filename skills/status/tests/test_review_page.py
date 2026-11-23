@@ -1,9 +1,11 @@
-"""Operations, proactive deliveries, read-through asks, public address handling, and usage metrics."""
+"""Operations, proactive deliveries and their versions, interactive documents, links, asks, public address handling, and usage metrics."""
 from datetime import datetime, timedelta, timezone
+import hashlib
 import http.client
 import json
 import os
 from pathlib import Path
+import socket
 import stat
 import subprocess
 import sys
@@ -18,14 +20,19 @@ sys.path.insert(0, str(SCRIPTS))
 from build_status import render
 import delivery_store
 from delivery_store import Deliveries
+from document_state import DocumentStates
+import interactive_documents
 import markdown_text
 from register_status import register
 from ribbon_field_asks import AskReader, for_operation, read_asks, title_and_detail
 from status_server import make_server, public_address
-from status_store import StatusError, StatusReports
+from status_store import ResponseConflict, StatusError, StatusReports
 from usage_events import UsageEvents, summarize
 
 PUBLIC = "https://machine.example.ts.net/status"
+RELAY = {"Host": "machine.example.ts.net", "Origin": "https://machine.example.ts.net"}
+SANDBOX = "allow-scripts allow-forms allow-modals allow-popups allow-downloads"
+INTERACTIVE = "<!doctype html><title>Plan</title><h1 id=agent-heading>Plan</h1><script>window.agentCode = 1</script>"
 
 
 def report(summary="First version", **fields):
@@ -289,6 +296,513 @@ class DeliveryTests(Workspace):
         self.assertNotIn("CI is green", json.dumps(events))        # measurements hold identifiers and times only
         review = json.loads(self.request("/api/review")[2])
         self.assertEqual(review["deliveries"][0]["response"]["type"], "accepted")
+
+
+class DeliveryVersionTests(Workspace):
+    def test_deliveries_sharing_a_key_are_versions_of_one_delivery(self):
+        first = self.publish(delivery(summary="First plan."), key="thanksgiving-plan")
+        self.assertEqual(self.publish(delivery(summary="First plan."), key="thanksgiving-plan"), first)      # unchanged: no new version
+        second = self.publish(delivery(summary="Corrected plan."), key="thanksgiving-plan", workspace="/elsewhere")
+        self.assertEqual(self.publish(delivery(summary="Corrected plan."), key="thanksgiving-plan", workspace="/elsewhere"), second)
+        third = self.publish(delivery(summary="First plan."), key="thanksgiving-plan")                      # a correction may return to earlier content
+        self.assertEqual(len({first, second, third}), 3)
+        self.publish(delivery(summary="First plan."))                                                       # no key: its own delivery
+        listing = self.deliveries.list()["deliveries"]
+        self.assertEqual(len(listing), 2)
+        living = next(entry for entry in listing if entry["key"])
+        self.assertEqual((living["id"], living["version"], living["version_count"], living["number"], living["latest"]), (third, third, 3, 3, True))
+        self.assertEqual([version["id"] for version in living["versions"]], [third, second, first])
+        series = living["series"]
+        self.assertRegex(series, r"\A[a-f0-9]{64}\Z")
+        self.assertNotIn(series, {first, second, third})
+        self.assertEqual(self.deliveries.record(series)["id"], third)                # the series address shows the latest version
+        earlier = self.deliveries.record(first)
+        self.assertEqual((earlier["id"], earlier["number"], earlier["latest"], earlier["series"], earlier["summary"]), (first, 1, False, series, "First plan."))
+        for invalid in ("Plan", "thanksgiving plan", "-plan", "a" * 81, ""):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                self.publish(key=invalid)
+        with self.assertRaises(ValueError):
+            self.publish(key="thanksgiving-plan", replaces=first)
+
+    def test_a_delivery_without_a_key_keeps_its_identifier_record_and_state(self):
+        document = delivery()
+        identifier = self.publish(document, agent="proactive")
+        origin = {"workspace": "/work", "agent": "proactive", "provider": None, "thread_id": None, "host": socket.gethostname()}
+        canonical = json.dumps({"delivery": document, "origin": origin, "body": None, "attachments": []},
+                               sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+        self.assertEqual(identifier, hashlib.sha256(canonical.encode()).hexdigest())      # the identifier from before versions existed
+        manifest = json.loads((self.root / "deliveries" / identifier / "delivery.json").read_text())
+        self.assertFalse({"key", "series", "content_digest", "interactive"} & manifest.keys())
+        self.assertFalse((self.root / "deliveries" / identifier / "interactive.html").exists())
+        record = self.deliveries.record(identifier)
+        self.assertEqual((record["series"], record["version"], record["version_count"], record["key"], record["interactive"]),
+                         (identifier, identifier, 1, None, None))
+        self.assertIsNone(record["document_state"])
+
+    def test_a_replacement_joins_the_series_and_keeps_the_responses_given_before_versions(self):
+        first = self.publish(thread_id="thread-1")
+        at = "2026-11-22T10:00:00+00:00"                      # a state record in the shape written before versions
+        (self.root / "delivery-state").mkdir()
+        (self.root / "delivery-state" / (first + ".json")).write_text(json.dumps({
+            "read_at": at, "discussed_at": None, "response": {"type": "accepted", "choice": "recommended_default", "note": None, "at": at},
+            "history": [{"action": "read", "at": at}, {"action": "accept", "choice": "recommended_default", "note": None, "at": at}]}))
+        before = self.deliveries.record(first)
+        self.assertEqual((before["unread"], before["status"], before["response"]["version"], before["read_version"]), (False, "accepted", first, first))
+        second = self.publish(delivery(summary="Corrected.", decision={"question": "Merge it?", "options": ["Wait a week"]}), replaces=first, thread_id="thread-1")
+        self.assertEqual(self.publish(delivery(summary="Corrected.", decision={"question": "Merge it?", "options": ["Wait a week"]}), replaces=first, thread_id="thread-1"), second)
+        record = self.deliveries.list()["deliveries"][0]
+        self.assertEqual(len(self.deliveries.list()["deliveries"]), 1)
+        self.assertEqual((record["id"], record["series"], record["version_count"]), (second, first, 2))
+        self.assertTrue(record["unread"])                                            # a newer version than the one he read
+        self.assertEqual((record["status"], record["response"]["version"], record["response_version_number"], record["number"]), ("accepted", first, 1, 2))
+        third = self.publish(delivery(summary="Corrected again."), replaces=second)   # naming any version continues the same series
+        self.assertEqual(self.deliveries.record(third)["series"], first)
+        self.assertEqual(self.deliveries.record(first)["id"], first)                  # a version's own address always shows that version
+        keyed = self.publish(key="living")
+        for invalid in (keyed, "0" * 64, "not-an-identifier"):
+            with self.subTest(invalid=invalid), self.assertRaises(ValueError):
+                self.publish(delivery(summary="Other."), replaces=invalid)
+
+    def test_responses_are_given_on_the_latest_version_and_record_it(self):
+        first = self.publish(key="plan")
+        self.deliveries.respond(first, "read")
+        self.deliveries.respond(first, "accept", choice="Hold for changes")
+        second = self.publish(delivery(summary="Second.", decision={"question": "Now?", "options": ["Wait a week"]}), key="plan")
+        with self.assertRaises(ResponseConflict):                                    # he was looking at a superseded version
+            self.deliveries.respond(first, "dismiss")
+        with self.assertRaises(ResponseConflict):
+            self.deliveries.respond(first, "reopen")
+        self.assertTrue(self.deliveries.respond(first, "read")["unread"])             # opening an earlier version clears nothing
+        series = self.deliveries.record(second)["series"]
+        with self.assertRaises(StatusError):
+            self.deliveries.respond(series, "dismiss")                               # a response names the version it answers
+        with self.assertRaises(StatusError):
+            self.deliveries.respond(second, "accept", choice="Hold for changes")      # choices are those of the version answered
+        stale = self.deliveries.record(second)
+        self.assertEqual((stale["status"], stale["unread"], stale["response"]["version"], stale["response_version_number"]), ("accepted", True, first, 1))
+        self.assertFalse(self.deliveries.respond(second, "read")["unread"])
+        self.assertEqual(self.deliveries.record(second)["response"]["choice"], "Hold for changes")       # reading keeps his response
+        self.assertIsNone(self.deliveries.respond(second, "reopen")["response"])
+        accepted = self.deliveries.respond(second, "accept", choice="Wait a week")
+        self.assertEqual((accepted["response"]["version"], accepted["response_version_number"]), (second, 2))
+        history = self.deliveries.record(second)["history"]
+        self.assertEqual([(event["action"], event["version"]) for event in history],
+                         [("read", first), ("accept", first), ("read", second), ("reopen", second), ("accept", second)])
+        self.assertEqual(sorted(path.name for path in (self.root / "delivery-state").glob("*.json")), [series + ".json"])
+
+    def test_pages_list_one_row_and_show_versions_with_an_earlier_version_notice(self):
+        first = self.publish(delivery(summary="First plan."), key="plan")
+        self.deliveries.respond(first, "accept", choice="recommended_default")
+        second = self.publish(delivery(summary="Second plan."), key="plan")
+        single = self.publish(delivery(title="Single"))
+        self.serve()
+        review = json.loads(self.request("/api/review")[2])
+        self.assertEqual(len(review["deliveries"]), 2)
+        row = next(entry for entry in review["deliveries"] if entry["key"] == "plan")
+        self.assertEqual((row["id"], row["version_count"], row["unread"], row["response"]["version"], row["response_version_number"]),
+                         (second, 2, True, first, 1))
+        self.assertNotIn("document_state", row)
+        series = row["series"]
+        for address in (series, second):
+            page = self.request("/deliveries/" + address)[2].decode()
+            self.assertIn("Second plan.", page)
+            self.assertIn("Version 2 of 2", page)
+            self.assertNotIn("Open the latest version", page)
+            self.assertIn(f'href="/deliveries/{first}"', page)
+        earlier = self.request("/deliveries/" + first)[2].decode()
+        self.assertIn("First plan.", earlier)
+        self.assertIn("You are reading version 1 of 2", earlier)
+        self.assertIn(f'href="/deliveries/{second}">Open the latest version', earlier)
+        self.assertNotIn("version-history", self.request("/deliveries/" + single)[2].decode())
+        body = {"id": first, "action": "dismiss"}
+        self.assertEqual(self.request("/api/delivery-response", body)[0], 409)        # refused: a newer version exists
+        self.assertEqual(self.request("/api/delivery-response", {"id": second, "action": "read"})[0], 200)
+        self.assertFalse(next(entry for entry in json.loads(self.request("/api/review")[2])["deliveries"] if entry["key"] == "plan")["unread"])
+
+    def test_agents_read_the_series_and_metrics_count_it_once(self):
+        first = self.publish(key="plan", agent="proactive")
+        self.deliveries.respond(first, "accept", choice="recommended_default")
+        second = self.publish(delivery(summary="Second."), key="plan", agent="proactive")
+        command = [sys.executable, "-B", str(SCRIPTS / "read_responses.py"), "--inbox", str(self.root)]
+        result = json.loads(subprocess.run(command + ["--deliveries", "--agent", "proactive"], check=True, capture_output=True, text=True).stdout)
+        self.assertEqual(len(result["deliveries"]), 1)
+        entry = result["deliveries"][0]
+        series = self.deliveries.record(second)["series"]
+        self.assertEqual((entry["id"], entry["key"], entry["series"], entry["version"], entry["version_count"], entry["response"]["version"]),
+                         (second, "plan", series, second, 2, first))
+        for address in (series, first):                         # the series or any of its versions selects the delivery
+            exact = json.loads(subprocess.run(command + ["--delivery", address], check=True, capture_output=True, text=True).stdout)
+            self.assertEqual(exact["deliveries"][0]["series"], series)
+        now = datetime.now(timezone.utc)
+        summary = summarize(self.reports, self.deliveries, [], since=now - timedelta(days=1), until=now + timedelta(minutes=1), zone=ZoneInfo("UTC"))
+        self.assertEqual(summary["proactive_deliveries"]["delivered"], 1)
+        self.assertEqual(summary["proactive_deliveries"]["counts"]["accepted"], 1)
+
+    def test_publish_command_publishes_versions_and_reports_conflicting_options(self):
+        source = self.root / "delivery.json"
+        source.write_text(json.dumps(delivery()))
+        command = [sys.executable, "-B", str(SCRIPTS / "publish_delivery.py"), str(source), "--workspace", "/work", "--inbox", str(self.root)]
+        first = json.loads(subprocess.run(command + ["--key", "plan"], check=True, capture_output=True, text=True).stdout)
+        source.write_text(json.dumps(delivery(summary="Second.")))
+        second = json.loads(subprocess.run(command + ["--key", "plan"], check=True, capture_output=True, text=True).stdout)
+        self.assertEqual((first["version_number"], second["version_number"], first["series"]), (1, 2, second["series"]))
+        plain = json.loads(subprocess.run(command, check=True, capture_output=True, text=True).stdout)
+        source.write_text(json.dumps(delivery(summary="Third.")))
+        replaced = json.loads(subprocess.run(command + ["--replaces", plain["delivery"]], check=True, capture_output=True, text=True).stdout)
+        self.assertEqual((replaced["series"], replaced["version_number"]), (plain["delivery"], 2))
+        for arguments in (["--key", "plan", "--replaces", plain["delivery"]], ["--replaces", second["delivery"]], ["--key", "Not Valid"]):
+            failed = subprocess.run(command + arguments, capture_output=True, text=True)
+            self.assertNotEqual(failed.returncode, 0)
+
+
+class InteractiveDocumentTests(Workspace):
+    def interactive_report(self, **arguments):
+        document = report("Interactive")
+        return register(document, render(document), root=self.root, workspace="/work/holdco", agent="operator", **arguments)
+
+    def test_a_retained_document_is_served_only_under_the_sandbox_policy(self):
+        identifier = self.publish(interactive_document=INTERACTIVE)
+        report_id = self.interactive_report(interactive_document=INTERACTIVE)
+        plain, plain_report = self.publish(delivery(title="Plain")), self.register(report("Plain"), agent="analyst")
+        self.serve(public_url=PUBLIC)
+        for path, headers in ((f"/deliveries/{identifier}/interactive", None), (f"/reports/{report_id}/interactive", None),
+                              (f"/status/deliveries/{identifier}/interactive", RELAY), (f"/reports/{report_id}/interactive", RELAY)):
+            with self.subTest(path=path, relayed=bool(headers)):
+                status, response, content = self.request(path, headers=headers)
+                self.assertEqual((status, content.decode()), (200, INTERACTIVE))
+                policy = response["Content-Security-Policy"]
+                self.assertEqual(policy, f"sandbox {SANDBOX}; frame-ancestors 'self'")
+                for forbidden in ("allow-same-origin", "allow-top-navigation", "allow-popups-to-escape-sandbox"):
+                    self.assertNotIn(forbidden, policy)
+                self.assertEqual(response["X-Frame-Options"], "SAMEORIGIN")
+                self.assertEqual(response["X-Content-Type-Options"], "nosniff")
+                self.assertTrue(response["Content-Type"].startswith("text/html"))
+                self.assertNotIn("Access-Control-Allow-Origin", response)
+        self.assertIn("sandbox", self.request(f"/deliveries/{identifier}/interactive", method="HEAD")[1]["Content-Security-Policy"])
+        for missing in (f"/deliveries/{plain}/interactive", f"/reports/{plain_report}/interactive", f"/reports/{report_id}/other",
+                        "/deliveries/" + "0" * 64 + "/interactive"):
+            self.assertEqual(self.request(missing)[0], 404)
+
+    def test_the_item_page_frames_the_document_without_its_origin_and_never_inlines_it(self):
+        identifier = self.publish(interactive_document=INTERACTIVE, body="# Write-up\n\nStill here.")
+        report_id = self.interactive_report(interactive_document=INTERACTIVE)
+        self.serve(public_url=PUBLIC)
+        frame = (f'<iframe id="embedded-document" class="embedded-document" src="{{}}" sandbox="{SANDBOX}" '
+                 f'referrerpolicy="no-referrer" loading="lazy" title="Interactive document: {{}}"></iframe>')
+        for path, source, title, headers in ((f"/deliveries/{identifier}", f"/deliveries/{identifier}/interactive", "CI is green again", None),
+                                             (f"/reports/{report_id}", f"/reports/{report_id}/interactive", "HoldCo bridge", None),
+                                             (f"/status/deliveries/{identifier}", f"/status/deliveries/{identifier}/interactive", "CI is green again", RELAY)):
+            with self.subTest(path=path):
+                status, response, content = self.request(path, headers=headers)
+                page = content.decode()
+                self.assertEqual(status, 200)
+                self.assertIn(frame.format(source, title), page)
+                self.assertEqual(page.count("<iframe"), 1)
+                self.assertNotIn("allow-same-origin", page)
+                self.assertNotIn("agentCode", page)                      # agent markup is never written into the host page
+                self.assertNotIn("agent-heading", page)
+                self.assertIn("embedded_host.js", page)
+                policy = response["Content-Security-Policy"]
+                self.assertEqual(policy, "default-src 'none'; script-src 'self'; style-src 'self'; connect-src 'self'; img-src data:; "
+                                         "base-uri 'none'; form-action 'none'; frame-ancestors 'none'; frame-src 'self' https://machine.example.ts.net")
+                self.assertEqual(response["X-Frame-Options"], "DENY")
+                self.assertEqual(response["Cross-Origin-Resource-Policy"], "same-origin")
+        page = self.request(f"/deliveries/{identifier}")[2].decode()
+        self.assertLess(page.index('id="delivery-response"'), page.index("<iframe"))          # after the response controls,
+        self.assertLess(page.index("<iframe"), page.index("Still here."))                     # before the write-up
+        served = self.request(f"/reports/{report_id}")[2].decode()
+        self.assertLess(served.index('class="assessment text"'), served.index("<iframe"))
+        asked = report("Asked", metrics=[{"label": "Guests", "value": "9"}], actions=[{"action": "Book the turkey", "owner": "operator"}],
+                       response_fields=[{"id": "proceed", "label": "Proceed?", "type": "boolean"}])
+        asked_id = register(asked, render(asked), root=self.root, workspace="/work/asked", agent="planner", interactive_document=INTERACTIVE)
+        served = self.request(f"/reports/{asked_id}")[2].decode()
+        positions = [served.index(mark) for mark in ('class="assessment text"', 'class="metrics"', 'id="status-response-fields"', "<iframe", "Next actions")]
+        self.assertEqual(positions, sorted(positions))                           # after the summary and the response fields, before the detail
+        configuration = json.loads(page.split('id="status-configuration">')[1].split("</script>")[0])
+        self.assertEqual(configuration["embedded"], {"kind": "delivery", "item": identifier, "latest": True, "public_url": PUBLIC})
+        self.assertEqual(configuration["delivery"]["interactive"], {"kind": "document", "address": None})
+        self.assertEqual(json.loads(self.request("/api/review")[2])["operations"][0]["interactive"], {"kind": "document", "address": None})
+
+    def test_without_a_public_address_pages_frame_only_this_origin(self):
+        self.serve()
+        self.assertTrue(self.request("/")[1]["Content-Security-Policy"].endswith("frame-ancestors 'none'; frame-src 'self'"))
+
+    def test_an_item_without_an_interactive_document_is_unchanged(self):
+        identifier = self.publish(body="# Write-up\n\nDetails.")
+        report_id = self.register(report("Plain"), agent="operator")
+        manifest = json.loads((self.root / "reports" / report_id / "manifest.json").read_text())
+        self.assertEqual(set(manifest), {"version", "id", "title", "subject", "summary", "generated_at", "received_at", "origin", "response_field_count"})
+        origin = {"workspace": "/work/holdco", "agent": "operator", "provider": None, "thread_id": None, "host": socket.gethostname()}
+        canonical = json.dumps({"document": report("Plain"), "origin": origin}, sort_keys=True, ensure_ascii=False, separators=(",", ":"))
+        self.assertEqual(report_id, hashlib.sha256(canonical.encode()).hexdigest())
+        self.assertEqual(sorted(path.name for path in (self.root / "reports" / report_id).iterdir()), ["manifest.json", "report.html", "report.json"])
+        self.serve()
+        for path in ("/deliveries/" + identifier, "/reports/" + report_id):
+            page = self.request(path)[2].decode()
+            for absent in ("<iframe", "embedded_host.js", 'class="embedded', '"embedded"'):
+                self.assertNotIn(absent, page)
+        self.assertIsNone(json.loads(self.request("/api/review")[2])["deliveries"][0]["interactive"])
+        self.assertEqual(self.request(f"/api/document-state/delivery/{identifier}")[0], 404)
+        self.assertEqual(self.request("/api/document-state", {"kind": "delivery", "id": identifier, "state": 1})[0], 400)
+
+    def test_one_form_is_accepted_and_an_address_is_a_plain_path_of_another_application(self):
+        for address in ("/thanksgiving/", "/thanksgiving", "/apps/plan-2026/index.html", "/a_b/c~d/"):
+            with self.subTest(address=address):
+                self.assertEqual(interactive_documents.validate_address(address, "/status"), address)
+        for address in ("/", "", "thanksgiving/", "//evil.example/", "https://evil.example/", "/a/../b", "/a/./b", "/..", "/a?b=1", "/a#b", "/a b",
+                        "/a%2e%2e/b", "/a\\b", "/status", "/status/", "/status/reports/x", "/a/" * 300, None, 7):
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                interactive_documents.validate_address(address, "/status")
+        with self.assertRaises(ValueError):
+            interactive_documents.validate_address("/thanksgiving/", "")              # the review page occupies the whole host
+        with self.assertRaises(ValueError):
+            self.publish(interactive_document=INTERACTIVE, embed="/thanksgiving/")
+        with self.assertRaises(ValueError):
+            self.publish(interactive_document="x" * (4 * 1024 * 1024 + 1))
+        with self.assertRaises(ValueError):
+            self.publish(interactive_document="   ")
+        with self.assertRaises(ValueError):
+            self.publish(embed="/status/deliveries/", public_prefix="/status")
+        with self.assertRaises(ValueError):
+            self.interactive_report(embed="//evil.example/")
+        self.assertEqual(self.deliveries.list()["deliveries"], [])
+        plain, embedding = self.publish(), self.publish(embed="/thanksgiving/")
+        self.assertNotEqual(plain, embedding)                                        # the document is part of what was delivered
+        self.assertNotEqual(self.publish(interactive_document=INTERACTIVE), self.publish(interactive_document=INTERACTIVE + " "))
+        path = self.root / "deliveries" / embedding / "delivery.json"
+        manifest = json.loads(path.read_text())
+        self.assertEqual(manifest["interactive"], {"kind": "address", "address": "/thanksgiving/"})
+        self.assertFalse((path.parent / "interactive.html").exists())                # an address is recorded, never fetched
+        path.write_text(json.dumps({**manifest, "interactive": {"kind": "address", "address": "https://evil.example/"}}))
+        with self.assertRaises(StatusError):
+            self.deliveries.record(embedding)                                        # a tampered record is unreadable, not framed
+
+    def test_an_address_is_framed_on_the_public_origin_and_explained_on_the_local_one(self):
+        identifier = self.publish(embed="/thanksgiving/")
+        report_id = self.interactive_report(embed="/thanksgiving/menu.html")
+        self.serve(public_url=PUBLIC)
+        page = self.request("/status/deliveries/" + identifier, headers=RELAY)[2].decode()
+        self.assertIn(f'<iframe id="embedded-document" class="embedded-document" src="https://machine.example.ts.net/thanksgiving/" sandbox="{SANDBOX}" '
+                      'referrerpolicy="no-referrer" loading="lazy"', page)
+        self.assertNotIn("allow-same-origin", page)
+        self.assertIn('src="https://machine.example.ts.net/thanksgiving/menu.html"', self.request("/reports/" + report_id, headers=RELAY)[2].decode())
+        self.assertEqual(self.request(f"/status/deliveries/{identifier}/interactive", headers=RELAY)[0], 404)      # nothing is retained or relayed
+        local = self.request("/deliveries/" + identifier)[2].decode()
+        self.assertNotIn("<iframe", local)
+        self.assertIn("served on the tailnet address", local)
+        self.assertIn(f'href="{PUBLIC}/deliveries/{identifier}">Open this delivery there', local)
+        self.assertIn(f'href="{PUBLIC}/reports/{report_id}">Open this report there', self.request("/reports/" + report_id)[2].decode())
+
+    def test_an_address_without_a_public_address_is_explained_and_never_framed(self):
+        identifier = self.publish(embed="/thanksgiving/")
+        self.serve()
+        page = self.request("/deliveries/" + identifier)[2].decode()
+        self.assertNotIn("<iframe", page)
+        self.assertIn("served on the tailnet address", page)
+
+    def test_the_document_helper_alone_is_readable_from_an_opaque_origin(self):
+        self.serve()
+        status, headers, content = self.request("/document_bridge.js", headers={"Origin": "null"})
+        self.assertEqual((status, headers["Cross-Origin-Resource-Policy"], headers["Access-Control-Allow-Origin"]), (200, "cross-origin", "*"))
+        self.assertIn(b"StatusDocument", content)
+        for path in ("/embedded_host.js", "/controls.js", "/api/config"):
+            headers = self.request(path, headers={"Origin": "null"})[1]
+            self.assertEqual(headers["Cross-Origin-Resource-Policy"], "same-origin")
+            self.assertNotIn("Access-Control-Allow-Origin", headers)
+
+    def test_document_state_is_saved_for_the_item_through_the_page_only(self):
+        first = self.publish(key="plan", interactive_document=INTERACTIVE)
+        report_id = self.interactive_report(interactive_document=INTERACTIVE)
+        self.serve()
+        body = {"kind": "delivery", "id": first, "state": {"picked": ["B"], "guests": 9}}
+        for headers in ({"X-Status-Token": ""}, {"Origin": "null"}, {"Origin": "https://elsewhere.invalid"}, {"Host": "elsewhere.invalid"}):
+            self.assertEqual(self.request("/api/document-state", body, headers=headers)[0], 403)      # a sandboxed frame's origin is null
+        self.assertEqual(json.loads(self.request(f"/api/document-state/delivery/{first}")[2]),
+                         {"state": None, "saved_at": None, "revision": 0, "version": None})
+        saved = json.loads(self.request("/api/document-state", body)[2])
+        self.assertEqual((saved["revision"], saved["version"]), (1, first))
+        self.assertEqual(json.loads(self.request("/api/document-state", {**body, "state": "second"})[2])["revision"], 2)
+        series = self.deliveries.record(first)["series"]
+        self.assertEqual(sorted(path.name for path in (self.root / "document-state").glob("*.json")), [series + ".json"])
+        self.assertEqual(DocumentStates(self.root).read(series)["state"], "second")
+        for invalid in ({**body, "state": "x" * (64 * 1024)}, {**body, "kind": "ask"}, {**body, "id": "0" * 64}, {**body, "id": series},
+                        {"kind": "delivery", "id": first}, {**body, "extra": 1}):
+            self.assertIn(self.request("/api/document-state", invalid)[0], (400, 404))
+        self.assertEqual(self.request("/api/document-state", {**body, "state": "x" * (90 * 1024)})[0], 400)
+        nested = '{"kind": "delivery", "id": "%s", "state": %s1%s}' % (first, "[" * 30000, "]" * 30000)      # deeper than the parser accepts
+        connection = http.client.HTTPConnection("127.0.0.1", self.port, timeout=5)
+        self.addCleanup(connection.close)
+        connection.request("POST", "/api/document-state", body=nested, headers={
+            "Origin": f"http://127.0.0.1:{self.port}", "X-Status-Token": self.token, "Content-Type": "application/json"})
+        self.assertEqual(connection.getresponse().status, 400)
+        self.assertEqual(DocumentStates(self.root).read(series)["revision"], 2)
+        self.assertIsNone(self.deliveries.record(first)["response"])                  # saved state is never a response
+        second = self.publish(delivery(summary="Second."), key="plan", interactive_document=INTERACTIVE)
+        self.assertEqual(self.request("/api/document-state", body)[0], 409)           # an earlier version cannot overwrite
+        self.assertEqual(json.loads(self.request(f"/api/document-state/delivery/{second}")[2])["state"], "second")      # state stays with the delivery
+        self.assertEqual(json.loads(self.request("/api/document-state", {**body, "id": second, "state": None})[2])["version"], second)
+        self.request("/api/document-state", {"kind": "report", "id": report_id, "state": {"row": 3}})
+        operation = self.reports.operations()["operations"][0]["id"]
+        self.assertEqual(DocumentStates(self.root).read(operation)["state"], {"row": 3})
+        command = [sys.executable, "-B", str(SCRIPTS / "read_responses.py"), "--inbox", str(self.root)]
+        answered = json.loads(subprocess.run(command + ["--report", report_id], check=True, capture_output=True, text=True).stdout)["responses"][0]
+        self.assertEqual((answered["document_state"]["state"], answered["document_state"]["version"], answered["operation"]), ({"row": 3}, report_id, operation))
+        listed = json.loads(subprocess.run(command + ["--workspace", "/work/holdco"], check=True, capture_output=True, text=True).stdout)["responses"]
+        self.assertEqual([entry["id"] for entry in listed], [report_id])
+        delivered = json.loads(subprocess.run(command + ["--delivery", series], check=True, capture_output=True, text=True).stdout)["deliveries"][0]
+        self.assertEqual((delivered["document_state"]["state"], delivered["document_state"]["revision"], delivered["interactive"]["kind"]), (None, 3, "document"))
+        (self.root / "document-state" / (series + ".json")).write_text("{}")
+        self.assertTrue(self.deliveries.record(second)["document_state"]["unreadable"])       # reported, never shown as nothing saved
+
+    def test_opening_an_interactive_document_is_measured_without_content(self):
+        identifier = self.publish(interactive_document=INTERACTIVE)
+        report_id = self.interactive_report(interactive_document=INTERACTIVE)
+        self.serve()
+        opened = {"type": "item_open", "view": "operation", "item_kind": "operation", "item": report_id, "action": "interactive_document"}
+        self.assertIsNone(json.loads(self.request("/api/events", opened)[2])["opened"])
+        self.assertTrue(self.reports.operations()["operations"][0]["unread"])         # the document's event is not the report being opened
+        self.assertEqual(self.request("/api/events", {**opened, "view": "delivery", "item_kind": "delivery", "item": identifier})[0], 200)
+        self.assertEqual(self.request("/api/events", {**opened, "action": "something_else"})[0], 400)
+        self.request("/api/events", {key: value for key, value in opened.items() if key != "action"})
+        events = UsageEvents(self.root).read()
+        self.assertEqual({key for event in events for key in event}, {"at", "type", "view", "item_kind", "item", "action", "narrow", "remote"})
+        now = datetime.now(timezone.utc)
+        summary = summarize(self.reports, self.deliveries, events, since=now - timedelta(days=1), until=now + timedelta(minutes=1), zone=ZoneInfo("UTC"))
+        self.assertEqual(summary["interactive_document_opens"], {"total": 2, "by_kind": {"delivery": 1, "operation": 1}})
+        self.assertEqual([row["opens"] for row in summary["operation_report_opens"]], [1])
+
+    def test_commands_publish_a_document_or_an_address(self):
+        page, source = self.root / "plan.html", self.root / "delivery.json"
+        page.write_text(INTERACTIVE)
+        source.write_text(json.dumps(delivery()))
+        command = [sys.executable, "-B", str(SCRIPTS / "publish_delivery.py"), str(source), "--workspace", "/work", "--inbox", str(self.root)]
+        published = json.loads(subprocess.run(command + ["--interactive", str(page)], check=True, capture_output=True, text=True).stdout)["delivery"]
+        self.assertEqual(self.deliveries.interactive_document(published), INTERACTIVE)
+        embedded = json.loads(subprocess.run(command + ["--embed", "/thanksgiving/"], check=True, capture_output=True, text=True).stdout)["delivery"]
+        self.assertEqual(self.deliveries.record(embedded)["interactive"], {"kind": "address", "address": "/thanksgiving/"})
+        for arguments in (["--interactive", str(page), "--embed", "/thanksgiving/"], ["--embed", "https://evil.example/"],
+                          ["--embed", "/"], ["--interactive", str(self.root / "missing.html")]):
+            failed = subprocess.run(command + arguments, capture_output=True, text=True)
+            self.assertNotEqual(failed.returncode, 0, arguments)
+        status = self.root / "status.json"
+        status.write_text(json.dumps(report("Interactive")))
+        environment = {**os.environ, "AGENT_STATUS_INBOX": str(self.root)}
+        build = [sys.executable, "-B", str(SCRIPTS / "build_status.py"), str(status), "--output", str(self.root / "status.html"), "--workspace", "/work"]
+        receipt = subprocess.run(build + ["--interactive", str(page)], check=True, capture_output=True, text=True, env=environment).stdout
+        built = receipt.split("Status inbox receipt: ")[1].splitlines()[0]
+        self.assertEqual(self.reports.interactive_document(built), INTERACTIVE)
+        self.assertNotIn("agentCode", (self.root / "status.html").read_text())        # the portable file stays the plain report
+        self.assertNotEqual(subprocess.run(build + ["--embed", "/a/../b"], capture_output=True, text=True, env=environment).returncode, 0)
+        self.assertNotEqual(subprocess.run(build + ["--no-register", "--embed", "/thanksgiving/"], capture_output=True, text=True, env=environment).returncode, 0)
+        (self.root / "status.html").write_text(render(report("Registered")))
+        status.write_text(json.dumps(report("Registered")))
+        registered = subprocess.run([sys.executable, "-B", str(SCRIPTS / "register_status.py"), str(status), "--html", str(self.root / "status.html"),
+                                     "--workspace", "/work", "--embed", "/thanksgiving/"], check=True, capture_output=True, text=True, env=environment).stdout.strip()
+        self.assertEqual(self.reports._manifest(registered)["interactive"], {"kind": "address", "address": "/thanksgiving/"})
+
+
+class LinkTests(Workspace):
+    def test_the_embedded_view_frames_another_application_inside_the_page(self):
+        identifier = self.publish()
+        report_id = self.register(report("Served"), agent="operator")
+        self.serve(public_url=PUBLIC)
+        status, headers, content = self.request(f"/status/embedded?address=/thanksgiving/&from={identifier}", headers=RELAY)
+        page = content.decode()
+        self.assertEqual(status, 200)
+        self.assertIn(f'<iframe id="embedded-document" class="embedded-document" src="https://machine.example.ts.net/thanksgiving/" sandbox="{SANDBOX}" '
+                      'referrerpolicy="no-referrer" loading="lazy" title="Application at /thanksgiving/"></iframe>', page)
+        self.assertNotIn("allow-same-origin", page)
+        self.assertIn(f'<a class="back-link" href="/status/deliveries/{identifier}">CI is green again</a>', page)
+        self.assertIn('<a href="https://machine.example.ts.net/thanksgiving/">Open on its own</a>', page)
+        self.assertIn("frame-src 'self' https://machine.example.ts.net", headers["Content-Security-Policy"])
+        self.assertEqual(headers["X-Frame-Options"], "DENY")
+        self.assertIn(f'href="/status/reports/{report_id}">HoldCo bridge</a>',
+                      self.request(f"/embedded?address=/thanksgiving/menu.html&from={report_id}", headers=RELAY)[2].decode())
+        for origin in ("", "&from=" + "0" * 64, "&from=%22%3E%3Cscript%3E"):
+            page = self.request("/embedded?address=/thanksgiving/" + origin, headers=RELAY)[2].decode()
+            self.assertIn('<a class="back-link" href="/status/">Review</a>', page)
+            self.assertNotIn("<script>", page.replace('<script src=', "").replace('<script type="application/json"', ""))
+        for address in ("/", "", "/status/", "/status/reports/x", "//evil.example/", "https://evil.example/", "/a/../b", "/a%3Fb",
+                        "/thanksgiving/%22%3E%3Cscript%3Ealert(1)%3C/script%3E", "javascript:alert(1)"):
+            with self.subTest(address=address):
+                self.assertEqual(self.request("/embedded?address=" + address, headers=RELAY)[0], 404)
+        local = self.request(f"/embedded?address=/thanksgiving/&from={identifier}")[2].decode()
+        self.assertNotIn("<iframe", local)
+        self.assertIn(f'href="{PUBLIC}/embedded?address=/thanksgiving/&amp;from={identifier}">Open it there', local)
+        self.assertIn(f'<a class="back-link" href="/deliveries/{identifier}">', local)
+
+    def test_links_to_this_host_stay_in_the_tab_and_other_applications_open_embedded(self):
+        other = self.publish(delivery(title="Other"))
+        report_id = self.register(report("Served"), agent="operator")
+        attachment = self.root / "options.md"
+        attachment.write_text("[menu](/thanksgiving/menu)")
+        existing = self.root / "notes.txt"
+        existing.write_text("local")
+        targets = {"App": "/thanksgiving/", "App page": "https://machine.example.ts.net/thanksgiving/menu.html",
+                   "Report": f"{PUBLIC}/reports/{report_id}", "Delivery": f"/deliveries/{other}", "Website": "https://example.com/pull/3",
+                   "File": str(existing), "Elsewhere file": "/work/REPORT.md", "Query": "https://machine.example.ts.net/thanksgiving/?tab=2",
+                   "Ribbon Field root": "https://machine.example.ts.net/", "Thread": "agentcoord://thread/abc", "Attached": "/work/options.md"}
+        body = " ".join(f"[{label}]({target})" for label, target in targets.items()) + " and https://machine.example.ts.net/thanksgiving/ bare"
+        identifier = self.publish({**delivery(), "links": [{"label": label, "target": target} for label, target in targets.items()]},
+                                  body=body, attachments=[attachment])
+        self.serve(public_url=PUBLIC)
+        port = self.port
+        embedded = "/status/embedded?address={}&amp;from=" + identifier
+        page = self.request("/status/deliveries/" + identifier, headers=RELAY)[2].decode()
+        listing, written = page.split('class="link-list">')[1], page.split('<section class="document">')[1].split("</section>")[0]
+        for section in (listing, written):
+            with self.subTest(section=section[:40]):
+                self.assertIn(f'<a href="{embedded.format("/thanksgiving/")}"', section)
+                self.assertIn(f'<a href="{embedded.format("/thanksgiving/menu.html")}"', section)
+                self.assertIn(f'<a href="/status/reports/{report_id}"', section)
+                self.assertIn(f'<a href="/status/deliveries/{other}"', section)
+                self.assertIn(f'<a href="/status/deliveries/{identifier}/attachments/0"', section)
+                self.assertIn('href="https://example.com/pull/3"', section)
+                self.assertIn('href="agentcoord://thread/abc"', section)
+                self.assertNotIn('href="https://machine.example.ts.net/thanksgiving/"', section)       # never straight to the shared origin
+                for internal in ("/status/embedded", "/status/reports", "/status/deliveries"):
+                    for link in section.split("<a ")[1:]:
+                        if link.startswith(f'href="{internal}'):
+                            self.assertNotIn("target=", link.split(">")[0])                              # internal targets never open a new tab
+        self.assertIn('target="_blank" rel="noreferrer noopener">Website', listing)
+        for label in ("Query", "Ribbon Field root"):                               # on this host but not embeddable: this tab, never a new one
+            link = next(link for link in listing.split("<a ")[1:] if f">{label}</a>" in link)
+            self.assertTrue(link.startswith('href="https://machine.example.ts.net/'))
+            self.assertNotIn("target=", link.split(">")[0])
+        self.assertIn(f'data-path="{existing}"', listing)                           # a file of this machine stays a path to copy
+        self.assertIn('data-path="/work/REPORT.md"', listing)
+        self.assertIn(f"<code>{existing}</code>", written)
+        self.assertIn('>https://machine.example.ts.net/thanksgiving/</a> bare', written)       # a bare address keeps its text and opens embedded
+        self.assertEqual(written.count(embedded.format("/thanksgiving/") + '"'), 2)
+        attached = self.request(f"/status/deliveries/{identifier}/attachments/0", headers=RELAY)[2].decode()
+        self.assertIn(f'<a href="{embedded.format("/thanksgiving/menu")}"', attached)
+        local = self.request("/deliveries/" + identifier)[2].decode()
+        self.assertIn(f'<a href="/reports/{report_id}"', local)                     # the same page on the address being used
+        self.assertIn(f'<a href="/embedded?address=/thanksgiving/&amp;from={identifier}"', local)
+        linked = self.publish({**delivery(title="Local link"), "links": [{"label": "Local", "target": f"http://127.0.0.1:{port}/deliveries/{other}"}]})
+        self.assertIn(f'<li><a href="/status/deliveries/{other}">Local</a></li>', self.request("/status/deliveries/" + linked, headers=RELAY)[2].decode())
+
+    def test_report_sources_on_this_host_stay_inside_the_page(self):
+        other = self.publish(delivery(title="Other"))
+        sourced = report("Sourced", sources=[{"label": "Application", "location": "https://machine.example.ts.net/thanksgiving/"},
+                                             {"label": "Delivery", "location": f"{PUBLIC}/deliveries/{other}"},
+                                             {"label": "Website", "location": "https://example.com/pull/3"},
+                                             {"label": "File", "location": "/work/REPORT.md"}])
+        report_id = self.register(sourced, agent="operator")
+        self.serve(public_url=PUBLIC)
+        page = self.request("/status/reports/" + report_id, headers=RELAY)[2].decode()
+        self.assertIn(f'<a href="/status/embedded?address=/thanksgiving/&amp;from={report_id}" rel="noreferrer">https://machine.example.ts.net/thanksgiving/</a>', page)
+        self.assertIn(f'<a href="/status/deliveries/{other}" rel="noreferrer">', page)
+        self.assertIn('<a href="https://example.com/pull/3" rel="noreferrer">', page)
+        self.assertIn("<code>/work/REPORT.md</code>", page)
+        self.assertIn('<a href="https://machine.example.ts.net/thanksgiving/" rel="noreferrer">', render(sourced))      # the portable file keeps the address
+
+    def test_without_a_public_address_a_bare_path_is_not_an_application(self):
+        identifier = self.publish({**delivery(), "links": [{"label": "App", "target": "/thanksgiving/"}]}, body="[App](/thanksgiving/)")
+        self.serve()
+        page = self.request("/deliveries/" + identifier)[2].decode()
+        self.assertNotIn("/embedded?", page)
+        self.assertIn('data-path="/thanksgiving/"', page)
 
 
 class PublicAddressTests(Workspace):

@@ -22,6 +22,7 @@ VIEWS = {"review", "operation", "delivery"}
 KINDS = {"operation", "delivery", "ask"}
 ASK_IDENTIFIER = re.compile(r"[1-9][0-9]{0,17}\Z")         # Ribbon Field's own ask number; nothing about its content
 IGNORED_AFTER = timedelta(hours=24)
+INTERACTIVE_OPEN = "interactive_document"                 # action of an item_open event: the item's interactive document was shown
 
 
 class UsageEvents:
@@ -79,13 +80,14 @@ def summarize(reports, deliveries, events, *, since, until, zone):
     operations = {operation["id"]: operation for operation in reports.operations()["operations"]}
     version_operation = {version["id"]: operation["id"] for operation in operations.values() for version in operation["versions"]}
     for event in events:
-        if event["type"] == "item_open" and event.get("item_kind") == "operation":
+        if event["type"] == "item_open" and event.get("item_kind") == "operation" and not event.get("action"):
             operation = version_operation.get(event["item"], event["item"])
             operation_opens[operation] = operation_opens.get(operation, 0) + 1
-    delivered = [delivery for delivery in deliveries.list()["deliveries"] if since <= moment(delivery["received_at"]) < until]
+    # A delivery with several versions is one series, counted once from the time its first version arrived.
+    delivered = [delivery for delivery in deliveries.list()["deliveries"] if since <= moment(delivery["first_received_at"]) < until]
     first_open, to_response, outcome = [], [], {"accepted": 0, "dismissed": 0, "discussed_only": 0, "ignored": 0, "pending": 0}
     for delivery in delivered:
-        received = moment(delivery["received_at"])
+        received = moment(delivery["first_received_at"])
         if delivery["read_at"]:
             first_open.append((moment(delivery["read_at"]) - received).total_seconds() / 60)
         responded = [moment(event["at"]) for event in delivery["history"] if event["action"] in {"accept", "dismiss", "discuss"}]
@@ -98,6 +100,7 @@ def summarize(reports, deliveries, events, *, since, until, zone):
         else:
             outcome["ignored" if until - received >= IGNORED_AFTER else "pending"] += 1
     total = len(delivered)
+    interactive_opens = [event for event in events if event["type"] == "item_open" and event.get("action") == INTERACTIVE_OPEN]
     resolutions = [event for event in events if event["type"] == "ask_resolution"]
     by_resolution = {}
     for event in resolutions:
@@ -120,6 +123,9 @@ def summarize(reports, deliveries, events, *, since, until, zone):
         "asks_resolved_on_page": {
             "total": len(resolutions), "by_resolution": by_resolution,
             "narrow_viewport": sum(1 for event in resolutions if event.get("narrow"))},
+        "interactive_document_opens": {
+            "total": len(interactive_opens),
+            "by_kind": {kind: sum(1 for event in interactive_opens if event.get("item_kind") == kind) for kind in ("delivery", "operation")}},
         "operation_report_opens": sorted(
             ({"operation": identifier, "title": operations[identifier]["title"] if identifier in operations else None,
               "workspace": operations[identifier]["origin"].get("workspace") if identifier in operations else None,
@@ -129,6 +135,8 @@ def summarize(reports, deliveries, events, *, since, until, zone):
             "ignored": "no acceptance, dismissal or discussion 24 hours or more after delivery, measured at the period end",
             "pending": "no response yet and delivered less than 24 hours before the period end",
             "response": "the first acceptance, dismissal or discussion; opening alone is counted under first open",
+            "delivered": "delivery series whose first version arrived in the period; later versions of a series are not counted again",
+            "interactive_document_opens": "times an item's interactive document was shown on its page",
             "asks_resolved_on_page": "asks resolved or snoozed from this page through Ribbon Field; compare with "
                                      "'agent-coord ask --metrics', which counts every resolution wherever it was made"},
     }

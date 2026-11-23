@@ -2,7 +2,8 @@
 
 Supported: headings, paragraphs, nested lists, pipe tables, fenced code, block
 quotes, rules, and inline code, emphasis, and links. Raw HTML is never passed
-through. Link targets are resolved by the caller, which decides what is safe.
+through. Link targets are resolved by the caller, which decides what is safe
+and which addresses stay inside the review page.
 """
 from __future__ import annotations
 
@@ -46,7 +47,8 @@ def inline(text, resolve=default_link):
             position -= len(match["bare"] or "") - len(address) if match["bare"] else 0
             escaped = html.escape(address, quote=True)
             label = "Open in Ribbon Field" if address.startswith("agentcoord://") else escaped
-            output.append(f'<a href="{escaped}" rel="noreferrer">{label}</a>')
+            destination = html.escape(resolve(address) or address, quote=True)      # the caller may keep an address on this host inside the page
+            output.append(f'<a href="{destination}" rel="noreferrer">{label}</a>')
         elif match["strong"] is not None:
             output.append("<strong>" + inline(match["strong"], resolve) + "</strong>")
         else:

@@ -7,8 +7,9 @@ reports and deliveries and states that asks are unavailable.
 
 - **Needs you:** open asks from Ribbon Field, blocking first. Open one to read
   it in full and answer it; the answer goes to Ribbon Field, which stores it.
-- **Proactive work:** deliveries awaiting a response, unread first. See
-  [deliveries.md](deliveries.md).
+- **Proactive work:** one row per delivery with its latest version, newest
+  first. A delivery leaves Open once he has responded and has seen its latest
+  version; a newer version brings it back. See [deliveries.md](deliveries.md).
 - **Operations:** one row per operation with its latest version. A row is unread
   until that version is opened. Dismiss hides it until its next version.
 - **Open / Done / All** and search apply to the whole page.
@@ -17,6 +18,37 @@ Opening an operation shows its latest report with a version menu for earlier
 versions and, above the report, the open asks from that operation's
 conversations and workspace. Reports with response fields are answered in the
 report; see [responses.md](responses.md).
+
+The page is a host for what agents build. A report version or a delivery may
+carry one interactive document, shown inside the item's page under the summary
+and response controls, in a sandbox that never has the page's origin. See
+[interactive-documents.md](interactive-documents.md).
+
+## Links stay in the page
+
+Only another website opens a new tab. Everything on this host opens in the
+same tab with a way back:
+
+- A link to a report, a delivery, or an attachment opens that page. An address
+  written for the tailnet host or for `127.0.0.1` leads to the same page on
+  the address in use.
+- A link to another application on the tailnet host (a plain path outside the
+  review page, such as `/thanksgiving/`, or a full address there) opens
+  `<page>/embedded?address=/thanksgiving/&from=<item-id>`: the page's frame
+  with a link back to the item and "Open on its own", around the application
+  in the same sandbox as an interactive document. On the local address, where
+  the application is not served, that view links to itself on the tailnet
+  address.
+- An address on the tailnet host that cannot be framed (its root, or one with
+  a query or fragment) is an ordinary link in the same tab.
+- A bare path is a file of the Mac, shown as text with Copy path, when it
+  begins with a directory that exists on the Mac or ends in a file suffix
+  other than `.html`. Without a recorded tailnet address every bare path is a
+  file.
+
+This applies to Markdown write-ups and attachments, delivery link lists,
+report sources, addresses in asks, and links an interactive document asks the
+page to open.
 
 ## Open the page
 
@@ -64,8 +96,10 @@ python3 -B <skill-directory>/scripts/status_server.py install --public-url https
 do not change other serve entries, and never use `tailscale funnel`, which is
 public. The service then accepts that host besides loopback, prefixes links and
 assets with the path, and accepts writes from that origin with the page token.
-Other applications served from the same tailnet host share its origin, so treat
-them as trusted with this page. `publish_delivery.py` and `build_status.py`
+Other applications served from the same tailnet host share its origin: opened
+at their own address they are trusted with this page and with Ribbon Field.
+Shown inside the review page they run in a sandbox without that origin.
+`publish_delivery.py` and `build_status.py`
 print the public address of each item when one is recorded. Remove the relay
 with `tailscale serve --set-path /status off`.
 
@@ -134,34 +168,44 @@ what it unblocks, and the agent's context, with web addresses as links. When
 the command is missing, too old, slow, or failing, the page states that asks
 are not shown and why; it does not show an empty list.
 
-**Answering.** On the tailnet address the page and Ribbon Field's web interface
-share one origin, so the page's script sends the user's resolution straight to
-Ribbon Field with the browser's own Ribbon Field pairing:
+**Answering.** The page offers the resolutions Ribbon Field lists for the
+ask's kind (choices and free text for a decision; Done or Not done; Approve or
+Decline; Accept or Request changes; Grant or Decline), an optional note,
+Snooze, and Dismiss. Ribbon Field records the resolution as the user's and
+wakes the asking agent through its inbox. After Ribbon Field accepts, the page
+reads the list again. A refused request keeps the typed text and shows Ribbon
+Field's reason. The answer reaches Ribbon Field by one of two paths, chosen by
+the address the page is open on:
 
-1. `GET /api/browser/config` returns the request token when the browser is paired.
-2. `POST /api/browser/asks/<id>` with `{resolution, option?, answer?, note?}`
-   resolves the ask; `POST /api/browser/asks/<id>/snooze` with `{until}` snoozes it.
+- **Tailnet address.** The page and Ribbon Field's web interface share one
+  origin, so the page's script sends the resolution straight to Ribbon Field
+  with the browser's own Ribbon Field pairing:
+  1. `GET /api/browser/config` returns the request token when the browser is paired.
+  2. `POST /api/browser/asks/<id>` with `{resolution, option?, answer?, note?}`
+     resolves the ask; `POST /api/browser/asks/<id>/snooze` with `{until}` snoozes it.
 
-Ribbon Field checks the paired-device cookie, the token, and the origin, records
-the resolution as the user's, and wakes the asking agent through its inbox. The
-page offers the resolutions Ribbon Field lists for the ask's kind (choices and
-free text for a decision; Done or Not done; Approve or Decline; Accept or
-Request changes; Grant or Decline), an optional note, Snooze, and Dismiss.
-After Ribbon Field accepts, the page reads the list again. A refused request
-keeps the typed text and shows Ribbon Field's reason.
+  Ribbon Field checks the paired-device cookie, the token, and the origin. The
+  Status service takes no part and refuses `/api/ask-resolution` on this
+  address. When the browser is not paired (Ribbon Field answers 401), the page
+  says so and names the local address; pair the browser from Ribbon Field on
+  the Mac (Remote access).
+- **Local address** (`http://127.0.0.1:8766`). No pairing is needed. The page
+  posts `{id, body, snooze?}` to the Status service's `POST /api/ask-resolution`
+  under the same Origin and token rules as every other write, and the service
+  forwards the resolution to Ribbon Field's loopback interface, whose address
+  it reads from Ribbon Field's discovery record. Ribbon Field authorizes
+  loopback requests itself, so this adds no authority beyond what any process
+  on the Mac already has, and the service holds no Ribbon Field credential.
+  When Ribbon Field is not running, the page says so and keeps the typed text.
 
-- **Browser not paired** (Ribbon Field answers 401): the page says so and links
-  to Ribbon Field. Pair the browser from Ribbon Field on the Mac (Remote access).
-- **Local address** (`http://127.0.0.1:8766`): Ribbon Field's local port is a
-  different origin and refuses the request, so the page points to the tailnet
-  address and links each ask to its thread.
-- The Status service takes no part in the answer and holds no Ribbon Field
-  credential. Do not add a proxy route for it.
+Neither path is open to an interactive document: its sandbox has no origin, so
+Ribbon Field and the Status service refuse its requests.
 
 ## Measurement
 
 The page records content-free usage events in `<inbox>/usage/<year-month>.jsonl`:
-page opens, item opens, responses, and ask resolutions made on the page, each
+page opens, item opens, interactive document opens, responses, and ask
+resolutions made on the page, each
 with a time, the view, an item identifier, whether the viewport was narrow, and
 whether the request came through the public address. No titles, text, notes, or
 answers are recorded; an ask resolution records the ask's number and the
@@ -175,8 +219,10 @@ The output reports, for the period: page opens per day; for proactive
 deliveries, the median minutes from delivery to first open and to first
 response, and the shares accepted, dismissed, ignored, and pending; asks
 resolved on the page by resolution (compare with `agent-coord ask --metrics`,
-which counts every resolution wherever it was made); and opens per operation
-report. `--since`, `--until`, and `--timezone` adjust the period;
+which counts every resolution wherever it was made); the number of times an
+interactive document was shown, by item kind; and opens per operation
+report. A delivery with several versions is counted once, from the arrival of
+its first version. `--since`, `--until`, and `--timezone` adjust the period;
 `definitions` in the output states how each share is counted.
 
 ## Other machines
@@ -193,19 +239,25 @@ All records live under the inbox directory.
 
 | Path | Contents | Written by |
 | --- | --- | --- |
-| `reports/<sha256>/` | `manifest.json`, `report.json`, `report.html`; immutable | producers, by atomic directory rename |
+| `reports/<sha256>/` | `manifest.json`, `report.json`, `report.html`, optional `interactive.html`; immutable | producers, by atomic directory rename |
 | `dismissed/<sha256>.json` | dismissal time of one report version | the user, through the page |
 | `operation-state/<operation>.json` | the version last opened and when | the page |
 | `responses/<sha256>.json` | answers to a report's response fields, with a revision | the user |
 | `response-keys/<sha256>` | access key restricting a portable report to its own answers | producers |
-| `deliveries/<sha256>/` | `delivery.json`, optional `document.md`, `attachments/<n>`; immutable | producers |
-| `delivery-state/<sha256>.json` | read time, current response, discussion time, history | the user |
+| `deliveries/<sha256>/` | one version: `delivery.json`, optional `document.md`, `attachments/<n>`, optional `interactive.html`; immutable | producers |
+| `delivery-state/<series>.json` | read time and version, current response, discussion time, history; each response names its version | the user |
+| `document-state/<series or operation>.json` | what an item's interactive document saved: `{state, saved_at, revision, version}` | the page, for the document |
 | `usage/<year-month>.jsonl` | usage events | the service |
 | `viewer/` | service log and the recorded public address | the service |
 
 The version-1 report manifest records title, subject, summary, generation and
-receipt times, origin metadata (with the optional operation key), and
-`response_field_count`. A report ID hashes its canonical document and origin.
+receipt times, origin metadata (with the optional operation key),
+`response_field_count`, and `interactive` when the version has an interactive
+document. A report ID hashes its canonical document and origin, and its
+interactive document when it has one. A delivery manifest also records `key`
+or `series` when it is a version of a living delivery. A delivery's series is
+the hash of its key, the series it joined through `--replaces`, or its own
+identifier, so records written before versions existed are read unchanged.
 Hidden staging directories are never listed. Earlier records remain readable.
 
 Only registered items are served. Reports are rendered from their validated
@@ -214,3 +266,14 @@ A record retained as HTML alone is served sandboxed, without script or network
 access. Delivery documents are rendered from Markdown with all markup escaped;
 only `http`, `https`, and `agentcoord` links and links to the delivery's own
 attachments are active.
+
+Agent-built HTML is served by two routes only, `<page>/deliveries/<id>/interactive`
+and `<page>/reports/<id>/interactive`, always with a `Content-Security-Policy`
+`sandbox` directive, and is shown in a sandboxed frame; it is never written
+into a page. `<page>/document_bridge.js` is the one file readable from the
+sandbox. The pages' own policy allows frames from this origin and the recorded
+tailnet origin and is otherwise unchanged. An interactive document saves
+state through the page: `POST /api/document-state` with `{kind, id, state}`
+(`kind` is `delivery` or `report`, `id` the latest version) under the same
+Origin and token rules as every other write, and `GET /api/document-state/<kind>/<id>`.
+Requests from the sandbox itself carry an opaque origin and are refused.
