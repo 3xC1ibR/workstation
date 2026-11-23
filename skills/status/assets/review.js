@@ -133,7 +133,6 @@
       review.asks.asks.length ? plural(review.asks.asks.length, "ask") + (blocking ? ` (${blocking} blocking)` : "") : null,
       awaiting ? plural(awaiting, "delivery", "deliveries") + " to review" : null,
       updated ? plural(updated, "operation") + " unread" : null].filter(Boolean).join(" · ") || (review.asks.available ? "Nothing is waiting for you" : "");
-    element("review-search").parentElement.hidden = !review.deliveries.length && !review.operations.length && !review.asks.asks.length;
     const empty = element("review-empty");
     empty.hidden = shown > 0;
     if (!shown) {
@@ -142,8 +141,7 @@
         : nothing ? "No reports or deliveries yet" : "All reviewed";
       empty.lastElementChild.textContent = query ? "Search covers titles, summaries, agents and projects in this view."
         : show === "done" ? "Deliveries you accept or dismiss, and operations you dismiss, are kept here."
-        : nothing ? "They appear here as your agents publish them."
-        : "New asks, deliveries and reports appear here.";
+        : "";
     }
     document.title = (awaiting + updated + review.asks.asks.length ? `(${awaiting + updated + review.asks.asks.length}) ` : "") + "Review";
   }

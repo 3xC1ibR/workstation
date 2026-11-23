@@ -94,13 +94,25 @@
   function elapsed(value, now = Date.now()) {
     const seconds = Math.max(0, (now - new Date(value).getTime()) / 1000), date = new Date(value);
     if (seconds < 90) return "now";
-    if (seconds < 3600) return `${Math.round(seconds / 60)} min`;
-    if (seconds < 86400) return `${Math.round(seconds / 3600)} h`;
+    if (seconds < 3600) return `${Math.round(seconds / 60)}m`;
+    if (seconds < 86400) return `${Math.round(seconds / 3600)}h`;
     return date.toLocaleDateString(undefined, {month: "short", day: "numeric",
       ...(date.getFullYear() === new Date(now).getFullYear() ? {} : {year: "numeric"})});
   }
   // A list title is set without its closing full stop; question marks and ellipses stay.
   const listTitle = text => String(text).replace(/([^.])\.\s*$/, "$1");
+  // The way to the conversation, as one quiet word; its full name stays for assistive technology and the tooltip.
+  function discussLink(href) {
+    const link = make("a", "Discuss", "quiet-link"); link.href = href;
+    link.setAttribute("aria-label", "Discuss in Ribbon Field"); link.title = "Discuss in Ribbon Field";
+    return link;
+  }
+  // A web address as link text: it may break after a slash, never inside a word.
+  function addressText(link, address) {
+    const [, scheme, rest] = address.match(/^([a-z]+:\/\/)?(.*)$/i);
+    rest.split("/").forEach((piece, index, pieces) => { link.append((index ? "" : scheme || "") + piece + (index < pieces.length - 1 ? "/" : "")); if (index < pieces.length - 1) link.append(document.createElement("wbr")); });
+    return link;
+  }
   // A title too long for its lines ends at a whole word, never inside a figure; the full title stays in its tooltip and name.
   function fitTitles(root = document) {
     for (const node of root.querySelectorAll(".row-title")) {
@@ -197,5 +209,5 @@
     if (target.search || target.hash || !APPLICATION_ADDRESS.test(path)) return null;
     return {kind: "application", href: `${base}/embedded?address=${path}` + (item ? `&from=${item}` : "")};
   }
-  window.StatusControls = {make, time, moment, elapsed, listTitle, fitTitles, createChoices, createLine, createPicker, pickers, base, request, measure, localizeTimes, destination};
+  window.StatusControls = {make, time, moment, elapsed, listTitle, fitTitles, discussLink, addressText, createChoices, createLine, createPicker, pickers, base, request, measure, localizeTimes, destination};
 })();

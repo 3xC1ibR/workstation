@@ -104,7 +104,8 @@ def linked(value):
             parts.append(escape(part))
             continue
         address = part.rstrip(".,;:")
-        parts.append(f'<a href="{escape(address)}" rel="noreferrer noopener">{escape(address)}</a>{escape(part[len(address):])}')
+        shown = escape(address).replace("/", "/<wbr>").replace(":/<wbr>/<wbr>", "://")     # a long address breaks after a slash
+        parts.append(f'<a href="{escape(address)}" rel="noreferrer noopener">{shown}</a>{escape(part[len(address):])}')
     return "".join(parts)
 
 
@@ -233,10 +234,13 @@ def render(document, connection=None, *, page=None):
               f'<title>{escape(document["title"])}</title>{head}</head><body><main>',
               page["navigation"] if page else "",
               f'<article class="sheet"><header class="sheet-header"><h1>{escape(document["title"])}</h1>{subject}</header>',
+              # The opening: what needs the reader and the assessment lead; on a wide page the measures stand beside them.
+              '<div class="sheet-opening"><div class="sheet-lead">',
               page.get("after_header", "") if page else ""]
     output.append(f'<p class="assessment text">{prose(document["summary"])}</p>')
     for notice in document.get("notices", []):
         output.append(f'<aside class="notice"><h2>{escape(notice["title"])}</h2><p class="text">{prose(notice["text"])}</p></aside>')
+    output.append('</div>')
     if document.get("metrics"):
         output.append('<dl class="metrics">')
         for metric in document["metrics"]:
@@ -244,6 +248,7 @@ def render(document, connection=None, *, page=None):
             source = f'<dd>{provenance(metric)}</dd>' if provenance(metric) else ""
             output.append(f'<div class="metric"><dt>{escape(metric["label"])}</dt><dd class="value">{escape(metric["value"])}</dd>{detail}{source}</div>')
         output.append('</dl>')
+    output.append('</div>')
     if document.get("response_fields"):
         output.append('<section id="status-response-fields"><h2 class="section-heading">Your responses</h2>'
                       '<noscript><p>Enable JavaScript to edit and save responses in this page.</p><dl class="response-questions">')

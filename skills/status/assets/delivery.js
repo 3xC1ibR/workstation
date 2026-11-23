@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  const {make, time, moment, createChoices, createLine, request, measure, localizeTimes} = window.StatusControls;
+  const {make, time, moment, discussLink, createChoices, createLine, request, measure, localizeTimes} = window.StatusControls;
   const configuration = JSON.parse(document.getElementById("status-configuration").textContent);
   localizeTimes();
   for (const button of document.querySelectorAll(".copy-path")) button.onclick = async () => {
@@ -70,13 +70,14 @@
     const add = (parent, label, handler, className) => { const button = make("button", label, className || ""); button.type = "button"; button.disabled = busy; button.onclick = handler; parent.append(button); };
     const typing = panel.contains(document.activeElement) && document.activeElement.classList.contains("response-note");
     const recommendation = document.querySelector(".recommendation");            // shown as the first choice while the delivery is open
-    if (recommendation) recommendation.hidden = !response && delivery.latest && choices.length > 1;
+    const acceptedDefault = response && response.type === "accepted" && response.choice === RECOMMENDED;
+    if (recommendation) recommendation.hidden = Boolean(acceptedDefault || (!response && delivery.latest && choices.length > 1));     // said once
     if (response) {
       const outcome = make("div", null, "response-outcome"), line = make("p");
       const accepted = response.type === "accepted";
       const when = make("time", moment(response.at)); when.dateTime = response.at; when.title = time(response.at);
       line.append(make("span", accepted ? "Accepted" : "Dismissed", accepted ? "outcome-accepted" : "outcome-dismissed"), " ", when,
-        accepted && response.choice !== RECOMMENDED ? `: ${response.choice}` : accepted ? ": the recommended default" : "");
+        accepted ? `: ${acceptedDefault ? delivery.recommended_default || "the recommended default" : response.choice}` : "");
       outcome.append(line);
       if (response.version !== delivery.id) {              // what the response refers to stays beside it, ahead of the action that changes it
         const given = delivery.response_version_number ? `version ${delivery.response_version_number}` : "an earlier version";
@@ -99,7 +100,7 @@
     if (proposal && delivery.latest) content.push(proposalBlock());
     if (failed) { const alert = make("p", failed, "failure"); alert.setAttribute("role", "alert"); content.push(alert); }
     if (delivery.thread && delivery.latest) {
-      const discuss = make("a", "Discuss in Ribbon Field"); discuss.href = delivery.thread;
+      const discuss = discussLink(delivery.thread);
       discuss.onclick = () => { request("/api/delivery-response", {id: delivery.id, action: "discuss"}).then(next => { delivery = next; }).catch(() => {}); };
       quiet.append(discuss);
     }

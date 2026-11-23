@@ -33,7 +33,7 @@ code, pre { font: .92em/var(--line) var(--mono); overflow-wrap: anywhere; }
 .notice { margin-top: var(--space-4); max-width: var(--measure); line-height: var(--line-reading); }
 .notice h2 { font-size: var(--reading); line-height: inherit; font-weight: var(--weight-strong); letter-spacing: 0; }
 .assessment + .notice { margin-top: 0; }
-.notice:has(+ :not(.notice)) { margin-bottom: var(--space-5); }
+.notice:last-child { margin-bottom: var(--space-5); }
 .metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, var(--metric-width)), 1fr)); align-items: start; gap: var(--space-5); padding: var(--space-4) 0; border-block: var(--stroke) solid var(--rule); }
 .metric { min-width: 0; overflow-wrap: anywhere; }
 .metric dt { color: var(--ink-secondary); font-size: var(--meta); }
@@ -136,6 +136,12 @@ button.quiet:hover { background: var(--surface-quiet); color: var(--ink); }
   .table-pair :is(th, td):first-child { width: 38%; }
   .subject-details summary { display: flex; min-height: var(--touch-height); }
   .source a { display: inline-flex; align-items: center; min-height: var(--touch-height); }
+}
+/* A wide page: the opening's lead text in the main column, the measures in the rail beside it. Tables keep the full width. */
+@media (min-width: 1000px) {
+  .sheet-opening { display: grid; grid-template-columns: minmax(0, var(--main-width)) minmax(0, var(--rail-width)); column-gap: var(--gutter); align-items: start; }
+  .sheet-opening > .metrics { grid-template-columns: 1fr 1fr; padding: var(--space-5) 0 0; border: 0; }
+  .sheet > :is(section, details):not(:has(table, iframe)), #status-response-fields { max-width: var(--main-width); }
 }
 @media print {
   main { max-width: none; padding: 0; }

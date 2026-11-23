@@ -2,8 +2,8 @@
 // Asks belong to Ribbon Field. This component shows one ask in full and, when this browser is paired with
 // Ribbon Field on the same address, sends the user's resolution straight to Ribbon Field. Nothing is stored here.
 (() => {
-  const {make, time, elapsed, listTitle, fitTitles, createChoices, createLine, request, measure, destination} = window.StatusControls;
-  const LABELS = {answered: "Send answer", done: "Done", not_done: "Not done", approved: "Approve", declined: "Decline",
+  const {make, time, elapsed, listTitle, fitTitles, discussLink, addressText, createChoices, createLine, request, measure, destination} = window.StatusControls;
+  const LABELS = {answered: "Send", done: "Done", not_done: "Not done", approved: "Approve", declined: "Decline",
                   accepted: "Accept", changes_requested: "Request changes", granted: "Grant", dismissed: "Dismiss"};
   const OUTCOMES = {answered: "Answered", done: "Marked done", not_done: "Marked not done", approved: "Approved", declined: "Declined",
                     accepted: "Accepted", changes_requested: "Changes requested", granted: "Granted", dismissed: "Dismissed", snoozed: "Snoozed"};
@@ -52,7 +52,7 @@
     text.split(LINK).forEach((part, index) => {
       if (index % 2 === 0) { node.append(part); return; }
       const address = part.replace(/[.,;:]+$/, "");
-      node.append(linkTo(make("a", address), address, publicUrl), part.slice(address.length));
+      node.append(linkTo(addressText(make("a"), address), address, publicUrl), part.slice(address.length));
     });
     return node;
   }
@@ -125,7 +125,7 @@
       const decision = (ask.resolutions || []).includes("answered"), options = ask.options || [];
       if (options.length) panel.append(createChoices(`ask-${ask.id}-choice`, "Choices", options.map(option => ({value: option, label: option})),
         state.option, state.busy, option => { state.option = option; }));
-      const field = createLine("ask-note", state.text, !decision ? "Note for the agent" : options.length ? "Another answer, or a note to send with your choice" : "Your answer",
+      const field = createLine("ask-note", state.text, !decision ? "Note for the agent" : options.length ? "Other answer or note" : "Your answer",
         decision ? "Your answer or a note" : "Note for the agent", 8000, text => { state.text = text; });
       field.disabled = state.busy;
       panel.append(field);
@@ -149,6 +149,7 @@
       for (const [label, until] of snoozeChoices()) add(menu, label, () => resolve({until: Math.floor(until / 1000)}, "snoozed"), "quiet");
       buttons.append(later);
       if ((ask.resolutions || []).includes("dismissed")) add(buttons, "Dismiss", () => resolve({resolution: "dismissed", ...note()}, "dismissed"), "quiet");
+      buttons.append(discuss());
       panel.append(buttons);
       return panel;
     }
@@ -165,10 +166,7 @@
       }
       return line;
     }
-    function links() {
-      const line = make("p", null, "ask-links"), thread = make("a", "Discuss in Ribbon Field"); thread.href = ask.thread_link; line.append(thread);
-      return line;
-    }
+    const discuss = () => discussLink(ask.thread_link);
     function unavailable() {
       const note = make("p", null, "ask-unavailable");
       if (connection.state === "unpaired") {
@@ -192,7 +190,6 @@
       if (state.error) { const alert = make("p", state.error, "failure"); alert.setAttribute("role", "alert"); content.push(alert); }
       if (ask.detail) content.push(prose(ask.detail, "ask-text", publicUrl));
       if (ask.context) content.push(prose(ask.context, "ask-text ask-context", publicUrl));
-      content.push(links());
       const focused = body.contains(document.activeElement) && document.activeElement.className;
       body.replaceChildren(...content);
       if (focused && focused.includes("ask-note")) body.querySelector(".ask-note")?.focus();
