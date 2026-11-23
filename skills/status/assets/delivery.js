@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  const {make, time, base, request, measure, localizeTimes} = window.StatusControls;
+  const {make, time, moment, base, request, measure, localizeTimes} = window.StatusControls;
   const configuration = JSON.parse(document.getElementById("status-configuration").textContent);
   localizeTimes();
   for (const button of document.querySelectorAll(".copy-path")) button.onclick = async () => {
@@ -67,8 +67,9 @@
     if (response) {
       const outcome = make("div", null, "response-outcome"), line = make("p"), quiet = make("div", null, "response-quiet");
       const accepted = response.type === "accepted";
-      line.append(make("span", accepted ? "Accepted" : "Dismissed", accepted ? "outcome-accepted" : "outcome-dismissed"),
-        ` ${time(response.at)}` + (accepted && response.choice !== "recommended_default" ? `: ${response.choice}` : accepted ? ": the recommended default" : ""));
+      const when = make("time", moment(response.at)); when.dateTime = response.at; when.title = time(response.at);
+      line.append(make("span", accepted ? "Accepted" : "Dismissed", accepted ? "outcome-accepted" : "outcome-dismissed"), " ", when,
+        accepted && response.choice !== "recommended_default" ? `: ${response.choice}` : accepted ? ": the recommended default" : "");
       outcome.append(line);
       if (delivery.latest) {
         const reopen = make("button", "Change response", "quiet"); reopen.type = "button"; reopen.disabled = busy; reopen.onclick = () => respond("reopen");

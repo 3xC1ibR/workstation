@@ -141,8 +141,8 @@
         : nothing ? "No reports or deliveries yet" : "All reviewed";
       empty.lastElementChild.textContent = query ? "Search covers titles, summaries, agents and projects in this view."
         : show === "done" ? "Deliveries you accept or dismiss, and operations you dismiss, are kept here."
-        : nothing ? "Operation reports and proactive deliveries from your agents will appear here as they are published."
-        : "New proactive work, operation reports and asks will appear here.";
+        : nothing ? "They appear here as your agents publish them."
+        : "New asks, deliveries and reports appear here.";
     }
     document.title = (awaiting + updated + review.asks.asks.length ? `(${awaiting + updated + review.asks.asks.length}) ` : "") + "Review";
   }

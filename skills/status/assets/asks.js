@@ -93,11 +93,9 @@
       within !== "operation" && (ask.thread_title || ask.project_label), ask.overdue && make("span", "Overdue", "flag-attention"),
       ask.stale && make("span", ask.thread_closed ? "Thread closed" : "Agent inactive", "flag-attention"), stamp].filter(Boolean);
     parts.forEach((part, index) => { if (index) meta.append(" · "); meta.append(part); });
-    const rest = [ask.detail, ask.unblocks && "Unblocks: " + ask.unblocks, ask.context].filter(Boolean).join("\n\n");
-    const preview = rest ? make("p", rest.replace(/\s+/g, " "), "row-summary") : null;
     const body = make("div", null, "ask-detail"); body.id = `ask-${ask.id}-detail`;
     toggle.setAttribute("aria-controls", body.id);
-    main.append(toggle, meta); if (preview) main.append(preview); main.append(body);
+    main.append(toggle, meta, body);
     item.append(marker, main);
 
     async function resolve(payload, action) {
@@ -129,7 +127,7 @@
       }
       // One line that grows with what is written.
       const field = make("textarea", null, "ask-note"); field.rows = 1; field.maxLength = 8000; field.value = state.text; field.disabled = state.busy;
-      field.placeholder = !decision ? "Note for the agent (optional)" : (ask.options || []).length ? "Or write your own answer, or a note to send with a choice" : "Your answer";
+      field.placeholder = !decision ? "Note for the agent" : (ask.options || []).length ? "Or answer in your own words" : "Your answer";
       field.setAttribute("aria-label", decision ? "Your answer or a note" : "Note for the agent");
       const fit = () => { if (!CSS.supports("field-sizing", "content")) { field.style.height = "auto"; field.style.height = field.scrollHeight + field.offsetHeight - field.clientHeight + "px"; } };
       field.oninput = () => { state.text = field.value; fit(); };
@@ -185,7 +183,6 @@
     }
     function draw() {
       item.dataset.open = String(state.open); toggle.setAttribute("aria-expanded", String(state.open));
-      if (preview) preview.hidden = state.open;
       body.hidden = !state.open;
       if (!state.open) { body.replaceChildren(); return; }
       // The response comes first, directly under the title; the whole question and its context follow.

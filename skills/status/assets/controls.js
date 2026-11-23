@@ -120,8 +120,11 @@
   }
   // Content-free usage measurement; a failed measurement never interrupts the page.
   const measure = fields => request("/api/events", {...fields, narrow: matchMedia("(max-width: 640px)").matches}).catch(() => {});
+  // A moment in the reader's own timezone: the year appears only when it is not this one, and the full form stays in the title.
+  const moment = value => { const date = new Date(value); return date.toLocaleString(undefined, {month: "short", day: "numeric", hour: "numeric", minute: "2-digit",
+    ...(date.getFullYear() === new Date().getFullYear() ? {} : {year: "numeric"})}); };
   const localizeTimes = (root = document) => {
-    for (const node of root.querySelectorAll("time[datetime]")) { node.textContent = time(node.dateTime); }
+    for (const node of root.querySelectorAll("time[datetime]")) { node.textContent = moment(node.dateTime); node.title = time(node.dateTime); }
   };
   // Where an address leads from this page, so that everything on this host stays in this tab. `publicUrl` is the
   // review page's address on the shared host, when one is configured; `item` is the report or delivery to return to.
@@ -149,5 +152,5 @@
     if (target.search || target.hash || !APPLICATION_ADDRESS.test(path)) return null;
     return {kind: "application", href: `${base}/embedded?address=${path}` + (item ? `&from=${item}` : "")};
   }
-  window.StatusControls = {make, time, elapsed, createPicker, pickers, base, request, measure, localizeTimes, destination};
+  window.StatusControls = {make, time, moment, elapsed, createPicker, pickers, base, request, measure, localizeTimes, destination};
 })();
