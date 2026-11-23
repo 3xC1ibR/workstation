@@ -10,6 +10,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 from urllib.parse import urlsplit
 from zoneinfo import ZoneInfo
 
@@ -91,6 +92,39 @@ def escape(value):
     return html.escape("Unknown" if value is None else str(value), quote=True)
 
 
+WEB_ADDRESS = re.compile(r"(https?://[^\s<>\"')\]]+)")
+NUMBERED_LINE = re.compile(r"\s*(\d{1,2}[.)])\s+(.*)\Z")
+
+
+def linked(value):
+    """Escaped text with its web addresses made into links."""
+    parts = []
+    for index, part in enumerate(WEB_ADDRESS.split(value)):
+        if index % 2 == 0:
+            parts.append(escape(part))
+            continue
+        address = part.rstrip(".,;:")
+        parts.append(f'<a href="{escape(address)}" rel="noreferrer noopener">{escape(address)}</a>{escape(part[len(address):])}')
+    return "".join(parts)
+
+
+def prose(value):
+    """The author's text for a `text` block: addresses linked, and each numbered line set as a step with a hanging indent."""
+    output, plain = [], []
+    for line in value.split("\n"):
+        step = NUMBERED_LINE.match(line)
+        if step:
+            if plain:
+                output.append(linked("\n".join(plain)))
+                plain = []
+            output.append(f'<span class="step"><span>{escape(step.group(1))}</span><span>{linked(step.group(2))}</span></span>')
+        else:
+            plain.append(line)
+    if plain:
+        output.append(linked("\n".join(plain)))
+    return "".join(output)
+
+
 def response_script(document, connection):
     assets = Path(__file__).resolve().parents[1] / "assets"
     configuration = json.dumps({"fields": document["response_fields"], "connection": connection}, ensure_ascii=True).replace("<", "\\u003c")
@@ -153,12 +187,15 @@ def render(document, connection=None, *, page=None):
             return ""
         if not section["rows"]:
             return '<p class="empty">No records available.</p>'
-        classes = [' class="text-column"' if index > 0 and any(len(row[index]) > 70 for row in section["rows"]) else ""
+        # A table of two columns wraps at phone width; wider tables scroll sideways under their first column.
+        pair = len(section["columns"]) <= 2
+        classes = [' class="text-column"' if index > 0 and not pair and any(len(row[index]) > 70 for row in section["rows"]) else ""
                    for index in range(len(section["columns"]))]
         heading = "".join(f'<th scope="col"{classes[index]}>{escape(column)}</th>' for index, column in enumerate(section["columns"]))
         rows = "".join("<tr>" + "".join(f"<td{classes[index]}>{escape(cell)}</td>" for index, cell in enumerate(row)) + "</tr>" for row in section["rows"])
-        return (f'<p class="scroll-note">Scroll the table sideways for all columns.</p>'
-                f'<div class="table-region" tabindex="0" role="region" aria-label="{escape(section["title"])}">'
+        if pair:
+            return f'<div class="table-region"><table class="table-pair"><thead><tr>{heading}</tr></thead><tbody>{rows}</tbody></table></div>'
+        return (f'<div class="table-region" tabindex="0" role="region" aria-label="{escape(section["title"])}">'
                 f'<table><thead><tr>{heading}</tr></thead><tbody>{rows}</tbody></table></div>')
 
     def source_link(location):
@@ -185,12 +222,11 @@ def render(document, connection=None, *, page=None):
               f'<title>{escape(document["title"])}</title>{head}</head><body><main>',
               page["navigation"] if page else "",
               f'<article class="sheet"><header class="sheet-header"><h1>{escape(document["title"])}</h1>{subject}'
-              f'<p class="sheet-meta">Observations assembled {escape(time_text(document["generated_at"]))}; times below use this timezone. '
-              f'This report does not refresh them.</p></header>',
+              f'<p class="sheet-meta">As of {escape(time_text(document["generated_at"]))}</p></header>',
               page.get("after_header", "") if page else ""]
-    output.append(f'<p class="assessment text">{escape(document["summary"])}</p>')
+    output.append(f'<p class="assessment text">{prose(document["summary"])}</p>')
     for notice in document.get("notices", []):
-        output.append(f'<aside class="notice"><h2>{escape(notice["title"])}</h2><p class="text">{escape(notice["text"])}</p></aside>')
+        output.append(f'<aside class="notice"><h2>{escape(notice["title"])}</h2><p class="text">{prose(notice["text"])}</p></aside>')
     if document.get("metrics"):
         output.append('<dl class="metrics">')
         for metric in document["metrics"]:
@@ -210,7 +246,7 @@ def render(document, connection=None, *, page=None):
     if document.get("actions"):
         output.append('<section><h2 class="section-heading">Next actions</h2><ol class="actions">')
         for action in document["actions"]:
-            reason = f'<p class="text">{escape(action["reason"])}</p>' if action.get("reason") else ""
+            reason = f'<p class="text">{prose(action["reason"])}</p>' if action.get("reason") else ""
             status = action.get("status", "status not stated")
             state = ("settled" if status.lower().startswith(("done", "complete", "finished", "closed", "cancel"))
                      else "blocked" if "block" in status.lower() else "open")
@@ -224,7 +260,7 @@ def render(document, connection=None, *, page=None):
             output.append(f'<details><summary>{heading}</summary>')
         else:
             output.append(f'<section><h2 class="section-heading">{heading}</h2>')
-        text = f'<p class="text">{escape(section["text"])}</p>' if section.get("text") else ""
+        text = f'<p class="text">{prose(section["text"])}</p>' if section.get("text") else ""
         output.append(f'{text}{table(section)}{provenance(section)}')
         output.append('</details>' if section.get("collapsed") else '</section>')
     if document.get("sources"):
@@ -274,11 +310,14 @@ def main():
             result = render(document, connection(inbox_directory(), identifier, args.viewer_url))
             args.output.write_text(result, encoding="utf-8")
         print(f"Status inbox receipt: {identifier}")
+        # Lead with the address that opens on every device; the address on this Mac is the fallback.
         from status_server import DEFAULT_PORT, saved_public_url
-        print(f"Review page: http://127.0.0.1:{DEFAULT_PORT}/reports/{identifier}")
-        public = saved_public_url(inbox_directory())
+        public, local = saved_public_url(inbox_directory()), f"http://127.0.0.1:{DEFAULT_PORT}/reports/{identifier}"
         if public:
-            print(f"Review page (tailnet): {public}/reports/{identifier}")
+            print(f"Review page: {public}/reports/{identifier}")
+            print(f"Review page (this Mac only): {local}")
+        else:
+            print(f"Review page: {local}")
 
 
 if __name__ == "__main__":

@@ -144,7 +144,8 @@ python3 -B <skill-directory>/scripts/publish_delivery.py /absolute/path/delivery
   --thread-id <ribbon-field-conversation-for-discussion>
 ```
 
-The command prints the delivery identifier and its page address. The user can
+The command prints the delivery identifier and its page address; give the user
+`url` when it is present, otherwise `local_url`. The user can
 read it, accept the recommended default or one of your options ("Do it"),
 dismiss it with a reason, or discuss it in the linked conversation. Read his
 responses on your next wake:

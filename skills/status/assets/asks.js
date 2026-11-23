@@ -41,17 +41,27 @@
   }
 
   const LINK = /(https?:\/\/[^\s<>"')\]]+)/g;
+  function linked(node, text) {
+    text.split(LINK).forEach((part, index) => {
+      if (index % 2 === 0) { node.append(part); return; }
+      const address = part.replace(/[.,;:]+$/, ""), link = make("a", address);
+      link.href = address; link.target = "_blank"; link.rel = "noreferrer noopener";
+      node.append(link, part.slice(address.length));
+    });
+    return node;
+  }
+  // The agent's text, with web addresses linked. A line that begins with a number becomes a step with a hanging indent.
   function prose(text, className) {
     const block = make("div", null, className);
     for (const paragraph of text.split(/\n{2,}/)) {
-      const node = make("p");
-      paragraph.split(LINK).forEach((part, index) => {
-        if (index % 2 === 0) { node.append(part); return; }
-        const address = part.replace(/[.,;:]+$/, ""), link = make("a", address);
-        link.href = address; link.target = "_blank"; link.rel = "noreferrer noopener";
-        node.append(link, part.slice(address.length));
-      });
-      block.append(node);
+      let plain = [];
+      const flush = () => { if (plain.length) block.append(linked(make("p"), plain.join("\n"))); plain = []; };
+      for (const line of paragraph.split("\n")) {
+        const step = line.match(/^\s*(\d{1,2}[.)])\s+(.*)$/);
+        if (step) { flush(); const node = make("p", null, "step"); node.append(make("span", step[1]), linked(make("span"), step[2])); block.append(node); }
+        else plain.push(line);
+      }
+      flush();
     }
     return block;
   }
@@ -62,19 +72,20 @@
   };
 
   // Build one ask row. `changed(message)` is called after Ribbon Field accepts a resolution or a snooze.
-  function createAskRow(ask, {changed, publicUrl}) {
+  function createAskRow(ask, {changed, publicUrl, within}) {
     const state = draft(ask.id), item = make("li", null, "row ask");
     item.dataset.key = "ask-" + ask.id; item.dataset.kind = "ask"; item.dataset.state = ask.blocking ? "blocking" : "waiting";
     const marker = make("span", null, "marker"); marker.setAttribute("aria-hidden", "true");
     const main = make("div", null, "row-main"), toggle = make("button", null, "ask-toggle");
     const stamp = make("time", elapsed(ask.created_at)); stamp.dateTime = ask.created_at; stamp.title = time(ask.created_at);
-    const aside = make("span", null, "row-aside"); aside.append(stamp);
-    toggle.type = "button"; toggle.append(make("span", ask.title, "row-title"), aside);       // the heading strip, age and chevron toggle together
-    const kind = ask.kind ? ask.kind[0].toUpperCase() + ask.kind.slice(1) : "Ask";
+    toggle.type = "button"; toggle.append(make("span", ask.title, "row-title"), make("span", null, "row-aside"));       // the title and the chevron toggle together
+    // A decision is the ordinary ask, so only the other kinds are named. Inside an operation's report its own name is left out.
+    const kind = ask.kind && ask.kind !== "decision" ? ask.kind[0].toUpperCase() + ask.kind.slice(1) : "";
+    const effort = ask.effort_minutes ? `${ask.effort_minutes} min` : "";
     const meta = make("p", null, "row-meta");
-    const parts = [ask.blocking && make("span", "Blocking", "flag-blocking"), kind + (ask.effort_minutes ? `, ${ask.effort_minutes} min` : ""),
-      ask.thread_title || ask.project_label, ask.overdue && make("span", "Overdue", "flag-attention"),
-      ask.stale && make("span", ask.thread_closed ? "Thread closed" : "Agent inactive", "flag-attention")].filter(Boolean);
+    const parts = [ask.blocking && make("span", "Blocking", "flag-blocking"), [kind, effort].filter(Boolean).join(", "),
+      within !== "operation" && (ask.thread_title || ask.project_label), ask.overdue && make("span", "Overdue", "flag-attention"),
+      ask.stale && make("span", ask.thread_closed ? "Thread closed" : "Agent inactive", "flag-attention"), stamp].filter(Boolean);
     parts.forEach((part, index) => { if (index) meta.append(" · "); meta.append(part); });
     const rest = [ask.detail, ask.unblocks && "Unblocks: " + ask.unblocks, ask.context].filter(Boolean).join("\n\n");
     const preview = rest ? make("p", rest.replace(/\s+/g, " "), "row-summary") : null;
@@ -99,7 +110,7 @@
     }
 
     function controls() {
-      const panel = make("div", null, "ask-response"), text = state.text.trim();
+      const panel = make("div", null, "ask-response");
       const add = (parent, label, handler, className) => {
         const button = make("button", label, className || ""); button.type = "button"; button.disabled = state.busy; button.onclick = handler;
         parent.append(button); return button;
@@ -110,20 +121,24 @@
         for (const option of ask.options) add(options, option, () => resolve({resolution: "answered", option, ...(state.text.trim() ? {note: state.text.trim()} : {})}, "answered"));
         panel.append(options);
       }
-      const field = make("textarea", null, "ask-note"); field.rows = 2; field.maxLength = 8000; field.value = state.text; field.disabled = state.busy;
-      field.placeholder = !decision ? "Add a note for the agent (optional)" : (ask.options || []).length ? "Or write your own answer, or a note to send with a choice" : "Your answer";
+      // One line that grows with what is written.
+      const field = make("textarea", null, "ask-note"); field.rows = 1; field.maxLength = 8000; field.value = state.text; field.disabled = state.busy;
+      field.placeholder = !decision ? "Note for the agent (optional)" : (ask.options || []).length ? "Or write your own answer, or a note to send with a choice" : "Your answer";
       field.setAttribute("aria-label", decision ? "Your answer or a note" : "Note for the agent");
-      const buttons = make("div", null, "ask-buttons");
-      field.oninput = () => { state.text = field.value; const answer = buttons.querySelector("[data-answer]"); if (answer) answer.disabled = state.busy || !field.value.trim(); };
+      const fit = () => { if (!CSS.supports("field-sizing", "content")) { field.style.height = "auto"; field.style.height = field.scrollHeight + field.offsetHeight - field.clientHeight + "px"; } };
+      field.oninput = () => { state.text = field.value; fit(); };
+      queueMicrotask(fit);
       panel.append(field);
-      const note = () => (state.text.trim() ? {note: state.text.trim()} : {});
+      const buttons = make("div", null, "ask-buttons"), note = () => (state.text.trim() ? {note: state.text.trim()} : {});
+      let primary = "primary";                 // the first resolution is the panel's one solid button
       for (const resolution of ask.resolutions || []) {
         if (resolution === "dismissed") continue;
-        if (resolution === "answered") {
-          const answer = add(buttons, LABELS.answered, () => resolve({resolution, answer: state.text.trim()}, resolution), "primary");
-          answer.dataset.answer = "true"; answer.disabled = state.busy || !text;
-        } else add(buttons, LABELS[resolution] || resolution.replace(/_/g, " "), () => resolve({resolution, ...note()}, resolution));
+        // "Send answer" stays solid; with nothing written it leads to the field instead of looking unavailable.
+        if (resolution === "answered") add(buttons, LABELS.answered, () => { if (state.text.trim()) resolve({resolution, answer: state.text.trim()}, resolution); else field.focus(); }, primary);
+        else add(buttons, LABELS[resolution] || resolution.replace(/_/g, " "), () => resolve({resolution, ...note()}, resolution), primary);
+        primary = "";
       }
+      buttons.append(make("span", null, "spacer"));
       const later = make("details", null, "ask-snooze"), menu = make("div", null, "ask-snooze-choices");
       later.append(make("summary", "Snooze"), menu);
       for (const [label, until] of snoozeChoices()) add(menu, label, () => resolve({until: Math.floor(until / 1000)}, "snoozed"), "quiet");
@@ -132,12 +147,21 @@
       panel.append(buttons);
       return panel;
     }
+    // What answering enables, and the place where the work is done, stay beside the controls.
+    function lead() {
+      if (!ask.unblocks && !/^https?:\/\//.test(ask.link || "")) return null;
+      const line = make("p", null, "ask-lead");
+      if (ask.unblocks) linked(line, "Unblocks: " + ask.unblocks);
+      if (/^https?:\/\//.test(ask.link || "")) {
+        let host = ask.link; try { host = new URL(ask.link).hostname.replace(/^www\./, ""); } catch { /* keep the address as written */ }
+        const where = make("a", "Open " + host); where.href = ask.link; where.target = "_blank"; where.rel = "noreferrer noopener"; where.title = ask.link;
+        if (ask.unblocks) line.append(" ");
+        line.append(where);
+      }
+      return line;
+    }
     function links() {
       const line = make("p", null, "ask-links"), thread = make("a", "Open the thread in Ribbon Field"); thread.href = ask.thread_link; line.append(thread);
-      if (/^https?:\/\//.test(ask.link || "")) {
-        const where = make("a", "Open where this is done"); where.href = ask.link; where.target = "_blank"; where.rel = "noreferrer noopener";
-        line.append(" · ", where);
-      }
       return line;
     }
     function unavailable() {
@@ -158,12 +182,11 @@
       if (preview) preview.hidden = state.open;
       body.hidden = !state.open;
       if (!state.open) { body.replaceChildren(); return; }
-      const content = [];
-      if (ask.detail) content.push(prose(ask.detail, "ask-text"));
-      if (ask.unblocks) content.push(prose("Unblocks: " + ask.unblocks, "ask-text"));
-      if (ask.context) content.push(prose(ask.context, "ask-text ask-context"));
-      content.push(!connection ? make("p", "Checking Ribbon Field…", "note") : ["ready", "local"].includes(connection.state) ? controls() : unavailable());
+      // The response comes first, directly under the title; the whole question and its context follow.
+      const content = [lead(), !connection ? make("p", "Checking Ribbon Field…", "note") : ["ready", "local"].includes(connection.state) ? controls() : unavailable()].filter(Boolean);
       if (state.error) { const alert = make("p", state.error, "failure"); alert.setAttribute("role", "alert"); content.push(alert); }
+      if (ask.detail) content.push(prose(ask.detail, "ask-text"));
+      if (ask.context) content.push(prose(ask.context, "ask-text ask-context"));
       content.push(links());
       const focused = body.contains(document.activeElement) && document.activeElement.className;
       body.replaceChildren(...content);

@@ -21,9 +21,9 @@
           <label><input type="radio" name="view" value="done"><span>Done</span></label>
           <label><input type="radio" name="view" value="all"><span>All</span></label>
         </div>
-        <input id="review-search" type="search" placeholder="Search" aria-label="Search titles, summaries, agents and projects">
+        <label class="search"><input id="review-search" type="search" placeholder="Search" aria-label="Search titles, summaries, agents and projects"></label>
       </form>
-      <p id="review-counts" class="review-counts" aria-live="polite">Loading…</p>
+      <p id="review-counts" class="announcement" aria-live="polite">Loading…</p>
     </header>
     <p id="review-error" class="failure" role="alert" hidden></p>
     <p id="review-coverage" class="note" hidden></p>
@@ -35,10 +35,12 @@
     <section id="deliveries" class="review-section" aria-labelledby="deliveries-heading" hidden>
       <h2 id="deliveries-heading">Proactive work <span class="count"></span></h2>
       <ol class="rows"></ol>
+      <details class="older" hidden><summary>Older <span class="count"></span></summary><ol class="rows"></ol></details>
     </section>
     <section id="operations" class="review-section" aria-labelledby="operations-heading" hidden>
       <h2 id="operations-heading">Operations <span class="count"></span></h2>
       <ol class="rows"></ol>
+      <details class="older" hidden><summary>Older <span class="count"></span></summary><ol class="rows"></ol></details>
     </section>
     <div id="review-empty" class="empty-state" hidden><h2></h2><p></p></div>
     <noscript><p class="failure">Enable JavaScript to use the review page. Individual reports remain readable without it.</p></noscript>
