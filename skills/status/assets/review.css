@@ -46,7 +46,7 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
 @media (hover: hover) { .row:hover { --row-surface: var(--surface-quiet); } }
 /* The right column holds the age in the lists that are ordered by it. */
 .row-aside { grid-column: 2; grid-row: 1; color: var(--ink-tertiary); font-size: var(--meta); font-variant-numeric: tabular-nums; white-space: nowrap; }
-.row-meta, .row-summary { grid-column: 1 / -1; font-size: var(--meta); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
+.row-meta { grid-column: 1 / -1; font-size: var(--meta); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
 .row-meta { color: var(--ink-tertiary); }
 .row-meta time { white-space: nowrap; }
 .row-meta .outcome-accepted { color: var(--positive); font-weight: var(--weight-medium); }
@@ -78,8 +78,6 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
 .ask-toggle:hover { background: none; }
 /* The chevron says the row opens in place; it stands where the other lists show an age. */
 .ask-toggle .row-aside::after { content: ""; display: inline-block; width: var(--space-2); height: var(--space-2); margin-inline: var(--focus); border-right: var(--glyph-stroke) solid currentColor; border-bottom: var(--glyph-stroke) solid currentColor; transform: translateY(-35%) rotate(45deg); }
-.row.ask .row-summary { display: none; color: var(--ink-secondary); }
-.row.ask[data-state="blocking"][data-open="false"] .row-summary { display: -webkit-box; }
 /* An open ask stays on the page's own ground, set off by space; its controls are the only outlines. */
 .row.ask[data-open="true"] { --row-surface: var(--surface); --row-pad: var(--space-3); padding-bottom: var(--space-5); }
 /* Once open, only the title and the line under it close the ask; a stray click in the text does not. */
@@ -134,7 +132,7 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
 .response-quiet { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-1); margin-inline-start: calc(-1 * var(--space-3)); }
 .response-quiet a { display: inline-flex; align-items: center; min-height: var(--control-height); padding: 0 var(--space-3); font-size: var(--control-text); font-weight: var(--weight-medium); }
 .response-note { margin-top: var(--space-2); }
-.response-outcome { display: grid; gap: var(--space-1); }
+.response-outcome { display: grid; gap: var(--space-1); margin-top: var(--space-3); }
 .response-outcome .outcome-accepted { color: var(--positive); font-weight: var(--weight-strong); }
 .response-outcome .outcome-dismissed { font-weight: var(--weight-strong); }
 .response-panel .note { margin-top: var(--space-2); }

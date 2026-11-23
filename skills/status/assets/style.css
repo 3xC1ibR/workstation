@@ -22,6 +22,10 @@ code, pre { font: .92em/var(--line) var(--mono); overflow-wrap: anywhere; }
 .sheet-header { display: grid; gap: var(--space-1); }
 .sheet-header h1 { margin-bottom: var(--space-1); }
 .subject { overflow-wrap: anywhere; }
+/* The parts of the line under a title are divided by a dot that disappears where the line wraps. */
+.sheet-meta { display: flex; flex-wrap: wrap; column-gap: var(--space-4); overflow: hidden; }
+.sheet-meta > * + * { position: relative; }
+.sheet-meta > * + *::before { content: "·"; position: absolute; left: calc(-1 * var(--space-4)); width: var(--space-4); text-align: center; }
 .subject-details summary { display: block; min-height: 0; padding: 0; color: var(--ink-tertiary); font-size: var(--meta); font-weight: 400; letter-spacing: 0; }
 .subject-details summary::after { content: none; }
 .assessment { line-height: var(--line-reading); padding: var(--space-5) 0; max-width: var(--measure); }

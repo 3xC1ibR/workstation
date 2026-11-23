@@ -119,7 +119,7 @@ def delivery_page(base, delivery, body):
     content = (
         f'<nav class="page-navigation" aria-label="Delivery"><a class="back-link" href="{escape(base)}/">Review</a></nav>'
         f'<article class="sheet delivery"><header class="sheet-header"><h1>{escape(delivery["title"])}</h1>'
-        f'<p class="sheet-meta">{origin_text(delivery)}{" · " if origin_text(delivery) else ""}{moment_tag(delivery["received_at"])}</p></header>'
+        f'<p class="sheet-meta">{f"<span>{origin_text(delivery)}</span>" if origin_text(delivery) else ""}{moment_tag(delivery["received_at"])}</p></header>'
         f'<p class="assessment text">{escape(delivery["summary"])}</p>'
         f'<section class="response-panel" aria-label="Your response">{recommendation}{question}'
         f'<div id="delivery-response"><noscript><p class="note">Enable JavaScript to respond to this delivery.</p></noscript></div></section>'

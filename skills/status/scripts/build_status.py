@@ -205,10 +205,12 @@ def render(document, connection=None, *, page=None):
         return f"<code>{escape(location)}</code>"
 
     assets = Path(__file__).resolve().parents[1] / "assets"
-    subject = f'<p class="subject">{escape(document["subject"])}</p>'
+    # One quiet line under the title: the subject, then when the observations were assembled. A long subject folds away.
+    assembled = f'As of {escape(time_text(document["generated_at"]))}'
+    subject = f'<p class="sheet-meta"><span class="subject">{escape(document["subject"])}</span><span>{assembled}</span></p>'
     if len(document["subject"]) > 100:
         subject = (f'<details class="subject-details"><summary>{escape(document["subject"][:60])}… (show the full subject)</summary>'
-                   f'<p class="subject">{escape(document["subject"])}</p></details>')
+                   f'<p class="subject">{escape(document["subject"])}</p></details><p class="sheet-meta"><span>{assembled}</span></p>')
     if page:
         base = escape(page["base"])
         head = (f'<link rel="stylesheet" href="{base}/tokens.css"><link rel="stylesheet" href="{base}/style.css">'
@@ -221,8 +223,7 @@ def render(document, connection=None, *, page=None):
               f'<meta name="viewport" content="width=device-width, initial-scale=1">'
               f'<title>{escape(document["title"])}</title>{head}</head><body><main>',
               page["navigation"] if page else "",
-              f'<article class="sheet"><header class="sheet-header"><h1>{escape(document["title"])}</h1>{subject}'
-              f'<p class="sheet-meta">As of {escape(time_text(document["generated_at"]))}</p></header>',
+              f'<article class="sheet"><header class="sheet-header"><h1>{escape(document["title"])}</h1>{subject}</header>',
               page.get("after_header", "") if page else ""]
     output.append(f'<p class="assessment text">{prose(document["summary"])}</p>')
     for notice in document.get("notices", []):
