@@ -144,7 +144,7 @@ button.quiet:hover { background: var(--surface-quiet); color: var(--ink); }
   .sheet-opening .metric + .metric { border-top: var(--stroke) solid var(--rule); }
   .sheet-opening .metric dd { grid-column: 1 / -1; }
   .sheet-opening .metric .value { grid-column: 2; grid-row: 1; margin: 0; font-size: var(--reading); line-height: var(--line); letter-spacing: 0; text-align: right; }
-  /* A table of up to three columns keeps the main column's width; wider tables take the page. */
+  /* A table of two columns fits the main column and keeps it; every wider table takes the page's width. */
   .table-region-narrow, .response-editor { max-width: var(--main-width); }
 }
 @media print {

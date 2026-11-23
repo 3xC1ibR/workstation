@@ -50,6 +50,7 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
 .row-aside { grid-column: 2; grid-row: 1; color: var(--ink-tertiary); font-size: var(--meta); font-variant-numeric: tabular-nums; white-space: nowrap; text-align: right; }
 .row-meta { grid-column: 1; font-size: var(--meta); overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
 .row-meta { color: var(--ink-tertiary); }
+.row-meta .row-age { display: none; }                  /* the age inside the line under an ask's title, used at phone width */
 .row-meta .outcome-accepted { color: var(--positive); font-weight: var(--weight-medium); }
 .row-meta .flag-blocking { color: var(--critical); font-weight: var(--weight-strong); }
 .row-meta .flag-attention { color: var(--attention); font-weight: var(--weight-medium); }
@@ -159,7 +160,7 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
 .document :is(h3, h4, h5, h6) { font-size: var(--reading); font-weight: var(--weight-strong); }
 .document :is(ul, ol) { margin: var(--space-3) 0 0; padding-inline-start: var(--space-5); }
 .document li + li { margin-top: var(--space-1); }
-.document > :not(table, pre) { max-width: var(--measure); }
+.document > :not(.table-region, pre) { max-width: var(--measure); }
 .document pre { padding: var(--space-3); background: var(--surface-quiet); border-radius: var(--radius-control); overflow-x: auto; white-space: pre; overflow-wrap: normal; }
 .document blockquote { margin: var(--space-3) 0 0; padding-inline-start: var(--space-4); border-inline-start: var(--accent-edge) solid var(--rule-strong); color: var(--ink-secondary); }
 .document hr { border: 0; border-top: var(--stroke) solid var(--rule); margin: var(--space-5) 0; }
@@ -180,7 +181,13 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
   .review-section { margin-top: var(--space-5); }
   .review-section:not([hidden]) ~ .review-section { margin-top: var(--space-6); }
   .marker { left: calc(var(--row-inset) - var(--page-inset) / 2 - var(--marker) / 2); }
+  /* The title takes the row's full width; the age ends the line under it, and stays beside the title only when there is no such line. */
   .row-title { -webkit-line-clamp: 2; }
+  .row:has(.row-meta) a.row-title { grid-column: 1 / -1; }
+  .row:has(.row-meta) > .row-aside { grid-row: 2; }
+  .row.ask:has(.row-meta:not([hidden])) .ask-toggle { grid-template-columns: minmax(0, 1fr); }
+  .row.ask:has(.row-meta:not([hidden])) .ask-toggle .row-aside { display: none; }
+  .row-meta .row-age { display: inline; }
   .row-meta { -webkit-line-clamp: 2; }
   .row.ask .row-meta { display: block; -webkit-line-clamp: none; overflow: visible; }
   .ask-snooze-choices { right: auto; left: 0; }
@@ -201,12 +208,12 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
   .delivery { display: grid; grid-template-columns: minmax(0, var(--main-width)) minmax(0, var(--rail-width)); grid-template-rows: auto auto 1fr; column-gap: var(--gutter); align-items: start; }
   .delivery > * { grid-column: 1 / -1; }
   .delivery > .assessment { grid-column: 1; grid-row: 2; }
-  .delivery > .response-panel { grid-column: 2; grid-row: 2 / span 2; position: sticky; top: var(--space-5); padding-top: var(--space-5); }
-  .delivery > .document { grid-column: 1; grid-row: 3; margin-top: 0; padding-top: 0; border-top: 0; }
-  /* An interactive document is read in the main column like the write-up; another application takes the page's width. */
-  .delivery > .embedded:not(.embedded-application) { grid-column: 1; grid-row: 3; margin-top: 0; }
-  .delivery:has(> .embedded) > .document { grid-row: auto; margin-top: var(--space-6); }
-  .delivery:has(> .embedded-application) > .response-panel { grid-row: 2; position: static; padding-bottom: var(--space-5); }
+  /* The response stands in the rail beside the summary and ends above wide content: a write-up with tables, an
+     interactive document or another application takes the page's whole width below it. */
+  .delivery > .response-panel { grid-column: 2; grid-row: 2; padding-block: var(--space-5); }
+  /* A write-up of prose alone is read in the main column, and the response stays in view beside it. */
+  .delivery:not(:has(> .embedded, .document .table-region)) > .response-panel { grid-row: 2 / span 2; position: sticky; top: var(--space-5); padding-bottom: 0; }
+  .delivery:not(:has(> .embedded, .document .table-region)) > .document { grid-column: 1; grid-row: 3; margin-top: 0; padding-top: 0; border-top: 0; }
 }
 @media print {
   .review-controls, .row-actions, .transient-notice, .response-panel .response-buttons { display: none; }

@@ -96,6 +96,8 @@
       within !== "operation" && (ask.thread_title || ask.project_label)].filter(Boolean);
     parts.forEach((part, index) => { if (index) meta.append(" · "); meta.append(part); });
     meta.hidden = !parts.length;
+    // At phone width the age ends this line, joined to the word before it so that it never stands alone on a line.
+    if (parts.length) { const age = make("span", "\u00a0·\u00a0", "row-age"); age.append(stamp.cloneNode(true)); meta.append(age); }
     const body = make("div", null, "ask-detail"); body.id = `ask-${ask.id}-detail`;
     toggle.setAttribute("aria-controls", body.id);
     main.append(toggle, meta, body);

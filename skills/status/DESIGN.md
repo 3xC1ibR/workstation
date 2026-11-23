@@ -125,8 +125,9 @@ page inset is 24 px. Spacing uses the 4 px scale.
   decision), then the source or an excerpt. A delivery's excerpt is
   "Recommended: ..." while it is open. Rows bleed 20 px past the column so the
   hover tint and focus ring share one box while text stays on the column edge.
-  At phone width the line beneath wraps: an ask's in full, an excerpt to two
-  lines. Row actions appear on hover or keyboard focus; a touch user responds
+  At phone width the title takes the row's full width and the age ends the
+  line beneath, which wraps: an ask's in full, an excerpt to two lines. The
+  age never stands alone on a line. Row actions appear on hover or keyboard focus; a touch user responds
   on the item's page.
 - **Margin mark.** One mark hangs left of the text column: an 8 px accent disc
   for an unread delivery or operation, a chevron for an ask (it opens in place).
@@ -138,13 +139,14 @@ page inset is 24 px. Spacing uses the 4 px scale.
   opening: the operation's asks, the assessment and the notices in the main
   column, with the measures in the rail as rows (label, value at the right,
   particulars beneath). Sections follow at full width with prose at the
-  measure. A table of up to three columns keeps the main column and wraps at
-  phone width when it has two; a wider table takes the page and scrolls
-  sideways under its first column, with edge shadows where it continues.
-- **Delivery.** Title and one quiet line, then the summary and the write-up in
-  the main column; the response stays in the rail beside them while he reads
-  (it follows the summary below 1000 px). An interactive document is read in
-  the main column; another application takes the page's width.
+  measure. A table of two columns keeps the main column and wraps at phone
+  width; every wider table takes the page's 1120 px and scrolls sideways under
+  its first column, with edge shadows, only when that is not enough.
+- **Delivery.** Title and one quiet line, then the summary in the main column with
+  the response in the rail beside it (it follows the summary below 1000 px).
+  A write-up of prose alone continues in the main column and the response stays
+  in view beside it. Wide content (a write-up with tables, an interactive
+  document, another application) takes the page's whole width below the rail.
 
 ## Elevation & Depth
 
@@ -303,7 +305,11 @@ ask chevron. Nothing moves on load.
   faults were fixed without another critic: ask titles are shown whole in the
   list, a choice's tag sits under its text, the answer and note fields have a
   full outline, and the line under a title wraps at phone width. Table cells
-  no longer hyphenate; columns have minimum widths instead.
+  no longer hyphenate; columns have minimum widths instead. A second
+  comparison found two more, both against owner requests, and they were fixed
+  the same way: wide content on report and delivery pages spans the 1120 px
+  page instead of the main column, and at phone width the age moved under the
+  title so that titles use the full row.
   Open: critics disagree on the rail (the fourth asked for measures as rows,
   the fifth called the rows a wall of grey) and on the answer form (ruled
   line and dividers against a filled field); the report below its opening has
