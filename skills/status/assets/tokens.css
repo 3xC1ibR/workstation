@@ -19,7 +19,7 @@
   --radius: 10px; --radius-control: 8px; --radius-small: 4px; --radius-round: 999px;
   /* A wide page is a main column and a rail: 640 + 64 + 416 = 1120. Text keeps the measure inside either. */
   --page-width: 1120px; --main-width: 640px; --rail-width: 416px; --gutter: 64px; --page-inset: 32px; --page-top: 56px; --row-bleed: 20px; --measure: 640px;
-  --metric-width: 190px; --search-width: 94px; --search-width-active: 176px; --age-width: 48px; --choice-mark: 16px; --cell-width: 120px; --phrase-cell-width: 176px; --record-width: 180px; --text-cell-width: 280px;
+  --metric-width: 190px; --search-width: 94px; --search-width-active: 176px; --age-width: 48px; --choice-mark: 16px; --cell-width: 120px; --phrase-cell-width: 240px; --record-width: 180px; --text-cell-width: 320px;
   --control-height: 32px; --control-text: var(--meta); --touch-height: 44px;
   --embedded-height: 480px; --embedded-application-height: 80vh;
   --layer-row-action: 1; --layer-menu: 2; --layer-notice: 3;

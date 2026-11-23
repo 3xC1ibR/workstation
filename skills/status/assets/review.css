@@ -39,6 +39,7 @@
 /* Every row is a title on one line with its age at the right. An ask and an unread item are set at medium weight, a read one at regular. */
 .row-title { grid-column: 1; grid-row: 1; color: var(--ink); font-size: var(--reading); line-height: var(--line-snug); font-weight: 400; overflow-wrap: anywhere; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
 .row.ask .row-title, .row[data-state="unread"] .row-title { font-weight: var(--weight-medium); }
+.row.ask .row-title { display: block; -webkit-line-clamp: none; overflow: visible; }            /* an ask's title is the question itself: never cut */
 a.row-title::after, .ask-toggle::after { content: ""; position: absolute; inset: 0; }             /* the whole row opens the item */
 a.row-title:hover { text-decoration: none; }
 /* Keyboard focus rings the whole row, the same box that hover tints. */
@@ -180,6 +181,8 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
   .review-section:not([hidden]) ~ .review-section { margin-top: var(--space-6); }
   .marker { left: calc(var(--row-inset) - var(--page-inset) / 2 - var(--marker) / 2); }
   .row-title { -webkit-line-clamp: 2; }
+  .row-meta { -webkit-line-clamp: 2; }
+  .row.ask .row-meta { display: block; -webkit-line-clamp: none; overflow: visible; }
   .ask-snooze-choices { right: auto; left: 0; }
   .ask-buttons { gap: var(--space-1); }
   .ask-buttons button.quiet, .ask-snooze summary, .ask-buttons .quiet-link { padding-inline: var(--space-2); }

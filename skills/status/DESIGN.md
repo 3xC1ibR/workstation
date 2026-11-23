@@ -96,9 +96,10 @@ figures.
 
 A row title is 16 px at 1.35: medium weight for an ask and for an unread item,
 regular for a read one. Metadata is one grey in every state; only a state word
-is coloured. A title too long for its lines ends at a whole word (the script
-fits it), never inside a figure, and the full title stays in its tooltip and
-accessible name. A list title is shown without its closing full stop. No
+is coloured. An ask's title is the question itself and is shown whole at every
+width. A delivery's or operation's title too long for its lines ends at a
+whole word (the script fits it), never inside a figure, and the full title
+stays in its tooltip and accessible name. A list title is shown without its closing full stop. No
 uppercase tracked labels, and no reference numerals on sections.
 
 Prose (the assessment, notices, section text, ask text) keeps the 640 px measure
@@ -118,14 +119,15 @@ page inset is 24 px. Spacing uses the 4 px scale.
   nothing new for seven days wait in one closed native "Older" group with a
   count at the end of their section; a search that matches inside opens it, and
   a section holding nothing newer shows its rows directly.
-- **Row.** A title on one line (two at phone width) with its age in a fixed
-  right column ("now", "52m", "15h", then "Nov 9"), and one line beneath:
+- **Row.** A title (a delivery's or operation's on one line, two at phone
+  width; an ask's whole) with its age in a fixed right column ("now", "52m", "15h", then "Nov 9"), and one line beneath:
   state words, then what it costs (kind and effort, for an ask other than a
   decision), then the source or an excerpt. A delivery's excerpt is
   "Recommended: ..." while it is open. Rows bleed 20 px past the column so the
   hover tint and focus ring share one box while text stays on the column edge.
-  Row actions appear on hover or keyboard focus; a touch user responds on the
-  item's page.
+  At phone width the line beneath wraps: an ask's in full, an excerpt to two
+  lines. Row actions appear on hover or keyboard focus; a touch user responds
+  on the item's page.
 - **Margin mark.** One mark hangs left of the text column: an 8 px accent disc
   for an unread delivery or operation, a chevron for an ask (it opens in place).
 - **Open ask.** It opens in place between two hairlines on the column. Order:
@@ -162,8 +164,8 @@ are drawn with two borders; the search glyph is the page's one drawn icon.
 |---|---|---|---|
 | Row | ask (collapsed, open), unread, read, closed | One operation, delivery, or ask in a list | Anything with more than two row actions |
 | Button | standard, primary, quiet | Primary: the one solid button of a panel, never greyed out. Standard: a second resolution (Decline, Not done). Quiet: snooze, dismiss, change, undo | A primary button on a list row |
-| Choices | - | Options of an ask or a delivery as rows: one is chosen, then sent with the panel's primary button; choosing the chosen row clears it | Sending on a single tap |
-| Line field | - | One ruled line for an answer or a note that grows with what is written | Report response fields (those keep outlined inputs) |
+| Choices | - | Options of an ask or a delivery as rows: one is chosen, then sent with the panel's primary button; choosing the chosen row clears it. A tag ("Recommended") takes its own line under the option's text | Sending on a single tap |
+| Answer field | - | One outlined field for an answer or a note, a line tall (44 px at phone width), growing with what is written | A field ruled only underneath: it was a weak target |
 | Action line | - | Primary at the left, quiet words at the right ending on the rule's edge; "Discuss" leads to the conversation | A second row of actions |
 | View switch | - | Open / Done / All as three words, the chosen one on the quiet surface | Navigation between pages |
 | Search | idle, in use | A glyph and a word until used; the glyph alone at phone width | A filter menu |
@@ -250,8 +252,8 @@ ask chevron. Nothing moves on load.
 
 1. Ink on a white page in a main column and a rail; hairlines and space do the
    grouping, and nothing is boxed but controls.
-2. One answer form everywhere: choices as rows, a ruled line for words, one
-   solid ink button, quiet words at the right.
+2. One answer form everywhere: choices as rows, an outlined field for words,
+   one solid ink button, quiet words at the right.
 3. An ask is answered where it is listed, between two hairlines, with the
    response directly under its title.
 4. A delivery row leads its second line with "Recommended:" so the default is
@@ -296,6 +298,12 @@ ask chevron. Nothing moves on load.
   removing the outline of an embedded document (it is the trust boundary
   between the page's controls and agent-built content); renaming the sections
   (the owner's own vocabulary); a text grey lighter than 4.5:1.
+  After the builder's blind comparison with the live page (the candidate was
+  preferred, slightly; the live page was judged the better phone design), four
+  faults were fixed without another critic: ask titles are shown whole in the
+  list, a choice's tag sits under its text, the answer and note fields have a
+  full outline, and the line under a title wraps at phone width. Table cells
+  no longer hyphenate; columns have minimum widths instead.
   Open: critics disagree on the rail (the fourth asked for measures as rows,
   the fifth called the rows a wall of grey) and on the answer form (ruled
   line and dividers against a filled field); the report below its opening has
