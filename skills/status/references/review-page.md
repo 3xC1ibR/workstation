@@ -168,29 +168,38 @@ what it unblocks, and the agent's context, with web addresses as links. When
 the command is missing, too old, slow, or failing, the page states that asks
 are not shown and why; it does not show an empty list.
 
-**Answering.** On the tailnet address the page and Ribbon Field's web interface
-share one origin, so the page's script sends the user's resolution straight to
-Ribbon Field with the browser's own Ribbon Field pairing:
+**Answering.** The page offers the resolutions Ribbon Field lists for the
+ask's kind (choices and free text for a decision; Done or Not done; Approve or
+Decline; Accept or Request changes; Grant or Decline), an optional note,
+Snooze, and Dismiss. Ribbon Field records the resolution as the user's and
+wakes the asking agent through its inbox. After Ribbon Field accepts, the page
+reads the list again. A refused request keeps the typed text and shows Ribbon
+Field's reason. The answer reaches Ribbon Field by one of two paths, chosen by
+the address the page is open on:
 
-1. `GET /api/browser/config` returns the request token when the browser is paired.
-2. `POST /api/browser/asks/<id>` with `{resolution, option?, answer?, note?}`
-   resolves the ask; `POST /api/browser/asks/<id>/snooze` with `{until}` snoozes it.
+- **Tailnet address.** The page and Ribbon Field's web interface share one
+  origin, so the page's script sends the resolution straight to Ribbon Field
+  with the browser's own Ribbon Field pairing:
+  1. `GET /api/browser/config` returns the request token when the browser is paired.
+  2. `POST /api/browser/asks/<id>` with `{resolution, option?, answer?, note?}`
+     resolves the ask; `POST /api/browser/asks/<id>/snooze` with `{until}` snoozes it.
 
-Ribbon Field checks the paired-device cookie, the token, and the origin, records
-the resolution as the user's, and wakes the asking agent through its inbox. The
-page offers the resolutions Ribbon Field lists for the ask's kind (choices and
-free text for a decision; Done or Not done; Approve or Decline; Accept or
-Request changes; Grant or Decline), an optional note, Snooze, and Dismiss.
-After Ribbon Field accepts, the page reads the list again. A refused request
-keeps the typed text and shows Ribbon Field's reason.
+  Ribbon Field checks the paired-device cookie, the token, and the origin. The
+  Status service takes no part and refuses `/api/ask-resolution` on this
+  address. When the browser is not paired (Ribbon Field answers 401), the page
+  says so and names the local address; pair the browser from Ribbon Field on
+  the Mac (Remote access).
+- **Local address** (`http://127.0.0.1:8766`). No pairing is needed. The page
+  posts `{id, body, snooze?}` to the Status service's `POST /api/ask-resolution`
+  under the same Origin and token rules as every other write, and the service
+  forwards the resolution to Ribbon Field's loopback interface, whose address
+  it reads from Ribbon Field's discovery record. Ribbon Field authorizes
+  loopback requests itself, so this adds no authority beyond what any process
+  on the Mac already has, and the service holds no Ribbon Field credential.
+  When Ribbon Field is not running, the page says so and keeps the typed text.
 
-- **Browser not paired** (Ribbon Field answers 401): the page says so and links
-  to Ribbon Field. Pair the browser from Ribbon Field on the Mac (Remote access).
-- **Local address** (`http://127.0.0.1:8766`): Ribbon Field's local port is a
-  different origin and refuses the request, so the page points to the tailnet
-  address and links each ask to its thread.
-- The Status service takes no part in the answer and holds no Ribbon Field
-  credential. Do not add a proxy route for it.
+Neither path is open to an interactive document: its sandbox has no origin, so
+Ribbon Field and the Status service refuse its requests.
 
 ## Measurement
 

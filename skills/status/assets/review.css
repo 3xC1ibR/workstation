@@ -137,7 +137,7 @@ a.row-title:focus-visible, .row[data-open="false"] .ask-toggle:focus-visible { o
 .response-outcome .outcome-dismissed { font-weight: var(--weight-strong); }
 .response-panel .note { margin-top: var(--space-2); }
 .response-panel .failure { margin-top: var(--space-3); }
-.response-version { margin-top: var(--space-2); color: var(--attention); font-size: var(--meta); font-weight: var(--weight-medium); }
+.response-version { color: var(--attention); font-size: var(--meta); font-weight: var(--weight-medium); }
 /* What the embedded document proposes follows the owner's own controls, set off by space like every group on the page. */
 .response-proposal { margin-top: var(--space-5); overflow-wrap: anywhere; }
 /* Content an agent built, in a sandboxed frame across the whole column: the one outlined region, so its edge is plain.

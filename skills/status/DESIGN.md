@@ -158,7 +158,9 @@ marker is an 8 px disc. Chevrons are drawn with two borders; there is no icon se
 | Term | Means | Never call it |
 |---|---|---|
 | Operation | A long-running effort with one living report | campaign, project report |
-| Version | One retained report of an operation | snapshot, copy |
+| Version | One retained report of an operation, or one publication of a delivery | snapshot, copy |
+| Interactive document | Content an agent built that runs inside an item's page, in a sandbox | widget, app, plugin |
+| Propose | An interactive document suggesting a response that the owner confirms or ignores | submit, respond, record |
 | Delivery | Finished unrequested work handed to the owner | suggestion, notification |
 | Ask | Something an agent needs from the owner, kept in Ribbon Field | decision, question, task |
 | Dismiss | Remove from Open without acting | archive, delete |

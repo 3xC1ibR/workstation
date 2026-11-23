@@ -1,6 +1,6 @@
 "use strict";
 (() => {
-  const {make, time, moment, base, request, measure, localizeTimes} = window.StatusControls;
+  const {make, time, moment, request, measure, localizeTimes} = window.StatusControls;
   const configuration = JSON.parse(document.getElementById("status-configuration").textContent);
   localizeTimes();
   for (const button of document.querySelectorAll(".copy-path")) button.onclick = async () => {
@@ -71,15 +71,15 @@
       line.append(make("span", accepted ? "Accepted" : "Dismissed", accepted ? "outcome-accepted" : "outcome-dismissed"), " ", when,
         accepted && response.choice !== "recommended_default" ? `: ${response.choice}` : accepted ? ": the recommended default" : "");
       outcome.append(line);
+      if (response.version !== delivery.id) {              // what the response refers to stays beside it, ahead of the action that changes it
+        const given = delivery.response_version_number ? `version ${delivery.response_version_number}` : "an earlier version";
+        outcome.append(make("p", `You ${accepted ? "accepted" : "dismissed"} ${given}; this is version ${delivery.number}.`, "response-version"));
+      }
       if (delivery.latest) {
         const reopen = make("button", "Change response", "quiet"); reopen.type = "button"; reopen.disabled = busy; reopen.onclick = () => respond("reopen");
         quiet.append(reopen);
       }
       outcome.append(quiet); content.push(outcome);
-      if (response.version !== delivery.id) {
-        const given = delivery.response_version_number ? `version ${delivery.response_version_number}` : "an earlier version";
-        content.push(make("p", `You ${accepted ? "accepted" : "dismissed"} ${given}; this is version ${delivery.number}.`, "response-version"));
-      }
       if (response.note) content.push(make("p", "Your note: " + response.note, "note text"));
     } else if (delivery.latest) {
       // One solid button accepts the recommendation; the other answers are outlined, and the rest stay quiet.
@@ -100,10 +100,7 @@
         content.push(field);
       }
     }
-    if (!delivery.latest) {
-      const later = make("p", "Responses are given on the latest version. ", "note"), link = make("a", "Open the latest version");
-      link.href = `${base}/deliveries/${delivery.version}`; later.append(link); content.push(later);
-    }
+    if (!delivery.latest) content.push(make("p", "Responses are given on the latest version.", "note"));      // the notice above links to it
     if (proposal && delivery.latest) content.push(proposalBlock());
     if (failed) { const alert = make("p", failed, "failure"); alert.setAttribute("role", "alert"); content.push(alert); }
     if (delivery.thread && delivery.latest) {
