@@ -81,3 +81,7 @@ First figure out what outcome I'm after. If there's a path that is materially be
 - Otherwise, do it my way and note the alternative in one line at the end.
 - If you're running unattended, do it my way and flag the alternative.
 Don't propose alternatives that are merely different. If you can't name a concrete gain, follow my method.
+
+# Stoic context after compaction
+
+In any thread where Stoic has been enabled (`/stoic`, `$stoic`, or "use Stoic"), after conversation compaction, re-run `python3 ~/.agents/skills/stoic/scripts/read_context.py start` before answering so verbatim `llm_directives` and `long_term_memory` are restored into context.
