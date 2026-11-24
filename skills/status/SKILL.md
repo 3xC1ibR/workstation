@@ -132,10 +132,10 @@ measure's trend and last value. Start from
 [references/briefing-example.json](references/briefing-example.json).
 
 Both `build_status.py` and `publish_delivery.py` print advisory checks; fix
-them or have a reason. For any `costly`/`irreversible` decision packet, an
-operation's first report, or a structural change, capture the report with
-`scripts/capture_report.py` and run a fresh-context **Principal Simulation
-Judge** (`references/decision-packet.md`). Do not grade your own packet.
+them or have a reason. Do not add a separate model-judge pass before
+publishing—rely on the criteria in `references/decision-packet.md` and
+`scripts/report_checks.py`. For an operation's first report or a structural
+layout change, verify the rendered page with `scripts/capture_report.py`.
 
 ## Messages from the review page
 

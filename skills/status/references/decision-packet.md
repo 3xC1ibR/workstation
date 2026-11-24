@@ -120,36 +120,22 @@ by inviting eyeballing and hiding unverified gaps.
   IDs) in prose; verify dollar figures survive shell quoting; remove stale chat
   reply instructions (`Reply "bundle" to approve`).
 
-## 3. Principal Simulation Judge (Bitter Lesson verification)
+## 3. Verification before publishing
 
-Deterministic checks in `scripts/report_checks.py` catch mechanical faults
-(summary length, duplicated options, missing reversibility/confidence, raw IDs,
-shell-eaten `$` figures, chat residue, unexplained LaunchAgent targets). They
-cannot judge whether your reasoning is sound or whether an option is a
-strawman.
+Rely on the seven criteria above and the deterministic checks in
+`scripts/report_checks.py` (run automatically by `build_status.py` and
+`publish_delivery.py`). Fix every advisory warning—or have a concrete reason
+for leaving it—before publishing.
 
-For **any `irreversible` or `costly` decision packet**, a **first operation
-report**, or a **major structural change**, run a fresh-context subagent as a
-**Principal Simulation Judge** (give it ONLY the rendered screenshots or the
-rendered report text + delivery JSON/Markdown—never your scratchpad or intent):
-
-> You are a busy principal reviewing this packet on your phone between
-> meetings, with a 60-second budget for a reversible decision or 3 minutes for
-> a costly/irreversible one. Do not assume anything not written in the packet.
->
-> Answer plainly:
-> 1. What exact decision (or no-decision update) is being asked of you, and
->    what is the agent recommending?
-> 2. Can you act on the recommendation right now without opening a thread or
->    doing outside research? If not, name the exact missing fact or option.
-> 3. Name any contradiction between the summary, recommendation, options, and
->    body—or any action bundled into approval that is not explained in the body.
-> 4. What is the strongest realistic reason NOT to follow the recommendation,
->    and did the packet confront it honestly?
-> 5. Name one thing to cut so verification takes half the time.
-
-Fix every genuine contradiction, missing option, or hidden assumption before
-publishing. Do not grade your own packet.
+- **No separate model-judge pass:** Per owner decision (2026-11-23), do not
+  spawn a fresh-context judge subagent before publishing. Keep authoring
+  single-pass and let clear criteria plus deterministic checks catch mechanical
+  faults (summary length, duplicated options, missing reversibility/confidence,
+  raw IDs, shell-eaten `$` figures, chat residue, unexplained LaunchAgent
+  targets).
+- **Layout check when structure changes:** For an operation's first report or
+  a structural visual change, verify the rendered page with
+  `scripts/capture_report.py` (see `references/briefing.md`).
 
 ## 4. Concrete before / after examples (from live reports)
 

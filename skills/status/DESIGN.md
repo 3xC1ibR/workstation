@@ -302,9 +302,10 @@ ask chevron. Nothing moves on load.
   operation reports and proactive deliveries (contradictory or duplicated
   defaults, unverified actions absent from the write-up, decision verbs hidden
   inside `needs_you`, shell-eaten dollar amounts, and prefixed raw IDs) paired
-  with an outcome-based contract and fresh-context Principal Simulation Judge
-  in `references/decision-packet.md`. Existing reports and deliveries continue
-  rendering unchanged.
+  with an outcome-based decision-packet contract in
+  `references/decision-packet.md` (deterministic checks only, with no separate
+  model-judge pass per owner decision 2026-11-23). Existing reports and
+  deliveries continue rendering unchanged.
 
 - 2026-11-23: **Select to ask the agent, and reports that follow new
   versions.** The owner asked to highlight anything on a page and send it to
