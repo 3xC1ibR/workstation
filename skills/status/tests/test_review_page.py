@@ -185,6 +185,8 @@ class DeliveryTests(Workspace):
     def test_invalid_deliveries_are_rejected_instead_of_losing_content(self):
         for change in ({"title": ""}, {"summary": None}, {"unknown": "field"}, {"decision": {"options": ["A"]}},
                        {"decision": {"question": "Q", "options": ["A", "A"]}}, {"decision": {"question": "Q", "options": ["recommended_default"]}},
+                       {"reversibility": "easy"}, {"reversibility_note": "needs level"},
+                       {"confidence": "certain"}, {"confidence_basis": "needs level"},
                        {"links": [{"label": "L", "target": "javascript:alert(1)"}]}, {"links": [{"label": "L", "target": "relative/path"}]},
                        {"thread": "https://example.com"}, {"created_at": "2026-11-22T10:00:00"}):
             with self.subTest(change=change), self.assertRaises(ValueError):
@@ -193,6 +195,23 @@ class DeliveryTests(Workspace):
         binary.write_bytes(b"PK")
         with self.assertRaises(ValueError):
             self.publish(attachments=[binary])
+
+    def test_delivery_reversibility_and_confidence_render_and_remain_optional(self):
+        plain = self.publish(delivery())
+        marked = self.publish(delivery(
+            title="Delete unused stack",
+            reversibility="irreversible",
+            reversibility_note="Deletes cloud resources permanently",
+            confidence="low",
+            confidence_basis="No traffic check on weekends yet",
+        ))
+        self.serve()
+        plain_html = self.request("/deliveries/" + plain)[2].decode()
+        self.assertNotIn("packet-meta", plain_html)
+        marked_html = self.request("/deliveries/" + marked)[2].decode()
+        self.assertIn('class="sheet-meta packet-meta"', marked_html)
+        self.assertIn('<span class="decision-flag tone-critical">Irreversible</span> (Deletes cloud resources permanently)', marked_html)
+        self.assertIn('<span class="tone-attention">Low confidence</span>: No traffic check on weekends yet', marked_html)
 
     def test_each_response_is_recorded_with_its_time_and_can_be_reopened(self):
         identifier = self.publish(thread_id="thread-1")

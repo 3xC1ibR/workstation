@@ -152,6 +152,7 @@ class StatusReports:
                 "received_at": latest["received_at"], "dismissed_at": latest["dismissed_at"],
                 "response_field_count": latest.get("response_field_count") or 0, "interactive": latest["interactive"],
                 "state": latest.get("state") if isinstance(latest.get("state"), str) else None,
+                "decision_count": latest.get("decision_count") if type(latest.get("decision_count")) is int else 0,
                 "needs_you_count": latest.get("needs_you_count") if type(latest.get("needs_you_count")) is int else 0,
                 "unread": opened.get("opened_report") != latest["id"], "opened_at": opened.get("opened_at"),
                 "threads": sorted({version["origin"].get("thread_id") for version in versions} - {None}),

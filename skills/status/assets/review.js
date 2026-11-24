@@ -72,11 +72,15 @@
     const outcome = !response ? (delivery.version_count > 1 ? `Version ${delivery.version_count}` : null)
       : response.type === "accepted" ? flag("Accepted" + given, "outcome-accepted") : "Dismissed" + given;
     const actions = [];
-    if (!responded && delivery.recommended_default) actions.push(["Do it", () => respond(delivery, "accept", "recommended_default")]);
+    if (!responded && delivery.recommended_default && delivery.reversibility !== "irreversible") {
+      actions.push(["Do it", () => respond(delivery, "accept", "recommended_default")]);
+    }
     actions.push(responded ? ["Reopen", () => respond(delivery, "reopen"), "quiet"] : ["Dismiss", () => respond(delivery, "dismiss"), "quiet"]);
+    const risk = !responded && delivery.reversibility === "irreversible" ? flag("Irreversible", "flag-blocking")
+      : !responded && delivery.reversibility === "costly" ? flag("Costly to reverse", "flag-attention") : null;
     return row({
       key: "delivery-" + delivery.series, state: delivery.unread ? "unread" : "read", closed: settled(delivery),
-      href: `${base}/deliveries/${delivery.id}`, title: delivery.title, flags: [outcome, delivery.category || delivery.origin.agent],
+      href: `${base}/deliveries/${delivery.id}`, title: delivery.title, flags: [outcome, risk, delivery.category || delivery.origin.agent],
       excerpt: !responded && delivery.recommended_default ? excerpt(delivery.recommended_default, "Recommended:") : excerpt(delivery.summary),
       at: delivery.received_at, actions});
   }
@@ -87,6 +91,7 @@
       href: `${base}/reports/${operation.latest}`, title: operation.title,
       flags: dismissed ? [] : [STATE_WORDS[operation.state] ? flag(STATE_WORDS[operation.state], "flag-state tone-" + STATE_TONES[operation.state]) : null,
               operation.ask_count ? flag(plural(operation.ask_count, "ask") + " open", "flag-needs") : null,
+              operation.decision_count ? flag(plural(operation.decision_count, "decision"), "flag-needs") : null,
               operation.needs_you_count ? flag(operation.needs_you_count + " for you to do", "flag-needs") : null,
               operation.response_field_count ? flag(plural(operation.response_field_count, "question") + " for you", "flag-needs") : null],
       excerpt: excerpt(operation.summary), at: operation.received_at,

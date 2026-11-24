@@ -58,6 +58,8 @@ def register(document, html, *, workspace, agent=None, provider=None, thread_id=
     # The review list shows how an operation stands and what it asks of the reader; a report without them keeps its record shape.
     if document.get("state"):
         manifest["state"] = document["state"]["level"]
+    if document.get("decisions"):
+        manifest["decision_count"] = len(document["decisions"])
     if document.get("needs_you"):
         manifest["needs_you_count"] = len(document["needs_you"])
     if interactive:

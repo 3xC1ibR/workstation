@@ -6,14 +6,16 @@ import argparse
 import json
 import os
 from pathlib import Path
+import sys
 
 from delivery_store import Deliveries, publish
 from register_status import add_interactive_arguments, inbox_directory, interactive_arguments
+from report_checks import check_delivery
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("delivery", type=Path, help="JSON file: title, summary, and optional recommended_default, decision, category, links, thread, created_at")
+    parser.add_argument("delivery", type=Path, help="JSON file: title, summary, and optional recommended_default, decision, reversibility, reversibility_note, confidence, confidence_basis, category, links, thread, created_at")
     parser.add_argument("--document", type=Path, help="Markdown file with the full delivery, retained and shown in the page")
     parser.add_argument("--attach", type=Path, action="append", default=[], help="Text file retained with the delivery; repeat for each. "
                         "Relative links to its file name in the document open the retained copy.")
@@ -39,6 +41,11 @@ def main():
         record = Deliveries(root).version(identifier)
     except (ValueError, KeyError, OSError) as error:
         parser.error(str(error))
+    advice = check_delivery(document, body=body)
+    if advice:
+        print("Delivery checks (advisory; see references/decision-packet.md and references/deliveries.md):", file=sys.stderr)
+        for line in advice:
+            print(f"- {line}", file=sys.stderr)
     # `url` opens on every device and comes first when the service has a recorded tailnet address; `local_url` is the fallback on this Mac.
     from status_server import DEFAULT_PORT, saved_public_url
     result, public = {"delivery": identifier, "series": record["series"], "version_number": record["number"]}, saved_public_url(root)
