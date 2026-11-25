@@ -90,31 +90,52 @@ For Open Kernel Challenge, read [references/okc.md](references/okc.md). Its loca
 collector provides a starting snapshot, **not a complete editorial assessment**.
 Review relevant recent decisions and the active conversation before delivering it.
 
-## Write a briefing, not a wall of text
+## Write a decision packet, not a wall of text
 
-**Read [references/briefing.md](references/briefing.md) before writing a report.**
-The reader runs several operations at once and gives each report under a minute,
-often on a phone. A report answers four questions, in order, each in its own block:
+**Read [references/decision-packet.md](references/decision-packet.md) and
+[references/briefing.md](references/briefing.md) before publishing a report or
+proactive delivery.** The reader runs many operations across hundreds of threads
+and wants to work at the report level—often on a phone—without dropping into
+threads to reconstruct options or audit hidden assumptions. Let the work choose
+the posture (decision packet, operation pulse, blocker escalation, or completed
+work) rather than forcing every update into one rigid template.
 
-1. **Where does it stand?** `state` (on track, at risk, off track, blocked,
-   paused, done, with a short reason) and a `summary` of at most 60 words.
-2. **What changed since I last looked?** `changes`, marked better or worse.
-3. **What must I do, by when?** `needs_you`: one item per action, with effort,
-   deadline, and what it unblocks.
-4. **What happens next, and when?** `timeline` (scheduled checks, deadlines,
+Every decision-bearing report or delivery must satisfy the seven criteria in
+`references/decision-packet.md`: completed staff work (advise, do not delegate
+homework), BLUF without duplication, contrastive options with honest tradeoffs,
+explicit **reversibility** (`reversible`, `costly`, `irreversible`), calibrated
+**confidence** separated from outcome probability, linchpin assumptions and
+falsifiers (`if_wrong`) for costly/irreversible calls, and zero hidden scope
+between what the reader approves and what the body explains.
+
+For operation reports, answer the reader's questions in order, each in its own
+block:
+
+1. **Where does it stand?** `state` (honest verdict, short reason, optional
+   `confidence` and `confidence_basis`) and a `summary` of at most 60 words.
+2. **What must I decide?** `decisions`: question, recommendation, why it beats
+   alternatives, contrastive `options` (upside/downside), `reversibility`,
+   `confidence`, and for costly/irreversible calls, `assumptions` and `if_wrong`.
+3. **What tasks wait on me, by when?** `needs_you`: pure execution actions only
+   (never hide a choice inside `needs_you`), with effort, deadline, and what
+   each unblocks.
+4. **What changed since I last looked?** `changes`, marked better or worse.
+5. **What happens next, and when?** `timeline` (scheduled checks, deadlines,
    windows) and `actions`.
 
 Then use the block that fits each fact's shape: a metric with `current` and
 `target` for progress, `phases` for stages, `workstreams` for parallel lanes,
 `charts` for numbers over time or across categories, prose only for judgment.
-Say each fact once. No raw identifiers in prose. Keep metric labels stable so
-the page can show each measure's trend and last value. Start from
+Say each fact once. No raw identifiers in prose; check that dollar figures
+survive shell quoting. Keep metric labels stable so the page can show each
+measure's trend and last value. Start from
 [references/briefing-example.json](references/briefing-example.json).
 
-The build prints **Report checks**; fix them or have a reason. For an
-operation's first report, and whenever its structure changes, capture it with
-`scripts/capture_report.py` and have a fresh-context subagent judge the images
-alone (briefing.md has the prompt). Do not grade your own report.
+Both `build_status.py` and `publish_delivery.py` print advisory checks; fix
+them or have a reason. Do not add a separate model-judge pass before
+publishing—rely on the criteria in `references/decision-packet.md` and
+`scripts/report_checks.py`. For an operation's first report or a structural
+layout change, verify the rendered page with `scripts/capture_report.py`.
 
 ## Messages from the review page
 
@@ -226,8 +247,12 @@ make an application embeddable.
 ## Proactive deliveries
 
 When you finish work the user did not request, publish it to the proactive feed
-instead of writing a report. Give the title, a one-paragraph summary, your
-recommended default, the single decision if there is one, links, and a category:
+instead of writing a report. Follow [references/decision-packet.md](references/decision-packet.md)
+and [references/deliveries.md](references/deliveries.md): give the title, a crisp
+summary (at most 80 words), your `recommended_default`, `decision` with distinct
+alternatives (never duplicating `recommended_default`), `reversibility` and
+`confidence` with their basis, links, and a category. Every action bundled into
+approval must be explained in `--document`:
 
 ```sh
 python3 -B <skill-directory>/scripts/publish_delivery.py /absolute/path/delivery.json \

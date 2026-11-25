@@ -20,6 +20,16 @@ STATE_LEVELS = {
     "paused": ("Paused", "quiet"),
     "done": ("Done", "positive"),
 }
+CONFIDENCE_LEVELS = {
+    "high": ("High confidence", "quiet"),
+    "moderate": ("Moderate confidence", "quiet"),
+    "low": ("Low confidence", "attention"),
+}
+REVERSIBILITY_LEVELS = {
+    "reversible": ("Reversible", "quiet"),
+    "costly": ("Costly to reverse", "attention"),
+    "irreversible": ("Irreversible", "critical"),
+}
 PHASE_STATES = {"done": "Done", "active": "Now", "upcoming": "Upcoming", "blocked": "Blocked", "skipped": "Skipped"}
 # Marks say whether a change is good or bad, never which way a number moved (a falling error rate is better).
 CHANGE_DIRECTIONS = {"better": ("+", "Better"), "worse": ("−", "Worse"), "new": ("•", "New"),
@@ -30,6 +40,9 @@ CHANGED_SINCE = "Since the last version"
 
 BLOCKS = {
     # collection: (required, optional)
+    "decisions": ({"question", "recommendation", "why"},
+                  {"reversibility", "reversibility_note", "confidence", "confidence_basis",
+                   "due", "effort", "unblocks", "ask", "link", "options", "assumptions", "if_wrong"}),
     "needs_you": ({"action"}, {"effort", "due", "unblocks", "link", "ask"}),
     "changes": ({"text"}, {"direction"}),
     "phases": ({"name", "state"}, {"start", "end", "detail"}),
@@ -74,14 +87,52 @@ def _text(record, key, location):
         raise ValueError(f"{location}.{key} must be nonempty text")
 
 
+def _validate_decision(decision, location):
+    if "reversibility" in decision and decision["reversibility"] not in REVERSIBILITY_LEVELS:
+        raise ValueError(f"{location}.reversibility must be one of {sorted(REVERSIBILITY_LEVELS)}")
+    if "reversibility_note" in decision and "reversibility" not in decision:
+        raise ValueError(f"{location}.reversibility_note needs reversibility")
+    if "confidence" in decision and decision["confidence"] not in CONFIDENCE_LEVELS:
+        raise ValueError(f"{location}.confidence must be one of {sorted(CONFIDENCE_LEVELS)}")
+    if "confidence_basis" in decision and "confidence" not in decision:
+        raise ValueError(f"{location}.confidence_basis needs confidence")
+    if "options" in decision:
+        options = decision["options"]
+        if not isinstance(options, list) or not 2 <= len(options) <= 6:
+            raise ValueError(f"{location}.options must list 2 to 6 options")
+        recommended = 0
+        for index, option in enumerate(options):
+            where = f"{location}.options[{index}]"
+            _record(option, {"label"}, {"recommended", "summary", "upside", "downside"}, where)
+            for key in ("label", "summary", "upside", "downside"):
+                _text(option, key, where)
+            if "recommended" in option:
+                if type(option["recommended"]) is not bool:
+                    raise ValueError(f"{where}.recommended must be boolean")
+                if option["recommended"]:
+                    recommended += 1
+        if recommended > 1:
+            raise ValueError(f"{location}.options may mark at most one option as recommended")
+    if "assumptions" in decision:
+        assumptions = decision["assumptions"]
+        if (not isinstance(assumptions, list) or not 1 <= len(assumptions) <= 8
+                or any(not isinstance(item, str) or not item.strip() for item in assumptions)):
+            raise ValueError(f"{location}.assumptions must list 1 to 8 nonempty text items")
+
+
 def validate_blocks(document):
     """Validate the visual blocks; the core fields are validated by build_status."""
     if "state" in document:
         state = document["state"]
-        _record(state, {"level"}, {"label"}, "state")
+        _record(state, {"level"}, {"label", "confidence", "confidence_basis"}, "state")
         if state["level"] not in STATE_LEVELS:
             raise ValueError(f"state.level must be one of {sorted(STATE_LEVELS)}")
         _text(state, "label", "state")
+        if "confidence" in state and state["confidence"] not in CONFIDENCE_LEVELS:
+            raise ValueError(f"state.confidence must be one of {sorted(CONFIDENCE_LEVELS)}")
+        _text(state, "confidence_basis", "state")
+        if "confidence_basis" in state and "confidence" not in state:
+            raise ValueError("state.confidence_basis needs confidence")
     if "timeline_window" in document:
         window = document["timeline_window"]
         _record(window, {"start", "end"}, {"label"}, "timeline_window")
@@ -95,11 +146,13 @@ def validate_blocks(document):
         for index, record in enumerate(records):
             location = f"{collection}[{index}]"
             _record(record, required, optional, location)
-            for key in record.keys() - {"series", "target", "freshness_minutes"}:
+            for key in record.keys() - {"series", "target", "freshness_minutes", "options", "assumptions"}:
                 _text(record, key, location)
             for key in ("due", "start", "end", "at", "observed_at"):
                 if key in record:
                     _timestamp(record[key], f"{location}.{key}")
+            if collection == "decisions":
+                _validate_decision(record, location)
             if collection == "changes" and record.get("direction", "new") not in CHANGE_DIRECTIONS:
                 raise ValueError(f"{location}.direction must be one of {sorted(CHANGE_DIRECTIONS)}")
             if collection == "phases" and record["state"] not in PHASE_STATES:
@@ -211,13 +264,86 @@ class Blocks:
         word, tone = STATE_LEVELS[level]
         return f'<span class="state-word tone-{tone}{extra_class}">{word}</span>'
 
-    # The header's state line: the one word that says how the operation stands, then the author's reason.
+    def _due_tag(self, value):
+        due = _timestamp(value, "due")
+        overdue = due < self.generated
+        when = self.clock(due) if due.astimezone(self.zone).date() == self.generated.astimezone(self.zone).date() \
+            else self.time_text(value, full=False)
+        return (f'<span class="todo-due{" tone-attention" if overdue else ""}">'
+                f'{"Overdue since" if overdue else "By"} {self.escape(when)}, {self.escape(self.relative(due))}</span>')
+
+    def _confidence_span(self, level, basis=None):
+        word, tone = CONFIDENCE_LEVELS[level]
+        detail = f": {self.escape(basis)}" if basis else ""
+        return f'<span class="tone-{tone}">{word}</span>{detail}'
+
+    def _reversibility_span(self, level, note=None):
+        word, tone = REVERSIBILITY_LEVELS[level]
+        detail = f" ({self.escape(note)})" if note else ""
+        return f'<span class="decision-flag tone-{tone}">{word}</span>{detail}'
+
+    # The header's state line: the one word that says how the operation stands, then the author's reason and confidence.
     def state(self):
         state = self.document.get("state")
         if not state:
             return ""
         label = f' <span class="state-label">{self.escape(state["label"])}</span>' if state.get("label") else ""
-        return f'<p class="sheet-state">{self.state_word(state["level"])}{label}</p>'
+        confidence = ""
+        if state.get("confidence"):
+            confidence = f'<p class="state-confidence">{self._confidence_span(state["confidence"], state.get("confidence_basis"))}</p>'
+        return f'<p class="sheet-state">{self.state_word(state["level"])}{label}</p>{confidence}'
+
+    def decisions(self):
+        items = self.document.get("decisions", [])
+        if not items:
+            return ""
+        rows = []
+        for item in items:
+            meta = []
+            if item.get("reversibility"):
+                meta.append(self._reversibility_span(item["reversibility"], item.get("reversibility_note")))
+            if item.get("confidence"):
+                meta.append(self._confidence_span(item["confidence"], item.get("confidence_basis")))
+            if item.get("due"):
+                meta.append(self._due_tag(item["due"]))
+            if item.get("effort"):
+                meta.append(self.escape(item["effort"]))
+            if item.get("ask"):
+                meta.append(f"Ask {self.escape(item['ask'])}")
+            meta_html = f'<p class="decision-meta">{" · ".join(meta)}</p>' if meta else ""
+            recommendation = f'<p class="decision-recommendation"><strong>Recommended:</strong> {self.prose(item["recommendation"])}</p>'
+            why = f'<p class="decision-why text">{self.prose(item["why"])}</p>'
+            options_html = ""
+            if item.get("options"):
+                option_rows = []
+                for option in item["options"]:
+                    tag = ' <span class="option-tag">Recommended</span>' if option.get("recommended") else ""
+                    summary = f'<span class="option-summary">{self.escape(option["summary"])}</span>' if option.get("summary") else ""
+                    tradeoffs = []
+                    if option.get("upside"):
+                        tradeoffs.append(f'<span class="option-tradeoff"><span class="decision-key">Upside:</span> {self.escape(option["upside"])}</span>')
+                    if option.get("downside"):
+                        tradeoffs.append(f'<span class="option-tradeoff"><span class="decision-key">Tradeoff:</span> {self.escape(option["downside"])}</span>')
+                    option_rows.append(
+                        f'<li{" data-recommended=\"true\"" if option.get("recommended") else ""}>'
+                        f'<span class="option-head"><span class="option-label">{self.escape(option["label"])}</span>{tag}</span>'
+                        f'{summary}{"".join(tradeoffs)}</li>')
+                options_html = f'<ul class="decision-options">{"".join(option_rows)}</ul>'
+            assumptions_html = ""
+            if item.get("assumptions"):
+                bullets = "".join(f'<li>{self.escape(assumption)}</li>' for assumption in item["assumptions"])
+                assumptions_html = f'<div class="decision-assumptions"><p class="decision-subhead">Key assumptions</p><ul>{bullets}</ul></div>'
+            if_wrong = (f'<p class="decision-detail"><span class="decision-key">If wrong:</span> {self.prose(item["if_wrong"])}</p>'
+                        if item.get("if_wrong") else "")
+            unblocks = (f'<p class="decision-detail"><span class="decision-key">Unblocks:</span> {self.escape(item["unblocks"])}</p>'
+                        if item.get("unblocks") else "")
+            link = f'<p class="decision-link">{self.link(item["link"])}</p>' if item.get("link") else ""
+            rows.append(
+                f'<li><p class="decision-title">{self.escape(item["question"])}</p>'
+                f'{meta_html}{recommendation}{why}{options_html}{assumptions_html}{if_wrong}{unblocks}{link}</li>')
+        return (f'<section class="block-decisions" aria-labelledby="block-decisions">'
+                f'<h2 class="block-heading" id="block-decisions">Decisions <span class="count">{len(items)}</span></h2>'
+                f'<ol class="decisions">{"".join(rows)}</ol></section>')
 
     def needs_you(self):
         items = self.document.get("needs_you", [])
@@ -227,12 +353,7 @@ class Blocks:
         for item in items:
             meta = []
             if item.get("due"):
-                due = _timestamp(item["due"], "due")
-                overdue = due < self.generated
-                when = self.clock(due) if due.astimezone(self.zone).date() == self.generated.astimezone(self.zone).date() \
-                    else self.time_text(item["due"], full=False)
-                meta.append(f'<span class="todo-due{" tone-attention" if overdue else ""}">{"Overdue since" if overdue else "By"} '
-                            f'{self.escape(when)}, {self.escape(self.relative(due))}</span>')
+                meta.append(self._due_tag(item["due"]))
             if item.get("effort"):
                 meta.append(self.escape(item["effort"]))
             if item.get("ask"):

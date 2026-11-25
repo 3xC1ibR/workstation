@@ -18,9 +18,13 @@ python3 -B <skill-directory>/scripts/publish_delivery.py /absolute/path/delivery
 ```json
 {
   "title": "Ribbon Field CI is green again (draft PR #3)",
-  "summary": "Every CI run on main had failed since Oct 28. On the draft PR all three jobs pass. It found three real bugs; one can affect you on travel networks.",
+  "summary": "Every CI run on main had failed since Oct 28. On the draft PR all three jobs pass; it fixes three bugs, one of which affects travel networks.",
   "recommended_default": "Review and merge PR #3, then close Beads agent-coord-dqo3.",
   "decision": {"question": "Merge it, or tell me what to change?", "options": ["Hold: I want changes first"]},
+  "reversibility": "reversible",
+  "reversibility_note": "Standard git revert on main if anything regresses.",
+  "confidence": "high",
+  "confidence_basis": "All three CI jobs passed on PR #3 and the travel-network fix was reproduced locally.",
   "category": "Projects",
   "links": [
     {"label": "Pull request #3", "target": "https://github.com/owner/repository/pull/3"},
@@ -33,9 +37,13 @@ python3 -B <skill-directory>/scripts/publish_delivery.py /absolute/path/delivery
 | Field | Required | Contents |
 | --- | --- | --- |
 | `title` | yes | What it is, at most 300 characters. |
-| `summary` | yes | One paragraph, at most 2000 characters: what was done and what it means for him. |
-| `recommended_default` | no | What happens if he chooses **Do it**. One concrete action you are ready to carry out or have prepared for him. |
-| `decision` | no | `question`: the single decision. `options`: up to 6 alternatives to the recommended default, each a button. |
+| `summary` | yes | Crisp BLUF paragraph (target ≤80 words; max 2000 characters): what was done and the bottom line. Put evidence and option tables in `--document`. |
+| `recommended_default` | no | What happens if he chooses **Do it**. One concrete action you are ready to carry out or have prepared for him. Must match `--document` with zero hidden targets. |
+| `decision` | no | `question`: the single decision. `options`: up to 6 **distinct** alternatives to `recommended_default` (never duplicate `recommended_default`). |
+| `reversibility` | no | `reversible`, `costly`, or `irreversible`. Irreversible deliveries flag `Irreversible` on the review list and withhold one-click hover **Do it** so the reader opens the packet first. |
+| `reversibility_note` | no | Short clause (max 300 characters) stating rollback path or cost; requires `reversibility`. |
+| `confidence` | no | `high`, `moderate`, or `low`: quality of evidence and analysis, separate from outcome probability. |
+| `confidence_basis` | no | Short clause (max 300 characters) naming what was verified vs. inferred; requires `confidence`. |
 | `category` | no | Short label such as People, Money, Health, Learning, Travel, Projects, Tools. |
 | `links` | no | Up to 20 `{label, target}`. Targets are `http(s)` addresses, `agentcoord://` links, or absolute file paths. |
 | `thread` | no | `agentcoord://thread/<id>` for **Discuss**. Defaults to `--thread-id`, which defaults to the publishing conversation. |

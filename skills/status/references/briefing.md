@@ -4,18 +4,21 @@ A report is read by someone who runs several operations at once. They open the
 review page in the morning (or after a meeting, often on a phone) and go through
 each operation's report in turn, giving each **under a minute**. The page is HTML:
 use it. Every fact belongs in the block made for its shape, so the reader can
-find it by position without reading prose.
+find it by position without reading prose. For the full decision-packet
+criteria, posture selection, and before/after rewrites, read
+[decision-packet.md](decision-packet.md).
 
-## The four questions, in this order
+## The opening questions, in order
 
 The renderer places blocks in this order; fill them so each answer comes first.
 
 | # | The reader asks | Answer with | Rule |
 | --- | --- | --- | --- |
-| 1 | Where does this stand? | `state` and `summary` | `state.level` is the honest one-word verdict; `state.label` is its reason in under 12 words. The summary is at most 60 words; its first sentence is the headline the review list shows. |
-| 2 | What changed since I last looked? | `changes` | 2 to 6 items, each one line, marked `better`, `worse`, `new`, `resolved`, or `unchanged`. Measures also show their previous value automatically. |
-| 3 | What must I do, by when? | `needs_you` | One item per action, starting with a verb: effort, deadline (`due`), what it unblocks, and a link or ask number. Nothing for the reader: omit the block and say so in the summary. |
-| 4 | What happens next, and when? | `timeline`, `actions` | Scheduled checks, deadlines, and windows go in the timeline with times; owners and commitments go in actions. |
+| 1 | Where does this stand, and how sure are you? | `state` and `summary` | `state.level` is the honest one-word verdict; `state.label` is its reason in under 12 words; optional `confidence` (`high`, `moderate`, `low`) and `confidence_basis` rate evidence quality separately from outcome probability. The summary is at most 60 words; its first sentence is the headline the review list shows. |
+| 2 | What must I decide? | `decisions` | Completed staff work: `question`, `recommendation`, contrastive `why`, 2–6 `options` (`upside`/`downside`), `reversibility`, `confidence`, plus `assumptions` and `if_wrong` for costly/irreversible calls. Omit when no choice is waiting. |
+| 3 | What tasks wait on me, by when? | `needs_you` | Pure execution steps only (never hide a choice here), starting with a verb: effort, deadline (`due`), what it unblocks, and a link or ask number. Nothing for the reader: omit the block and say so in the summary. |
+| 4 | What changed since I last looked? | `changes` | 2 to 6 items, each one line, marked `better`, `worse`, `new`, `resolved`, or `unchanged`. Measures also show their previous value automatically. |
+| 5 | What happens next, and when? | `timeline`, `actions` | Scheduled checks, deadlines, and windows go in the timeline with times; owners and commitments go in actions. |
 
 Then the shape of the work: `metrics` (the rail), `phases`, `workstreams`,
 `charts`. Then evidence: `sections` (background collapsed) and `sources`.
@@ -24,7 +27,9 @@ Then the shape of the work: `metrics` (the rail), `phases`, `workstreams`,
 
 | The content is | Use | Not |
 | --- | --- | --- |
-| A verdict on the whole operation | `state` | An adjective buried in the summary |
+| A verdict on the whole operation | `state` (with optional `confidence`) | An adjective buried in the summary |
+| A choice the reader must make (options, tradeoffs, spend, risk) | `decisions` | A vague `"Choose X"` line in `needs_you` |
+| A pure execution task only the reader can perform (login, key, signature) | `needs_you` | A notice or summary bullet |
 | A number with a goal ("$0 of $1,000", "48 of 50 checks") | a metric with `current` and `target` (draws a bar) | A sentence |
 | A number you report every version | a metric with `current` and the **same label** each time (draws its trend and "Was ...") | Re-describing the change in prose |
 | A number over time you observed | a `line` chart, or a metric `series` for a small trend | A table of times and values |

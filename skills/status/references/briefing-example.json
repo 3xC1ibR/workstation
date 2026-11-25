@@ -5,17 +5,47 @@
   "timezone": "America/Chicago",
   "state": {
     "level": "at_risk",
-    "label": "Cutover waits on your approval; lag broke its limit overnight"
+    "label": "Cutover waits on your go/no-go; lag broke its limit overnight",
+    "confidence": "moderate",
+    "confidence_basis": "Shadow parity verified across 48,210 invoices; 4:00 PM batch slot tested in replay only, not live load."
   },
-  "summary": "Shadow traffic ran clean for 36 hours and every invoice matched. Replication lag broke its 5 s limit overnight because of the nightly invoice batch; moving the batch to 4:00 PM keeps it under 3 s in the replay. Cutover is ready for 2:00 PM.",
-  "needs_you": [
+  "summary": "Shadow traffic ran clean for 36 hours with zero invoice mismatches. Overnight replication lag hit 9 s during the nightly batch, but replaying the batch at 4:00 PM kept lag under 3 s. Cutover is ready for 2:00 PM pending your go/no-go and allowlist renewal.",
+  "decisions": [
     {
-      "action": "Approve or postpone the 2:00 PM cutover",
-      "effort": "2 min",
+      "question": "Proceed with the 2:00 PM billing cutover today or postpone to Thursday?",
+      "recommendation": "Proceed at 2:00 PM, gated on the 12:00 PM lag check staying under 5 s.",
+      "why": "Beats postponing to Thursday by avoiding $240/day in dual-region run cost and a second customer notice, while the 12:00 PM check gives a hard abort gate before DNS shifts.",
+      "reversibility": "costly",
+      "reversibility_note": "DNS rollback takes 15 min plus invoice reconciliation for any writes during the cutover window.",
+      "confidence": "moderate",
+      "confidence_basis": "36 h shadow parity is direct evidence; 4:00 PM batch replay is synthetic load.",
       "due": "2026-11-23T12:30:00-06:00",
+      "effort": "2 min",
       "ask": "71",
-      "unblocks": "The cutover runbook; without it the window moves to Thursday"
-    },
+      "unblocks": "The 2:00 PM cutover runbook; without approval the window moves to Thursday",
+      "options": [
+        {
+          "label": "Proceed at 2:00 PM if noon lag is under 5 s",
+          "recommended": true,
+          "summary": "Shift weighted DNS at 2:05 PM and move the nightly invoice batch to 4:00 PM.",
+          "upside": "Saves $720 in dual-region cost and honors the maintenance notice already sent to 312 accounts.",
+          "downside": "Live 4:00 PM batch could still spike lag if afternoon checkout traffic exceeds replay."
+        },
+        {
+          "label": "Postpone cutover to Thursday 2:00 PM",
+          "summary": "Run one live 4:00 PM batch in shadow first, then cut over Thursday.",
+          "upside": "Eliminates the synthetic-replay assumption before touching live writes.",
+          "downside": "Adds $720 in dual-region spend and requires resending maintenance notices to 312 accounts."
+        }
+      ],
+      "assumptions": [
+        "Afternoon checkout volume between 4:00 PM and 5:00 PM stays within 1.2x of replay volume.",
+        "Payment processor allowlist is renewed by 1:00 PM."
+      ],
+      "if_wrong": "If lag exceeds 5 s at noon or during the 4:00 PM batch, abort cutover or pause batch writes and roll DNS back within 15 min."
+    }
+  ],
+  "needs_you": [
     {
       "action": "Renew the payment processor's IP allowlist for the new region",
       "effort": "10 min, needs your processor login",

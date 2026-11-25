@@ -10,7 +10,7 @@ import unittest
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "scripts"))
 from build_status import previous_versions, render, validate
 from register_status import register
-from report_checks import check
+from report_checks import check, check_delivery
 from status_store import StatusReports
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "references" / "briefing-example.json"
@@ -24,12 +24,22 @@ class ValidationTests(unittest.TestCase):
     def test_the_example_is_valid_and_uses_every_block(self):
         document = json.loads(EXAMPLE.read_text())
         validate(document)
-        for key in ("state", "needs_you", "changes", "phases", "timeline", "timeline_window", "workstreams", "charts"):
+        for key in ("state", "decisions", "needs_you", "changes", "phases", "timeline", "timeline_window", "workstreams", "charts"):
             self.assertIn(key, document)
 
     def test_invalid_blocks_are_refused_with_their_location(self):
         cases = [
             ({"state": {"level": "fine"}}, "state.level"),
+            ({"state": {"level": "on_track", "confidence": "sure"}}, "state.confidence"),
+            ({"state": {"level": "on_track", "confidence_basis": "direct check"}}, "confidence_basis needs confidence"),
+            ({"decisions": [{"question": "Q", "recommendation": "R", "why": "W", "reversibility": "maybe"}]}, "decisions[0].reversibility"),
+            ({"decisions": [{"question": "Q", "recommendation": "R", "why": "W", "reversibility_note": "n"}]}, "reversibility_note needs reversibility"),
+            ({"decisions": [{"question": "Q", "recommendation": "R", "why": "W", "confidence": "very"}]}, "decisions[0].confidence"),
+            ({"decisions": [{"question": "Q", "recommendation": "R", "why": "W", "confidence_basis": "b"}]}, "confidence_basis needs confidence"),
+            ({"decisions": [{"question": "Q", "recommendation": "R", "why": "W", "options": [{"label": "Only one"}]}]}, "2 to 6 options"),
+            ({"decisions": [{"question": "Q", "recommendation": "R", "why": "W",
+                             "options": [{"label": "A", "recommended": True}, {"label": "B", "recommended": True}]}]}, "at most one option"),
+            ({"decisions": [{"question": "Q", "recommendation": "R", "why": "W", "assumptions": []}]}, "1 to 8 nonempty"),
             ({"needs_you": [{"action": "Approve", "due": "tomorrow"}]}, "needs_you[0].due"),
             ({"phases": [{"name": "Plan", "state": "started"}]}, "phases[0].state"),
             ({"timeline": [{"at": "2026-11-23T12:00:00", "title": "Check"}]}, "timezone"),
@@ -50,7 +60,7 @@ class ValidationTests(unittest.TestCase):
 
     def test_documents_without_blocks_render_as_before(self):
         output = render(base())
-        for marker in ("sheet-state", "block-needs-you", "phases", "events", "workstreams", "plot"):
+        for marker in ("sheet-state", "state-confidence", "block-decisions", "block-needs-you", "phases", "events", "workstreams", "plot"):
             self.assertNotIn(f'class="{marker}', output)
 
 
@@ -61,13 +71,16 @@ class RenderingTests(unittest.TestCase):
 
     def test_the_four_questions_come_in_order(self):
         positions = [self.output.index(marker) for marker in
-                     ('class="sheet-state"', 'class="assessment', 'id="block-needs-you"', 'class="block-changes"',
-                      'class="block-phases"', 'class="block-timeline"', 'class="block-workstreams"', 'class="block-chart"')]
+                     ('class="sheet-state"', 'class="state-confidence"', 'class="assessment', 'id="block-decisions"',
+                      'id="block-needs-you"', 'class="block-changes"', 'class="block-phases"', 'class="block-timeline"',
+                      'class="block-workstreams"', 'class="block-chart"')]
         self.assertEqual(positions, sorted(positions))
 
     def test_state_and_lane_words_carry_their_tone(self):
         self.assertIn('<span class="state-word tone-attention">At risk</span>', self.output)
         self.assertIn('<span class="state-word tone-critical">Blocked</span>', self.output)
+        self.assertIn('<span class="decision-flag tone-attention">Costly to reverse</span>', self.output)
+        self.assertIn('<span class="tone-quiet">Moderate confidence</span>', self.output)
 
     def test_needs_you_leads_with_the_deadline_and_time_left(self):
         self.assertIn('<span class="todo-due">By 12:30 PM, in 5 h</span>', self.output)
@@ -103,7 +116,11 @@ class RenderingTests(unittest.TestCase):
 
     def test_author_text_in_blocks_is_escaped(self):
         hostile = '<img src=x onerror=alert(1)>'
-        document = {**base(), "state": {"level": "blocked", "label": hostile},
+        document = {**base(), "state": {"level": "blocked", "label": hostile, "confidence": "low", "confidence_basis": hostile},
+                    "decisions": [{"question": hostile, "recommendation": hostile, "why": hostile,
+                                   "reversibility": "irreversible", "reversibility_note": hostile,
+                                   "options": [{"label": hostile, "upside": hostile, "downside": hostile}, {"label": "Wait"}],
+                                   "assumptions": [hostile], "if_wrong": hostile, "link": "javascript:alert(1)"}],
                     "needs_you": [{"action": hostile, "link": "javascript:alert(1)"}],
                     "workstreams": [{"name": hostile, "state": "on_track", "now": hostile}],
                     "charts": [{"title": hostile, "kind": "bar", "series": [{"name": hostile, "points": [[hostile, 1]]}]}]}
@@ -131,14 +148,16 @@ class VersionTests(unittest.TestCase):
 
     def test_the_review_list_receives_state_and_actions_for_the_reader(self):
         with tempfile.TemporaryDirectory() as directory:
-            document = {**base(), "state": {"level": "blocked"}, "needs_you": [{"action": "Approve"}, {"action": "Sign"}]}
+            document = {**base(), "state": {"level": "blocked"},
+                        "decisions": [{"question": "Choose plan", "recommendation": "Plan A", "why": "Cheaper"}],
+                        "needs_you": [{"action": "Approve"}, {"action": "Sign"}]}
             register(document, render(document), workspace="/work", root=directory, operation="campaign")
             operation = StatusReports(directory).operations()["operations"][0]
-            self.assertEqual((operation["state"], operation["needs_you_count"]), ("blocked", 2))
+            self.assertEqual((operation["state"], operation["decision_count"], operation["needs_you_count"]), ("blocked", 1, 2))
             plain = {**base(), "title": "Other"}
             register(plain, render(plain), workspace="/work", root=directory, operation="plain")
             other = next(o for o in StatusReports(directory).operations()["operations"] if o["title"] == "Other")
-            self.assertEqual((other["state"], other["needs_you_count"]), (None, 0))
+            self.assertEqual((other["state"], other["decision_count"], other["needs_you_count"]), (None, 0, 0))
 
 
 class CheckTests(unittest.TestCase):
@@ -152,8 +171,53 @@ class CheckTests(unittest.TestCase):
                     "sections": [{"title": "Pipeline", "columns": ["Lane", "Owner", "State"], "rows": [["a", "b", "c"]]}]}
         advice = " ".join(check(document, operation=True))
         for expected in ("summary has", "no state", "no timeline", "needs_you with", "raw identifiers", "current and target",
-                         "use workstreams", "no changes", "neither needs_you nor actions"):
+                         "use workstreams", "no changes", "neither decisions, needs_you, nor actions"):
             self.assertIn(expected, advice)
+
+    def test_decision_packet_report_checks(self):
+        document = {**base(), "state": {"level": "blocked"},
+                    "changes": [{"text": "Stripe acct_1UeSj5Gj26oDTVCY verified (, nonmember)"}],
+                    "needs_you": [{"action": "Choose an imprint address"}]}
+        advice = " ".join(check(document, operation=True))
+        self.assertIn("acct_1UeSj5Gj26oDTVCY", advice)
+        self.assertIn("missing dollar amount", advice)
+        self.assertIn("needs_you asks the reader to decide", advice)
+
+        irreversible = {**base(), "state": {"level": "at_risk"},
+                        "decisions": [{"question": "Delete stack?", "recommendation": "Delete", "why": "Unused",
+                                       "reversibility": "irreversible"}]}
+        advice2 = " ".join(check(irreversible))
+        self.assertIn("has no options", advice2)
+        self.assertIn("missing reversibility or confidence", advice2)
+        self.assertIn("marked irreversible", advice2)
+
+    def test_delivery_checks_catch_live_failure_modes(self):
+        bad = {
+            "title": "AWS cleanup",
+            "summary": " ".join(["cost"] * 90) + " on acct_1UeSj5Gj26oDTVCY for  pilot",
+            "recommended_default": "Execute safe bundle + stop com.rquinonez.ribbon-field-tunnel",
+            "decision": {
+                "question": "Approve?",
+                "options": ["Execute safe bundle and stop com.rquinonez.ribbon-field-tunnel", "Hold"],
+            },
+        }
+        body = "We audited AWS.\n\nReply \"bundle\" to approve 1-6."
+        advice = " ".join(check_delivery(bad, body=body))
+        for expected in ("summary has", "duplicates recommended_default", "without reversibility or confidence",
+                         "acct_1UeSj5Gj26oDTVCY", "missing dollar amount", "chat-reply instructions",
+                         "com.rquinonez.ribbon-field-tunnel"):
+            self.assertIn(expected, advice)
+
+        clean = {
+            "title": "Cut AWS bill 29%",
+            "summary": "Live audit found $44/mo in verified idle resources.",
+            "recommended_default": "Clean up the 5 verified idle resources and add a $100 budget alert.",
+            "decision": {"question": "Approve the 5-item cleanup or include Datadog too?",
+                         "options": ["Include Datadog deletion too (saves $56/mo)", "Hold"]},
+            "reversibility": "costly",
+            "confidence": "high",
+        }
+        self.assertEqual(check_delivery(clean, body="## Options\n\nAll 5 resources listed."), [])
 
 
 if __name__ == "__main__":

@@ -15,6 +15,7 @@ from urllib.parse import urlsplit
 
 import interactive_documents
 import markdown_text
+from report_blocks import CONFIDENCE_LEVELS, REVERSIBILITY_LEVELS
 
 ASSETS = Path(__file__).resolve().parents[1] / "assets"
 WEB_LINK = re.compile(r"https?://[^\s]+\Z")
@@ -229,10 +230,21 @@ def delivery_page(addresses, delivery, body, embedded="", public_url=None):
     version_address = lambda index, version: delivery_route(delivery["series"], version, index == 0)
     navigation = (version_navigation(base, "Delivery", version_address, delivery["versions"], delivery["id"]) if delivery["version_count"] > 1
                   else f'<nav class="page-navigation" aria-label="Delivery"><a class="back-link" href="{escape(base)}/">Review</a></nav>')
+    packet_parts = []
+    if delivery.get("reversibility"):
+        word, tone = REVERSIBILITY_LEVELS[delivery["reversibility"]]
+        note = f" ({escape(delivery['reversibility_note'])})" if delivery.get("reversibility_note") else ""
+        packet_parts.append(f'<span><span class="decision-flag tone-{tone}">{word}</span>{note}</span>')
+    if delivery.get("confidence"):
+        word, tone = CONFIDENCE_LEVELS[delivery["confidence"]]
+        basis = f": {escape(delivery['confidence_basis'])}" if delivery.get("confidence_basis") else ""
+        packet_parts.append(f'<span><span class="tone-{tone}">{word}</span>{basis}</span>')
+    packet_meta = f'<p class="sheet-meta packet-meta">{"".join(packet_parts)}</p>' if packet_parts else ""
     content = (
         f'{navigation}'
         f'<article class="sheet delivery"><header class="sheet-header"><h1>{escape(delivery["title"])}</h1>'
-        f'<p class="sheet-meta">{f"<span>{origin_text(delivery)}</span>" if origin_text(delivery) else ""}{moment_tag(delivery["received_at"])}</p></header>'
+        f'<p class="sheet-meta">{f"<span>{origin_text(delivery)}</span>" if origin_text(delivery) else ""}{moment_tag(delivery["received_at"])}</p>'
+        f'{packet_meta}</header>'
         f'<p class="assessment text">{escape(delivery["summary"])}</p>'
         f'<section class="response-panel" aria-label="Your response">{recommendation}{question}'
         f'<div id="delivery-response"><noscript><p class="note">Enable JavaScript to respond to this delivery.</p></noscript></div></section>'

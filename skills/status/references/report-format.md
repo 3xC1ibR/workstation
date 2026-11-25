@@ -20,16 +20,19 @@ Optional `timezone` defaults to `UTC` and accepts an IANA name. Collections:
 
 ## Visual blocks
 
-Optional, and rendered in this order: the header's state; after the summary,
-`needs_you`, then notices, then `changes`; after the opening, `phases`,
-`timeline`, `workstreams`, `charts`, then response fields, actions, sections,
-sources. Read [briefing.md](briefing.md) for when to use each. Timestamps are
-ISO 8601 with a timezone and are shown in `timezone`.
+Optional, and rendered in this order: the header's state (with optional
+confidence); after the summary, `decisions`, then `needs_you`, then `changes`,
+then `notices`; after the opening, `phases`, `timeline`, `workstreams`,
+`charts`, then response fields, actions, sections, sources. Read
+[decision-packet.md](decision-packet.md) and [briefing.md](briefing.md) for
+when to use each. Timestamps are ISO 8601 with a timezone and are shown in
+`timezone`.
 
 | Field | Contents |
 | --- | --- |
-| `state` | `{level, label?}`. `level`: `on_track`, `at_risk`, `off_track`, `blocked`, `paused`, `done`. Shown as a coloured word under the title and on the review list's row. `label`: the reason, under 12 words. |
-| `needs_you` | `{action, effort?, due?, unblocks?, link?, ask?}`: what only the reader can do. `due` is a timestamp (past due shows "Overdue since"); `ask` is a Ribbon Field ask number; `link` is a web address, an `agentcoord://` link, or a path. The review list counts these on the row. |
+| `state` | `{level, label?, confidence?, confidence_basis?}`. `level`: `on_track`, `at_risk`, `off_track`, `blocked`, `paused`, `done`. Shown as a coloured word under the title and on the review list's row. `label`: the reason, under 12 words. `confidence`: `high`, `moderate`, or `low` (evidence quality, separate from outcome probability), with optional `confidence_basis`. |
+| `decisions` | `{question, recommendation, why, reversibility?, reversibility_note?, confidence?, confidence_basis?, due?, effort?, unblocks?, ask?, link?, options?, assumptions?, if_wrong?}`: choices waiting on the reader. `reversibility`: `reversible`, `costly`, or `irreversible`. `confidence`: `high`, `moderate`, or `low`. `options`: 2 to 6 `{label, recommended?, summary?, upside?, downside?}` (at most one `recommended: true`). `assumptions`: 1 to 8 strings. The review list counts these on the row. |
+| `needs_you` | `{action, effort?, due?, unblocks?, link?, ask?}`: pure execution tasks only the reader can do (put choices in `decisions`). `due` is a timestamp (past due shows "Overdue since"); `ask` is a Ribbon Field ask number; `link` is a web address, an `agentcoord://` link, or a path. The review list counts these on the row. |
 | `changes` | `{text, direction?}`. `direction`: `better`, `worse`, `new` (default), `resolved`, `unchanged`. Headed "Since the last version" with the previous version's time. |
 | `phases` | `{name, state, start?, end?, detail?}`. `state`: `done`, `active`, `upcoming`, `blocked`, `skipped`. A row of steps; a column past five steps and on phones. |
 | `timeline` | `{at, title, end?, detail?, kind?, owner?}`. `kind`: `event` (default), `scheduled`, `deadline`, `milestone`. `end` makes a span. Drawn as an axis with the present marked, then a list with a "Now" rule; more than eight past events fold all but the last four. |

@@ -24,6 +24,7 @@ import tempfile
 
 from document_state import DocumentStates
 import interactive_documents
+from report_blocks import CONFIDENCE_LEVELS, REVERSIBILITY_LEVELS
 from status_store import IDENTIFIER, ResponseConflict, StatusError, moment, read_text, write_json
 
 DOCUMENT_LIMIT = 2 * 1024 * 1024
@@ -37,6 +38,8 @@ RECOMMENDED = "recommended_default"
 DELIVERY_KEY = re.compile(r"[a-z0-9]+(-[a-z0-9]+)*\Z")           # the same rule as an operation key
 STATE_FIELDS = {"read_at", "read_version", "response", "discussed_at", "history"}
 EARLIER_STATE_FIELDS = STATE_FIELDS - {"read_version"}            # records written before deliveries had versions
+DOCUMENT_FIELDS = {"title", "summary", "recommended_default", "decision", "reversibility", "reversibility_note",
+                   "confidence", "confidence_basis", "category", "links", "thread", "created_at"}
 
 
 def series_identity(manifest):
@@ -61,13 +64,25 @@ def text(value, label, limit, *, required=False):
 
 def validate(document):
     """Check a delivery document; unknown fields are errors, never silent loss."""
-    allowed = {"title", "summary", "recommended_default", "decision", "category", "links", "thread", "created_at"}
+    allowed = DOCUMENT_FIELDS
     if not isinstance(document, dict) or document.keys() - allowed:
         raise ValueError("A delivery accepts only: " + ", ".join(sorted(allowed)))
     text(document.get("title"), "title", 300, required=True)
     text(document.get("summary"), "summary", 2000, required=True)
     text(document.get("recommended_default"), "recommended_default", 1000)
     text(document.get("category"), "category", 60)
+    if "reversibility" in document and document["reversibility"] not in REVERSIBILITY_LEVELS:
+        raise ValueError(f"reversibility must be one of {sorted(REVERSIBILITY_LEVELS)}")
+    if "reversibility_note" in document:
+        if "reversibility" not in document:
+            raise ValueError("reversibility_note needs reversibility")
+        text(document.get("reversibility_note"), "reversibility_note", 300, required=True)
+    if "confidence" in document and document["confidence"] not in CONFIDENCE_LEVELS:
+        raise ValueError(f"confidence must be one of {sorted(CONFIDENCE_LEVELS)}")
+    if "confidence_basis" in document:
+        if "confidence" not in document:
+            raise ValueError("confidence_basis needs confidence")
+        text(document.get("confidence_basis"), "confidence_basis", 300, required=True)
     decision = document.get("decision")
     if decision is not None:
         if not isinstance(decision, dict) or decision.keys() - {"question", "options"}:
@@ -203,8 +218,7 @@ class Deliveries:
             if manifest.get("version") != 1 or manifest.get("id") != identifier:
                 raise ValueError("Unsupported delivery record")
             validate({key: value for key, value in manifest.items()
-                      if key in {"title", "summary", "recommended_default", "decision", "category", "links", "created_at"}
-                      and value is not None})
+                      if key in DOCUMENT_FIELDS - {"thread"} and value is not None})
             moment(manifest["received_at"])
             if not isinstance(manifest["origin"], dict) or not isinstance(manifest["attachments"], list):
                 raise ValueError("Invalid delivery origin")

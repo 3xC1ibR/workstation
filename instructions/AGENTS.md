@@ -22,35 +22,6 @@ conversation sync; follow its separate opt-in instructions in `llms.txt`.
 You must gather enough behavioral signal (semantic search behaviors, patterns, preferences, time tracking, location history, ect) to fully tailor your response to make it maximally useful to the user. Drive towards concrete deliverables. Prefer gather meaningful signal over continous development. 
 
 
-# Friction reports
-
-When something costs you avoidable effort but does not stop the task, record
-it at once with one shell command, then continue:
-
-    friction 'While <task>, <what got in the way>; <likely cause or remedy>.'
-
-Record: retried or failed commands, misleading errors, missing or wrong
-documentation, instructions that disagree with the code, undocumented setup
-steps, flaky tests, stale caches, slow or surprising tools, and anything you
-would warn the next agent about. Record it even if you worked around it.
-
-- One obstacle per record, one or two sentences. Name the exact command, path,
-  or error text and what it cost (for example, three retries or ten minutes).
-- Add `--scope repository|environment|harness|external` when the owner of the
-  remedy is clear: this repository, this machine or shell, the agent tool or
-  coordination layer, or a third-party service.
-- Use single quotes. For text containing a single quote, pipe it:
-  `friction - <<'EOF'` ... `EOF`.
-- The command captures directory, repository, branch, commit, provider,
-  session, and host. It writes outside every repository: no write scope, no
-  Git change. Unless you are assigned friction triage, never list, resolve, or
-  summarize records, and do not report them to the user unless the friction
-  changed the outcome. Triage marks records handled with `friction --resolve`
-  (see `friction --help`) and never edits the store file.
-- Do not stop your task to fix friction outside your current scope. Blocking
-  defects and requested work belong in Beads, not here.
-
-
 # Personal skills
 
 Keep custom personal skills version-controlled in `/opt/projects/workstation/skills/<skill-name>/`, with a `SKILL.md` entrypoint and any supporting resources.
@@ -110,3 +81,7 @@ First figure out what outcome I'm after. If there's a path that is materially be
 - Otherwise, do it my way and note the alternative in one line at the end.
 - If you're running unattended, do it my way and flag the alternative.
 Don't propose alternatives that are merely different. If you can't name a concrete gain, follow my method.
+
+# Stoic context after compaction
+
+In any thread where Stoic has been enabled (`/stoic`, `$stoic`, or "use Stoic"), after conversation compaction, re-run `python3 ~/.agents/skills/stoic/scripts/read_context.py start` before answering so verbatim `llm_directives` and `long_term_memory` are restored into context.

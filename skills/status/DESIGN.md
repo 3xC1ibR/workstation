@@ -75,10 +75,12 @@ Colour carries state, never decoration. Most of every screen is ink on paper.
 - **Ink** is also the action colour: the one solid button of a panel is ink on
   paper (paper on ink in the dark theme), not the accent.
 - **Accent** marks unread items, links in text, and keyboard focus. Nothing else.
-- **Critical** marks the word "Blocking", a failed request, and the state words
-  "Off track" and "Blocked" with a worse change's mark. Nothing else is red.
+- **Critical** marks the word "Blocking", a failed request, an "Irreversible"
+  decision, and the state words "Off track" and "Blocked" with a worse change's
+  mark. Nothing else is red.
 - **Attention** marks stale or overdue asks, an inactive agent, stale
-  observations, an unavailable source, and the notice on an earlier version.
+  observations, an unavailable source, a "Costly to reverse" decision, "Low
+  confidence", and the notice on an earlier version.
 - **Positive** marks an accepted delivery, the state words "On track" and
   "Done", and a better or resolved change. Dismissed is neutral, not red.
 - **Attention** also marks "At risk", an overdue item for the reader, a
@@ -141,16 +143,20 @@ page inset is 24 px. Spacing uses the 4 px scale.
   title, the line beneath, what answering unblocks and the place to act, the
   response, then the whole question and its context, in ink. Nothing in it is
   boxed except its controls.
-- **Report.** Navigation, title, one quiet line (subject, "As of ..."), then the
-  opening: the operation's asks, the assessment and the notices in the main
-  column, with the measures in the rail as rows (label, value at the right,
-  particulars beneath). Sections follow at full width with prose at the
-  measure. A table of two columns keeps the main column and wraps at phone
-  width; every wider table takes the page's 1120 px and scrolls sideways under
-  its first column, with edge shadows, only when that is not enough.
-- **Delivery.** Title and one quiet line, then the summary in the main column with
-  the response in the rail beside it (it follows the summary below 1000 px).
-  A write-up of prose alone continues in the main column and the response stays
+- **Report.** Navigation, title, state (with optional confidence and its basis),
+  one quiet line (subject, "As of ..."), then the opening: the operation's asks,
+  the assessment, any decisions waiting on the reader (recommendation, why,
+  options with tradeoffs, reversibility, confidence, assumptions), "For you to
+  do", "Since the last version", and notices in the main column, with the
+  measures in the rail as rows (label, value at the right, particulars beneath).
+  Sections follow at full width with prose at the measure. A table of two
+  columns keeps the main column and wraps at phone width; every wider table
+  takes the page's 1120 px and scrolls sideways under its first column, with
+  edge shadows, only when that is not enough.
+- **Delivery.** Title and one quiet line (origin, time, and optional
+  reversibility and confidence), then the summary in the main column with the
+  response in the rail beside it (it follows the summary below 1000 px). A
+  write-up of prose alone continues in the main column and the response stays
   in view beside it. Wide content (a write-up with tables, an interactive
   document, another application) takes the page's whole width below the rail.
 
@@ -182,7 +188,7 @@ are drawn with two borders; the search glyph is the page's one drawn icon.
 | Notice | - | A material exception in a report: a strong first line and a paragraph directly under the assessment | Routine information |
 | Measure | tile, rail row; with a bar toward its target, a trend line, and its last value | A metric with its provenance | Prose |
 | State word | on track, at risk, off track, blocked, paused, done | How an operation or a lane stands: under a report's title, on its review row, beside a workstream | Decoration, or anything that is not a state |
-| Report blocks | for you to do, since the last version, phases, timeline (axis for a fixed window, list by day with a Now rule), workstreams, line chart, bar chart | The four questions of a briefing and the shape of the work; drawn without script, positions in SVG percentages | Content that only one report needs: that is an interactive document |
+| Report blocks | decisions, for you to do, since the last version, phases, timeline (axis for a fixed window, list by day with a Now rule), workstreams, line chart, bar chart | Decision packets (question, recommendation, contrastive options, reversibility, confidence, assumptions), the briefing questions, and the shape of the work; drawn without script, positions in SVG percentages | Content that only one report needs: that is an interactive document |
 | Response panel | awaiting, accepted, dismissed, earlier version | The owner's response to a delivery | Report response fields |
 | Response editor | - | Agent-defined questions inside a report, with "Save responses" as its primary | Delivery responses |
 | Version history | - | Earlier versions of an operation report or of a delivery | Anything else |
@@ -220,9 +226,9 @@ are drawn with two borders; the search glyph is the page's one drawn icon.
 
 | Object | Key attributes | Actions | Appears in |
 |---|---|---|---|
-| Operation | title, latest summary, origin, version count, unread, open asks | open, dismiss until next version, restore | Review list, report page |
-| Report version | observations, notices, metrics, actions, sections, response fields | read, answer response fields, open another version | Report page |
-| Delivery | title, summary, recommended default, decision, links, document, attachments, category, agent, key or series, latest version, version count, unread | read, do it (default or an option), dismiss with a reason, discuss in Ribbon Field, reopen | Review list, delivery page |
+| Operation | title, latest summary, state, decision count, needs-you count, origin, version count, unread, open asks | open, dismiss until next version, restore | Review list, report page |
+| Report version | state (with optional confidence), decisions, needs-you, changes, notices, metrics, actions, sections, response fields | read, answer response fields, open another version | Report page |
+| Delivery | title, summary, recommended default, decision, reversibility, confidence, links, document, attachments, category, agent, key or series, latest version, version count, unread | read, do it (default or an option), dismiss with a reason, discuss in Ribbon Field, reopen | Review list, delivery page |
 | Delivery version | one immutable publication of a delivery; number, received time | read, open another version; responses are given on the latest | Delivery page |
 | Interactive document | kind (retained document or address of an application), the item version it belongs to | use inside the item's page; follow its links in the same tab | Report page, delivery page |
 | Document state | the value the document saved, save time, revision, saving version | saved and loaded by the document through the page; read by agents | Not shown; `read_responses.py` |
@@ -273,6 +279,33 @@ ask chevron. Nothing moves on load.
 5. The margin mark: an accent disc for unread, a chevron for an ask.
 
 ## Decision record
+
+- 2026-11-23: **Reports and deliveries become decision packets.** The owner
+  wants to work at the report level rather than the thread level: each report
+  or delivery should surface what was done, his options, a recommendation and
+  why, tradeoffs, key assumptions, confidence, and reversibility, shaped to the
+  work rather than forced into one rigid template. Grounded in Completed Staff
+  Work (Lerch 1942), ODNI ICD 203 (separating confidence from probability,
+  explicit linchpin assumptions and alternatives), Amazon Type 1 / Type 2
+  reversibility, Nygard ADRs (positive, negative, and neutral consequences),
+  and 2024–2026 HCI findings on verification-cost errors and contrastive
+  explanations. Added three backward-compatible elements: (1) an optional
+  `decisions` block in the report opening (rendered with hairlines, ink, and
+  space—zero boxes—carrying question, recommendation, why, contrastive options,
+  reversibility, confidence, assumptions, and what changes if wrong), surfaced
+  as a count flag on the Operations row; (2) optional `confidence` and
+  `confidence_basis` on `state` and optional `reversibility`,
+  `reversibility_note`, `confidence`, and `confidence_basis` on proactive
+  deliveries, set quietly under the header with colour reserved for
+  `Irreversible` (critical) and `Costly to reverse` / `Low confidence`
+  (attention); (3) upgraded advisory checks in `report_checks.py` for both
+  operation reports and proactive deliveries (contradictory or duplicated
+  defaults, unverified actions absent from the write-up, decision verbs hidden
+  inside `needs_you`, shell-eaten dollar amounts, and prefixed raw IDs) paired
+  with an outcome-based decision-packet contract in
+  `references/decision-packet.md` (deterministic checks only, with no separate
+  model-judge pass per owner decision 2026-11-23). Existing reports and
+  deliveries continue rendering unchanged.
 
 - 2026-11-23: **Select to ask the agent, and reports that follow new
   versions.** The owner asked to highlight anything on a page and send it to

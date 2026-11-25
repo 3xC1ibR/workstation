@@ -252,7 +252,8 @@ def render(document, connection=None, *, page=None, previous=None):
               '<div class="sheet-opening"><div class="sheet-lead">',
               page.get("after_header", "") if page else ""]
     output.append(f'<p class="assessment text">{prose(document["summary"])}</p>')
-    # Where things stand, then what the reader must do, then what moved since the last version, then the exceptions.
+    # Where things stand, then decisions waiting on the reader, then tasks, then what moved since the last version, then exceptions.
+    output.append(blocks.decisions())
     output.append(blocks.needs_you())
     output.append(blocks.changes())
     for notice in document.get("notices", []):
@@ -367,7 +368,7 @@ def main():
     from report_checks import check
     advice = check(document, operation=bool(args.operation or previous))
     if advice:
-        print("Report checks (advisory; see references/briefing.md):", file=sys.stderr)
+        print("Report checks (advisory; see references/decision-packet.md and references/briefing.md):", file=sys.stderr)
         for line in advice:
             print(f"- {line}", file=sys.stderr)
     args.output.parent.mkdir(parents=True, exist_ok=True)

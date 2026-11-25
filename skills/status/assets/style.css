@@ -131,12 +131,36 @@ button.quiet:hover { background: var(--surface-quiet); color: var(--ink); }
 .state-word { font-weight: var(--weight-strong); }
 .sheet-state { line-height: var(--line-snug); margin-bottom: var(--space-1); max-width: var(--measure); }
 .sheet-state .state-label { margin-inline-start: var(--space-1); }
+.state-confidence { font-size: var(--meta); color: var(--ink-tertiary); line-height: var(--line); max-width: var(--measure); }
 /* Blocks of the opening share its main column; their headings are text size on a hairline, as in the review list. */
 .sheet .sheet-lead > section { margin: var(--space-5) 0 0; max-width: var(--measure); }
 .sheet .sheet-lead > .assessment + section { margin-top: 0; }
 .sheet .sheet-lead > section:last-child { margin-bottom: var(--space-5); }
 .block-heading { font-size: var(--reading); line-height: var(--line-snug); font-weight: var(--weight-strong); padding-bottom: var(--space-2); border-bottom: var(--stroke) solid var(--rule); }
-.todo, .changes, .phases, .events, .workstreams, .bars, .chart-legend { margin: 0; padding: 0; list-style: none; }
+.decisions, .decision-options, .todo, .changes, .phases, .events, .workstreams, .bars, .chart-legend { margin: 0; padding: 0; list-style: none; }
+/* Decisions: numbered, recommendation and contrastive options separated by hairlines and space alone. */
+.decisions { counter-reset: decision; }
+.decisions > li { counter-increment: decision; display: grid; grid-template-columns: var(--space-5) minmax(0, 1fr); row-gap: var(--space-1); padding: var(--space-3) 0; border-bottom: var(--stroke) solid var(--rule); }
+.decisions > li::before { content: counter(decision); grid-row: 1 / span 10; color: var(--ink-tertiary); font-variant-numeric: tabular-nums; }
+.decisions > li > * { grid-column: 2; overflow-wrap: anywhere; }
+.decisions > li:last-child { border-bottom: 0; }
+.decision-title { font-weight: var(--weight-strong); line-height: var(--line-snug); }
+.decision-flag { font-weight: var(--weight-medium); }
+.decision-meta, .decision-detail, .decision-link { font-size: var(--meta); color: var(--ink-secondary); }
+.decision-recommendation { margin-top: var(--space-1); line-height: var(--line-reading); }
+.decision-why { color: var(--ink-secondary); line-height: var(--line-reading); }
+.decision-options { margin-top: var(--space-2); border-top: var(--stroke) solid var(--rule); }
+.decision-options > li { display: grid; gap: var(--space-1); padding: var(--space-2) 0; border-bottom: var(--stroke) solid var(--rule); font-size: var(--table); }
+.decision-options > li:last-child { border-bottom: 0; padding-bottom: 0; }
+.option-head { display: flex; flex-wrap: wrap; align-items: baseline; column-gap: var(--space-2); }
+.option-label { font-weight: var(--weight-medium); color: var(--ink); }
+.decision-options [data-recommended="true"] .option-label { font-weight: var(--weight-strong); }
+.option-tag { font-size: var(--meta); color: var(--ink-tertiary); font-weight: 400; }
+.option-summary, .option-tradeoff { font-size: var(--meta); color: var(--ink-secondary); line-height: var(--line); }
+.decision-key { color: var(--ink-tertiary); font-weight: var(--weight-medium); }
+.decision-assumptions { margin-top: var(--space-2); font-size: var(--meta); color: var(--ink-secondary); }
+.decision-subhead { font-weight: var(--weight-medium); color: var(--ink); margin-bottom: var(--space-1); }
+.decision-assumptions ul { margin: 0; padding-inline-start: var(--space-4); display: grid; gap: var(--space-1); }
 /* For you to do: numbered, each a strong line with what it costs and when beneath. */
 .todo { counter-reset: todo; }
 .todo li { counter-increment: todo; display: grid; grid-template-columns: var(--space-5) minmax(0, 1fr); padding: var(--space-2) 0; border-bottom: var(--stroke) solid var(--rule); }
